@@ -32,10 +32,21 @@ function Terminal() {
 
   const handleExecuteCommand = React.useCallback(
     async (command: string) => {
-      if (!command.trim()) return;
+      const trimmed = command.trim();
+      if (!trimmed) return;
+
+      // Intercept clear / cls to clear the XTerm screen locally
+      if (trimmed === "clear" || trimmed === "cls") {
+        clearTerminal();
+        terminalRef.current?.clear();
+        terminalRef.current?.write("$ ");
+        return;
+      }
+
       useCommandStore.getState().setIsExecuting(true);
       try {
-        const result = await runBashCommand(command, workingDir, 60);
+        const execCommand = `export TERM=xterm-256color; ${trimmed}`;
+        const result = await runBashCommand(execCommand, workingDir, 60);
         const outputParts = [];
         if (result.stdout) outputParts.push(result.stdout);
         if (result.stderr) outputParts.push(result.stderr);
@@ -43,7 +54,10 @@ function Terminal() {
         useCommandStore
           .getState()
           .appendOutput(
-            combined || `[Process exited with code ${result.exit_code}]`,
+            combined ||
+              (result.exit_code === 0
+                ? ""
+                : `[Process exited with code ${result.exit_code}]`),
           );
       } catch (err) {
         useCommandStore
@@ -55,7 +69,7 @@ function Terminal() {
         useCommandStore.getState().setIsExecuting(false);
       }
     },
-    [runBashCommand, workingDir],
+    [clearTerminal, runBashCommand, terminalRef, workingDir],
   );
 
   const { ref, terminalRef } = useTerminal({
