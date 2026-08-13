@@ -30,6 +30,8 @@ function Terminal() {
     !isRuntimeInactive && !!conversationUrl,
   );
 
+  const activeTerminalRef = React.useRef<Terminal | null>(null);
+
   const handleExecuteCommand = React.useCallback(
     async (command: string) => {
       const trimmed = command.trim();
@@ -38,8 +40,8 @@ function Terminal() {
       // Intercept clear / cls to clear the XTerm screen locally
       if (trimmed === "clear" || trimmed === "cls") {
         clearTerminal();
-        terminalRef.current?.clear();
-        terminalRef.current?.write("$ ");
+        activeTerminalRef.current?.clear();
+        activeTerminalRef.current?.write("$ ");
         return;
       }
 
@@ -69,13 +71,15 @@ function Terminal() {
         useCommandStore.getState().setIsExecuting(false);
       }
     },
-    [clearTerminal, runBashCommand, terminalRef, workingDir],
+    [clearTerminal, runBashCommand, workingDir],
   );
 
   const { ref, terminalRef } = useTerminal({
     onExecuteCommand: handleExecuteCommand,
     isInteractive: !isRuntimeInactive,
   });
+
+  activeTerminalRef.current = terminalRef.current;
 
   const handleClear = () => {
     clearTerminal();
