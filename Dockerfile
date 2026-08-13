@@ -105,6 +105,10 @@ COPY --from=config-gen /tmp/defaults.env /opt/agent-canvas/defaults.env
 COPY OpenHands/docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh
 RUN chmod +x /opt/agent-canvas/entrypoint.sh
 
+# Copy the wrapper entrypoint (fixes volume ownership before starting services)
+COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
+RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh
+
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
@@ -114,7 +118,10 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /projects && \
     chown -R openhands:openhands /home/openhands/.openhands /projects
 
-USER openhands
+# Stay as root — the wrapper entrypoint drops to openhands after fixing
+# file ownership on mounted volumes. This is needed because the old
+# container ran as root, so persisted files have root:root ownership.
+# USER openhands
 
 # Persistence volumes:
 #   /home/openhands/.openhands — settings, secrets, conversations, automation DB
@@ -129,4 +136,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -sf http://localhost:8000/health || exit 1
 
-ENTRYPOINT ["tini", "--", "/opt/agent-canvas/entrypoint.sh"]
+# Wrapper fixes permissions, then execs the real entrypoint as openhands
+ENTRYPOINT ["tini", "--", "/opt/agent-canvas/wrapper-entrypoint.sh"]
