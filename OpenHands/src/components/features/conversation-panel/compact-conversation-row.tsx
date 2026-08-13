@@ -1,6 +1,7 @@
 import React from "react";
 import { Tooltip } from "@heroui/react";
 import { useTranslation } from "react-i18next";
+import { MessageSquare } from "lucide-react";
 import { NavigationLink } from "#/components/shared/navigation-link";
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
@@ -59,14 +60,18 @@ export function CompactConversationRow({
   const backendScopedPath = useBackendScopedPath();
   const disableAnimation = import.meta.env.MODE === "test";
 
+  const statusDot = (
+    <ConversationStatusDot
+      executionStatus={executionStatus}
+      sandboxStatus={sandboxStatus}
+      showTooltip={false}
+    />
+  );
+
   const preview = (
     <div className="w-[260px] p-3">
       <div className="flex items-center gap-2 mb-1">
-        <ConversationStatusDot
-          executionStatus={executionStatus}
-          sandboxStatus={sandboxStatus}
-          showTooltip={false}
-        />
+        {statusDot}
         <span className="text-sm font-medium text-white truncate" title={title}>
           {title || t(I18nKey.CONVERSATION$UNTITLED)}
         </span>
@@ -112,11 +117,9 @@ export function CompactConversationRow({
           )
         }
       >
-        <ConversationStatusDot
-          executionStatus={executionStatus}
-          sandboxStatus={sandboxStatus}
-          showTooltip={false}
-        />
+        {statusDot || (
+          <MessageSquare className="w-4 h-4 text-[var(--oh-text-dim)]" />
+        )}
       </NavigationLink>
     </Tooltip>
   );
