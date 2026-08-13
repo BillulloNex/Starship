@@ -56,6 +56,10 @@ function Terminal() {
       if (!trimmed) return;
 
       const currentSessionId = useCommandStore.getState().activeSessionId;
+      const currentSession = useCommandStore
+        .getState()
+        .sessions.find((s) => s.id === currentSessionId);
+      const currentCwd = currentSession?.cwd || workingDir;
 
       // Intercept clear / cls to clear the XTerm screen locally
       if (trimmed === "clear" || trimmed === "cls") {
@@ -68,16 +72,29 @@ function Terminal() {
       useCommandStore.getState().setIsExecuting(true, currentSessionId);
       try {
         const firstWord = trimmed.split(/\s+/)[0];
+        const isCd = firstWord === "cd";
         const ttyCommands = ["htop", "top", "vim", "vi", "nano", "less", "more", "man"];
-        let execCommand = `export TERM=xterm-256color; ${trimmed}`;
+
+        let execCommand = isCd
+          ? `export TERM=xterm-256color; ${trimmed} && pwd`
+          : `export TERM=xterm-256color; ${trimmed}`;
 
         if (ttyCommands.includes(firstWord)) {
           execCommand = `export TERM=xterm-256color; python3 -c "import pty, sys; pty.spawn(sys.argv[1:])" ${trimmed}`;
         }
 
-        const result = await runBashCommand(execCommand, workingDir, 60);
+        const result = await runBashCommand(execCommand, currentCwd, 60);
+
+        if (isCd && result.exit_code === 0 && result.stdout) {
+          const lines = result.stdout.trim().split("\n");
+          const newPwd = lines[lines.length - 1]?.trim();
+          if (newPwd && newPwd.startsWith("/")) {
+            useCommandStore.getState().setSessionCwd(newPwd, currentSessionId);
+          }
+        }
+
         const outputParts = [];
-        if (result.stdout) outputParts.push(result.stdout);
+        if (result.stdout && !isCd) outputParts.push(result.stdout);
         if (result.stderr) outputParts.push(result.stderr);
         const combined = outputParts.join("");
         useCommandStore

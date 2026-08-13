@@ -12,6 +12,7 @@ export interface TerminalSession {
   isAgentOnly?: boolean;
   commands: Command[];
   isExecuting: boolean;
+  cwd?: string;
 }
 
 const DEFAULT_SESSIONS: TerminalSession[] = [
@@ -34,12 +35,12 @@ const DEFAULT_SESSIONS: TerminalSession[] = [
 interface CommandState {
   sessions: TerminalSession[];
   activeSessionId: string;
-  // Legacy getter for active session commands
   commands: Command[];
   isExecuting: boolean;
   createSession: (name?: string) => string;
   closeSession: (id: string) => void;
   setActiveSessionId: (id: string) => void;
+  setSessionCwd: (cwd: string, sessionId?: string) => void;
   appendInput: (
     content: string,
     source?: "user" | "agent",
@@ -111,6 +112,16 @@ export const useCommandStore = create<CommandState>((set, get) => ({
       });
     }
   },
+
+  setSessionCwd: (cwd: string, sessionId?: string) =>
+    set((state) => {
+      const targetId = sessionId || state.activeSessionId;
+      return {
+        sessions: state.sessions.map((s) =>
+          s.id === targetId ? { ...s, cwd } : s,
+        ),
+      };
+    }),
 
   appendInput: (
     content: string,
