@@ -14,12 +14,12 @@ if [ "$(id -u)" = "0" ]; then
   chown -R openhands:openhands "$OPENHANDS_DIR" /projects 2>/dev/null || true
 
   # The old container stored workspaces at /root/workspace/. Conversations
-  # reference these paths. Make them accessible to the openhands user.
-  if [ -d /root/workspace ]; then
-    echo "[grokbot-wrapper] Fixing ownership on /root/workspace (legacy)..."
-    chmod 755 /root
-    chown -R openhands:openhands /root/workspace 2>/dev/null || true
-  fi
+  # reference these paths. Make /root accessible and create the workspace
+  # directory if it doesn't exist (it won't in the new base image).
+  echo "[grokbot-wrapper] Fixing /root permissions (legacy workspace path)..."
+  chmod 755 /root
+  mkdir -p /root/workspace
+  chown -R openhands:openhands /root/workspace 2>/dev/null || true
 
   # Drop privileges and re-exec as openhands
   exec su -s /bin/bash openhands -c "exec tini -- /opt/agent-canvas/entrypoint.sh"
