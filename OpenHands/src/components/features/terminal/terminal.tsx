@@ -1,3 +1,5 @@
+import React from "react";
+import { Trash2, Terminal as TerminalIcon, CircleDot } from "lucide-react";
 import { useTerminal } from "#/hooks/use-terminal";
 import "@xterm/xterm/css/xterm.css";
 import { RUNTIME_INACTIVE_STATES } from "#/types/agent-state";
@@ -5,28 +7,94 @@ import { cn } from "#/utils/utils";
 import { WaitingForRuntimeMessage } from "../chat/waiting-for-runtime-message";
 import { useAgentState } from "#/hooks/use-agent-state";
 import { useCommandStore } from "#/stores/command-store";
-import { EmptyTerminalMessage } from "./empty-terminal-message";
+import { useSendMessage } from "#/hooks/use-send-message";
 
 function Terminal() {
   const { curAgentState } = useAgentState();
   const commands = useCommandStore((state) => state.commands);
+  const isExecuting = useCommandStore((state) => state.isExecuting);
+  const clearTerminal = useCommandStore((state) => state.clearTerminal);
+  const { send } = useSendMessage();
 
   const isRuntimeInactive = RUNTIME_INACTIVE_STATES.includes(curAgentState);
   const hasOutput = commands.length > 0;
-  const hideTerminalSurface = isRuntimeInactive || !hasOutput;
 
-  const ref = useTerminal();
+  const handleExecuteCommand = React.useCallback(
+    async (command: string) => {
+      if (!command.trim()) return;
+      try {
+        await send({
+          action: "message",
+          args: { content: `Execute in shell: ${command}` },
+        });
+      } catch (err) {
+        useCommandStore
+          .getState()
+          .appendOutput(
+            `\r\nError executing command: ${err instanceof Error ? err.message : String(err)}\r\n`,
+          );
+      }
+    },
+    [send],
+  );
+
+  const { ref, terminalRef } = useTerminal({
+    onExecuteCommand: handleExecuteCommand,
+    isInteractive: !isRuntimeInactive,
+  });
+
+  const handleClear = () => {
+    clearTerminal();
+    terminalRef.current?.clear();
+  };
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      {isRuntimeInactive && <WaitingForRuntimeMessage className="pt-16" />}
+    <div className="relative flex h-full min-h-0 flex-col bg-[var(--oh-bg-workspace)]">
+      {/* Terminal Toolbar */}
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--oh-border)] bg-[var(--oh-surface)] px-4">
+        <div className="flex items-center gap-2 text-xs font-medium text-[var(--oh-foreground)]">
+          <TerminalIcon className="h-4 w-4 text-[var(--oh-accent)]" />
+          <span>Interactive Terminal</span>
+          <div className="flex items-center gap-1.5 rounded-full bg-[var(--oh-surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--oh-muted)]">
+            <CircleDot
+              className={cn(
+                "h-2 w-2",
+                isExecuting
+                  ? "animate-pulse text-amber-500"
+                  : isRuntimeInactive
+                    ? "text-red-500"
+                    : "text-emerald-500",
+              )}
+            />
+            <span>
+              {isRuntimeInactive
+                ? "Inactive"
+                : isExecuting
+                  ? "Executing..."
+                  : "Ready"}
+            </span>
+          </div>
+        </div>
 
-      {!isRuntimeInactive && !hasOutput && <EmptyTerminalMessage />}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleClear}
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--oh-muted)] hover:bg-[var(--oh-surface-hover)] hover:text-[var(--oh-foreground)] transition-colors"
+            title="Clear terminal output (Ctrl+L)"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      {isRuntimeInactive && <WaitingForRuntimeMessage className="pt-16" />}
 
       <div
         className={cn(
           "flex-1 min-h-0 p-4",
-          hideTerminalSurface &&
+          isRuntimeInactive &&
             "pointer-events-none absolute inset-0 h-0 w-0 overflow-hidden p-0 opacity-0",
         )}
       >
@@ -37,3 +105,4 @@ function Terminal() {
 }
 
 export default Terminal;
+

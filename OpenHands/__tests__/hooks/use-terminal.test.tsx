@@ -19,18 +19,19 @@ vi.mock("#/contexts/conversation-websocket-context", () => ({
 }));
 
 function TestTerminalComponent() {
-  const ref = useTerminal();
+  const { ref } = useTerminal({ isInteractive: false });
   return <div ref={ref} />;
 }
 
 describe("useTerminal", () => {
-  // Terminal is read-only - no longer tests user input functionality
+  // Terminal tests
   const mockTerminal = vi.hoisted(() => ({
     loadAddon: vi.fn(),
     open: vi.fn(),
     write: vi.fn(),
     writeln: vi.fn(),
     dispose: vi.fn(),
+    onData: vi.fn(() => ({ dispose: vi.fn() })),
     element: document.createElement("div"),
   }));
 
@@ -61,6 +62,8 @@ describe("useTerminal", () => {
         writeln = mockTerminal.writeln;
 
         dispose = mockTerminal.dispose;
+
+        onData = mockTerminal.onData;
 
         element = mockTerminal.element;
       },

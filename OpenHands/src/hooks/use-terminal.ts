@@ -89,13 +89,25 @@ function resolveTerminalForeground(host: HTMLElement): string {
 // This ensures terminal history is preserved when navigating away and back
 const persistentLastCommandIndex = { current: 0 };
 
-export const useTerminal = () => {
+export interface UseTerminalOptions {
+  onExecuteCommand?: (command: string) => void;
+  isInteractive?: boolean;
+}
+
+export const useTerminal = (options: UseTerminalOptions = {}) => {
+  const { onExecuteCommand, isInteractive = true } = options;
   const commands = useCommandStore((state) => state.commands);
   const terminal = React.useRef<Terminal | null>(null);
   const fitAddon = React.useRef<FitAddon | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
   const lastCommandIndex = persistentLastCommandIndex; // Use the persistent reference
   const isDisposed = React.useRef(false);
+  const currentLineRef = React.useRef("");
+  const onExecuteRef = React.useRef(onExecuteCommand);
+
+  React.useEffect(() => {
+    onExecuteRef.current = onExecuteCommand;
+  }, [onExecuteCommand]);
 
   const createTerminal = (host: HTMLDivElement) =>
     new Terminal({
@@ -104,9 +116,8 @@ export const useTerminal = () => {
       scrollback: 10000,
       scrollSensitivity: 1,
       fastScrollSensitivity: 5,
-      disableStdin: true, // Make terminal read-only
-      // Canvas fillStyle does not resolve CSS variables; use transparency so
-      // the host / panel background shows through (`allowTransparency` required).
+      disableStdin: !isInteractive,
+      cursorBlink: isInteractive,
       allowTransparency: true,
       theme: {
         background: "rgba(0, 0, 0, 0)",
@@ -128,8 +139,13 @@ export const useTerminal = () => {
       if (fitAddon.current) terminal.current.loadAddon(fitAddon.current);
       if (ref.current) {
         terminal.current.open(ref.current);
-        // Hide cursor for read-only terminal using ANSI escape sequence
-        terminal.current.write("\x1b[?25l");
+        if (isInteractive) {
+          // Show cursor for interactive terminal
+          terminal.current.write("\x1b[?25h");
+        } else {
+          // Hide cursor for read-only terminal
+          terminal.current.write("\x1b[?25l");
+        }
         fitTerminalSafely();
       }
     }
@@ -149,19 +165,74 @@ export const useTerminal = () => {
     if (ref.current) {
       initializeTerminal();
       // Render all commands in array
-      // This happens when we just switch to Terminal from other tabs
       if (commands.length > 0) {
         for (let i = 0; i < commands.length; i += 1) {
           if (commands[i].type === "input") {
             terminal.current.write("$ ");
           }
-          // Don't pass isUserInput=true here because we're initializing the terminal
-          // and need to show all previous commands
           renderCommand(commands[i], terminal.current, false);
         }
         lastCommandIndex.current = commands.length;
       }
-      // Don't show prompt in read-only terminal
+
+      if (isInteractive) {
+        // Write fresh prompt if ending on output
+        const lastCmd = commands[commands.length - 1];
+        if (!lastCmd || lastCmd.type === "output") {
+          terminal.current.write("$ ");
+        }
+
+        // Attach interactive data listener
+        const dataDisposable = terminal.current.onData((data) => {
+          if (!terminal.current) return;
+
+          // Enter key
+          if (data === "\r" || data === "\n") {
+            terminal.current.write("\r\n");
+            const cmd = currentLineRef.current.trim();
+            currentLineRef.current = "";
+
+            if (cmd) {
+              useCommandStore.getState().appendInput(cmd, "user");
+              useCommandStore.getState().setIsExecuting(true);
+              if (onExecuteRef.current) {
+                onExecuteRef.current(cmd);
+              }
+            } else {
+              terminal.current.write("$ ");
+            }
+          }
+          // Backspace
+          else if (data === "\x7f" || data === "\b") {
+            if (currentLineRef.current.length > 0) {
+              currentLineRef.current = currentLineRef.current.slice(0, -1);
+              terminal.current.write("\b \b");
+            }
+          }
+          // Ctrl+C
+          else if (data === "\x03") {
+            currentLineRef.current = "";
+            terminal.current.write("^C\r\n$ ");
+          }
+          // Ctrl+L (Clear screen)
+          else if (data === "\x0c") {
+            terminal.current.clear();
+            terminal.current.write("$ " + currentLineRef.current);
+          }
+          // Printable characters
+          else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+            currentLineRef.current += data;
+            terminal.current.write(data);
+          }
+        });
+
+        return () => {
+          dataDisposable.dispose();
+          isDisposed.current = true;
+          terminal.current?.dispose();
+          lastCommandIndex.current = 0;
+        };
+      }
     }
 
     return () => {
@@ -181,19 +252,24 @@ export const useTerminal = () => {
         if (commands[i].type === "input") {
           terminal.current.write("$ ");
         }
-        // Pass true for isUserInput to skip rendering user input commands
-        // that have already been displayed as the user typed
         renderCommand(commands[i], terminal.current, false);
       }
       lastCommandIndex.current = commands.length;
+
+      // Add a fresh prompt after rendering new output in interactive mode
+      if (isInteractive) {
+        const lastCmd = commands[commands.length - 1];
+        if (lastCmd && lastCmd.type === "output") {
+          terminal.current.write("$ ");
+        }
+      }
     }
-  }, [commands]);
+  }, [commands, isInteractive]);
 
   React.useEffect(() => {
     let resizeObserver: ResizeObserver | null = null;
 
     resizeObserver = new ResizeObserver(() => {
-      // Use requestAnimationFrame to debounce resize events and ensure DOM is ready
       requestAnimationFrame(() => {
         fitTerminalSafely();
       });
@@ -208,5 +284,6 @@ export const useTerminal = () => {
     };
   }, [fitTerminalSafely]);
 
-  return ref;
+  return { ref, terminalRef: terminal };
 };
+
