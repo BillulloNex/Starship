@@ -42,6 +42,7 @@ import {
   LAUNCH_CHILD_CONVERSATION_CLIENT_TOOL,
   LAUNCH_CHILD_CONVERSATION_TOOL_NAME,
 } from "./launch-child-conversation-client-tool";
+import { generateRandomConversationName } from "#/utils/random-conversation-names";
 
 export interface DirectConversationInfo {
   id: string;
@@ -299,11 +300,17 @@ export function toConversationUrl(conversationId: string): string {
   return `${host}/api/conversations/${conversationId}`;
 }
 
-// TODO(i18n): extract "Conversation" once we add CONVERSATION$DEFAULT_TITLE
-// with `{{shortId}}` interpolation. Kept as a literal for now to keep the
-// fallback inside this pure adapter rather than fanning out to display sites.
+/**
+ * Generate a fun, deterministic placeholder name for a conversation that
+ * doesn't have a title yet (e.g. "cosmic-falcon", "bold-narwhal").
+ *
+ * Replaces the old "Conversation a43fd" pattern. The real title is set later
+ * by the server's auto-titler and post-processed by `useTitleProcessor`.
+ */
+export { generateRandomConversationName };
 export function getDefaultConversationTitle(conversationId: string): string {
-  return `Conversation ${conversationId.slice(0, 5)}`;
+  // Backward-compatible wrapper that delegates to the random name generator.
+  return generateRandomConversationName(conversationId);
 }
 
 export function toAppConversation(

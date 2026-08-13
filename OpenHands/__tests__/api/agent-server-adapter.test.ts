@@ -902,10 +902,15 @@ describe("buildStartConversationRequest", () => {
 });
 
 describe("getDefaultConversationTitle", () => {
-  it("formats the title using the first 5 characters of the conversation id", () => {
-    expect(getDefaultConversationTitle("372eb-1234-5678-9abc")).toBe(
-      "Conversation 372eb",
-    );
+  it("generates a random adjective-noun placeholder name", () => {
+    const title = getDefaultConversationTitle("372eb-1234-5678-9abc");
+    expect(title).toMatch(/^[a-z]+-[a-z]+$/);
+  });
+
+  it("is deterministic — same ID produces the same name", () => {
+    const title1 = getDefaultConversationTitle("372eb-1234-5678-9abc");
+    const title2 = getDefaultConversationTitle("372eb-1234-5678-9abc");
+    expect(title1).toBe(title2);
   });
 });
 
@@ -916,24 +921,24 @@ describe("toAppConversation", () => {
     updated_at: "2026-01-01T00:00:00Z",
   };
 
-  it("falls back to the default title when the backend returns null", () => {
+  it("falls back to a random placeholder when the backend returns null", () => {
     const result = toAppConversation({ ...baseInfo, title: null });
-    expect(result.title).toBe("Conversation 372eb");
+    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
   });
 
-  it("falls back to the default title when the backend returns undefined", () => {
+  it("falls back to a random placeholder when the backend returns undefined", () => {
     const result = toAppConversation({ ...baseInfo });
-    expect(result.title).toBe("Conversation 372eb");
+    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
   });
 
-  it("falls back to the default title when the backend returns an empty string", () => {
+  it("falls back to a random placeholder when the backend returns an empty string", () => {
     const result = toAppConversation({ ...baseInfo, title: "" });
-    expect(result.title).toBe("Conversation 372eb");
+    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
   });
 
-  it("falls back to the default title when the backend returns whitespace only", () => {
+  it("falls back to a random placeholder when the backend returns whitespace only", () => {
     const result = toAppConversation({ ...baseInfo, title: "   " });
-    expect(result.title).toBe("Conversation 372eb");
+    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
   });
 
   it("preserves a backend-provided title when one is set", () => {

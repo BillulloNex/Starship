@@ -14,12 +14,16 @@ import { HooksModal } from "../conversation-panel/hooks-modal";
 import { ConfirmDeleteModal } from "../conversation-panel/confirm-delete-modal";
 import { ConfirmStopModal } from "../conversation-panel/confirm-stop-modal";
 import { TranscriptExportModal } from "./transcript-export-modal";
+import { useTitleProcessor } from "#/hooks/use-title-processor";
 
 export function ConversationName() {
   const { t } = useTranslation("openhands");
   const { conversationId } = useConversationId();
   const { data: conversation } = useActiveConversation();
   const { mutate: updateConversation } = useUpdateConversation();
+
+  // Post-process server-generated titles (strip emojis, add prefix, cap length)
+  const { markUserRenamed } = useTitleProcessor(conversation);
 
   const [titleMode, setTitleMode] = React.useState<"view" | "edit">("view");
   const [contextMenuOpen, setContextMenuOpen] = React.useState(false);
@@ -74,6 +78,8 @@ export function ConversationName() {
     if (inputRef.current?.value && conversationId) {
       const trimmed = inputRef.current.value.trim();
       if (trimmed !== conversation?.title) {
+        // Mark as user-renamed so the title processor doesn't overwrite it
+        if (conversationId) markUserRenamed(conversationId);
         updateConversation(
           { conversationId, newTitle: trimmed },
           {
