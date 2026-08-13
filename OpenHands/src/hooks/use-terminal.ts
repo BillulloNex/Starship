@@ -92,15 +92,17 @@ const persistentLastCommandIndex = { current: 0 };
 export interface UseTerminalOptions {
   onExecuteCommand?: (command: string) => void;
   isInteractive?: boolean;
+  commands?: Command[];
 }
 
 export const useTerminal = (options: UseTerminalOptions = {}) => {
-  const { onExecuteCommand, isInteractive = true } = options;
-  const commands = useCommandStore((state) => state.commands);
+  const { onExecuteCommand, isInteractive = true, commands: optionsCommands } = options;
+  const storeCommands = useCommandStore((state) => state.commands);
+  const commands = optionsCommands ?? storeCommands;
   const terminal = React.useRef<Terminal | null>(null);
   const fitAddon = React.useRef<FitAddon | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
-  const lastCommandIndex = persistentLastCommandIndex; // Use the persistent reference
+  const lastCommandIndex = React.useRef(0);
   const isDisposed = React.useRef(false);
   const currentLineRef = React.useRef("");
   const onExecuteRef = React.useRef(onExecuteCommand);
@@ -244,8 +246,14 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
   }, []);
 
   React.useEffect(() => {
+    if (!terminal.current) return;
+
+    if (lastCommandIndex.current > commands.length) {
+      terminal.current.clear?.();
+      lastCommandIndex.current = 0;
+    }
+
     if (
-      terminal.current &&
       commands.length > 0 &&
       lastCommandIndex.current < commands.length
     ) {

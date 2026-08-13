@@ -1,0 +1,1 @@
+i noticed that there is only 1 terminal, so when my agent does stuff, i cant use it, can i have the option for multiple terminals?

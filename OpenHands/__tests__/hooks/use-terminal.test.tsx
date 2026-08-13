@@ -30,6 +30,7 @@ describe("useTerminal", () => {
     open: vi.fn(),
     write: vi.fn(),
     writeln: vi.fn(),
+    clear: vi.fn(),
     dispose: vi.fn(),
     onData: vi.fn(() => ({ dispose: vi.fn() })),
     element: document.createElement("div"),
@@ -61,6 +62,8 @@ describe("useTerminal", () => {
 
         writeln = mockTerminal.writeln;
 
+        clear = mockTerminal.clear;
+
         dispose = mockTerminal.dispose;
 
         onData = mockTerminal.onData;
@@ -80,7 +83,25 @@ describe("useTerminal", () => {
   afterEach(() => {
     vi.clearAllMocks();
     // Reset command store between tests
-    useCommandStore.setState({ commands: [] });
+    useCommandStore.setState({
+      sessions: [
+        {
+          id: "agent",
+          name: "Agent Output",
+          isAgentOnly: true,
+          commands: [],
+          isExecuting: false,
+        },
+        {
+          id: "shell-1",
+          name: "User Shell 1",
+          isAgentOnly: false,
+          commands: [],
+          isExecuting: false,
+        },
+      ],
+      activeSessionId: "shell-1",
+    });
   });
 
   it("should render", () => {
@@ -94,7 +115,26 @@ describe("useTerminal", () => {
     ];
 
     // Set commands in store before rendering to ensure they're picked up during initialization
-    useCommandStore.setState({ commands });
+    useCommandStore.setState({
+      sessions: [
+        {
+          id: "agent",
+          name: "Agent Output",
+          isAgentOnly: true,
+          commands: [],
+          isExecuting: false,
+        },
+        {
+          id: "shell-1",
+          name: "User Shell 1",
+          isAgentOnly: false,
+          commands,
+          isExecuting: false,
+        },
+      ],
+      activeSessionId: "shell-1",
+      commands,
+    });
 
     renderWithProviders(<TestTerminalComponent />);
 

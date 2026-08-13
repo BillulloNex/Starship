@@ -1,5 +1,12 @@
 import React from "react";
-import { Trash2, Terminal as TerminalIcon, CircleDot } from "lucide-react";
+import {
+  Plus,
+  X,
+  Trash2,
+  CircleDot,
+  Bot,
+  SquareTerminal,
+} from "lucide-react";
 import { useTerminal } from "#/hooks/use-terminal";
 import "@xterm/xterm/css/xterm.css";
 import { RUNTIME_INACTIVE_STATES } from "#/types/agent-state";
@@ -12,9 +19,20 @@ import { useBashCommandRunner } from "#/hooks/use-bash-command-runner";
 
 function Terminal() {
   const { curAgentState } = useAgentState();
-  const commands = useCommandStore((state) => state.commands);
-  const isExecuting = useCommandStore((state) => state.isExecuting);
+  const sessions = useCommandStore((state) => state.sessions);
+  const activeSessionId = useCommandStore((state) => state.activeSessionId);
+  const setActiveSessionId = useCommandStore(
+    (state) => state.setActiveSessionId,
+  );
+  const createSession = useCommandStore((state) => state.createSession);
+  const closeSession = useCommandStore((state) => state.closeSession);
   const clearTerminal = useCommandStore((state) => state.clearTerminal);
+
+  const activeSession =
+    sessions.find((s) => s.id === activeSessionId) || sessions[0];
+  const isAgentSession = activeSession?.isAgentOnly ?? false;
+  const commands = activeSession?.commands || [];
+  const isExecuting = activeSession?.isExecuting || false;
 
   const { data: conversation } = useActiveConversation();
   const conversationUrl = conversation?.conversation_url;
@@ -30,22 +48,24 @@ function Terminal() {
     !isRuntimeInactive && !!conversationUrl,
   );
 
-  const activeTerminalRef = React.useRef<Terminal | null>(null);
+  const activeTerminalRef = React.useRef<{ clear: () => void; write: (data: string) => void } | null>(null);
 
   const handleExecuteCommand = React.useCallback(
     async (command: string) => {
       const trimmed = command.trim();
       if (!trimmed) return;
 
+      const currentSessionId = useCommandStore.getState().activeSessionId;
+
       // Intercept clear / cls to clear the XTerm screen locally
       if (trimmed === "clear" || trimmed === "cls") {
-        clearTerminal();
+        clearTerminal(currentSessionId);
         activeTerminalRef.current?.clear();
         activeTerminalRef.current?.write("$ ");
         return;
       }
 
-      useCommandStore.getState().setIsExecuting(true);
+      useCommandStore.getState().setIsExecuting(true, currentSessionId);
       try {
         const execCommand = `export TERM=xterm-256color; ${trimmed}`;
         const result = await runBashCommand(execCommand, workingDir, 60);
@@ -60,15 +80,17 @@ function Terminal() {
               (result.exit_code === 0
                 ? ""
                 : `[Process exited with code ${result.exit_code}]`),
+            currentSessionId,
           );
       } catch (err) {
         useCommandStore
           .getState()
           .appendOutput(
             `\r\nError executing command: ${err instanceof Error ? err.message : String(err)}\r\n`,
+            currentSessionId,
           );
       } finally {
-        useCommandStore.getState().setIsExecuting(false);
+        useCommandStore.getState().setIsExecuting(false, currentSessionId);
       }
     },
     [clearTerminal, runBashCommand, workingDir],
@@ -76,23 +98,72 @@ function Terminal() {
 
   const { ref, terminalRef } = useTerminal({
     onExecuteCommand: handleExecuteCommand,
-    isInteractive: !isRuntimeInactive,
+    isInteractive: !isRuntimeInactive && !isAgentSession,
+    commands,
   });
 
   activeTerminalRef.current = terminalRef.current;
 
   const handleClear = () => {
-    clearTerminal();
+    clearTerminal(activeSessionId);
     terminalRef.current?.clear();
   };
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--oh-bg-workspace)]">
-      {/* Terminal Toolbar */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--oh-border)] bg-[var(--oh-surface)] px-4">
-        <div className="flex items-center gap-2 text-xs font-medium text-[var(--oh-foreground)]">
-          <TerminalIcon className="h-4 w-4 text-[var(--oh-accent)]" />
-          <span>Interactive Terminal</span>
+      {/* Terminal Multi-Tab Header */}
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--oh-border)] bg-[var(--oh-surface)] px-2">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+          {sessions.map((session) => {
+            const isActive = session.id === activeSessionId;
+            return (
+              <div
+                key={session.id}
+                onClick={() => setActiveSessionId(session.id)}
+                className={cn(
+                  "group relative flex items-center gap-1.5 rounded-t px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors border-b-2",
+                  isActive
+                    ? "bg-[var(--oh-bg-workspace)] text-[var(--oh-foreground)] border-[var(--oh-accent)]"
+                    : "text-[var(--oh-muted)] hover:bg-[var(--oh-surface-hover)] hover:text-[var(--oh-foreground)] border-transparent",
+                )}
+              >
+                {session.isAgentOnly ? (
+                  <Bot className="h-3.5 w-3.5 text-indigo-400" />
+                ) : (
+                  <SquareTerminal className="h-3.5 w-3.5 text-[var(--oh-accent)]" />
+                )}
+                <span>{session.name}</span>
+                {session.isExecuting && (
+                  <CircleDot className="h-2 w-2 animate-pulse text-amber-500 ml-0.5" />
+                )}
+                {!session.isAgentOnly && sessions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeSession(session.id);
+                    }}
+                    className="ml-1 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-[var(--oh-surface-hover)] hover:text-red-400 transition-all"
+                    title="Close Terminal"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => createSession()}
+            className="flex items-center justify-center rounded p-1.5 text-[var(--oh-muted)] hover:bg-[var(--oh-surface-hover)] hover:text-[var(--oh-foreground)] transition-colors ml-1"
+            title="New Terminal Tab"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 pr-2">
           <div className="flex items-center gap-1.5 rounded-full bg-[var(--oh-surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--oh-muted)]">
             <CircleDot
               className={cn(
@@ -109,17 +180,17 @@ function Terminal() {
                 ? "Inactive"
                 : isExecuting
                   ? "Executing..."
-                  : "Ready"}
+                  : isAgentSession
+                    ? "Read-only"
+                    : "Ready"}
             </span>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleClear}
             className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--oh-muted)] hover:bg-[var(--oh-surface-hover)] hover:text-[var(--oh-foreground)] transition-colors"
-            title="Clear terminal output (Ctrl+L)"
+            title="Clear terminal output"
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>Clear</span>
@@ -143,5 +214,6 @@ function Terminal() {
 }
 
 export default Terminal;
+
 
 
