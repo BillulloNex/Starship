@@ -22,7 +22,8 @@ WORKDIR /build
 
 # Cache-friendly: package files first
 COPY OpenHands/package.json OpenHands/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy everything needed for the build
 COPY OpenHands/ .
@@ -78,8 +79,19 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
     fi
 
 # Install automation server via pip (version pinned from config/defaults.json).
-RUN uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==1.6.0"
+
+# Pre-create persistence directories with correct ownership so the
+# openhands user can write to them even when Docker creates anonymous
+# volumes (which default to root).
+RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
+             /home/openhands/.openhands/agent-canvas/bash_events \
+             /home/openhands/.openhands/automation \
+             /projects && \
+    chown -R openhands:openhands /home/openhands/.openhands /projects
 
 # Copy the frontend build output.
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
@@ -111,15 +123,6 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 # Copy the wrapper entrypoint (fixes volume ownership before starting services)
 COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
 RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh
-
-# Pre-create persistence directories with correct ownership so the
-# openhands user can write to them even when Docker creates anonymous
-# volumes (which default to root).
-RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
-             /home/openhands/.openhands/agent-canvas/bash_events \
-             /home/openhands/.openhands/automation \
-             /projects && \
-    chown -R openhands:openhands /home/openhands/.openhands /projects
 
 # Stay as root — the wrapper entrypoint drops to openhands after fixing
 # file ownership on mounted volumes. This is needed because the old
