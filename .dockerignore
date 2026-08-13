@@ -1,13 +1,11 @@
 node_modules
 .git
-*.md
-!README.md
 .env
 .env.*
 !.env.sample
 .DS_Store
 .openhands-state
-.openhands-dev
 dist
 coverage
 reports
+message_boards
