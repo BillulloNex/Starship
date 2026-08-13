@@ -4,11 +4,50 @@ import ObservationType from "#/types/observation-type";
 import { useBrowserStore } from "#/stores/browser-store";
 import { useAgentStore } from "#/stores/agent-store";
 import { AgentState } from "#/types/agent-state";
+import useMetricsStore from "#/stores/metrics-store";
+import { activeMcpToolCalls } from "./actions";
+import { recordMcpToolCall } from "./langfuse-service";
 
 export function handleObservationMessage(message: ObservationMessage) {
+  if (
+    message.observation === ObservationType.MCP ||
+    message.observation === "mcp"
+  ) {
+    const pendingCall =
+      activeMcpToolCalls.get(message.cause) ||
+      activeMcpToolCalls.get(message.id);
+    const durationMs = pendingCall
+      ? Date.now() - pendingCall.startTime
+      : 150;
+
+    const toolName = pendingCall?.toolName || "mcp_tool";
+    const serverName = pendingCall?.serverName || "mcp-server";
+    const success = !message.extras?.error_id;
+
+    useMetricsStore
+      .getState()
+      .recordMcpToolExecution(toolName, serverName, durationMs, success);
+
+    recordMcpToolCall({
+      conversationId: String(message.id ?? "active-conversation"),
+      toolName,
+      serverName,
+      input: pendingCall?.input,
+      output: message.content,
+      durationMs,
+      status: success ? "SUCCESS" : "ERROR",
+      errorMessage: message.extras?.error_id
+        ? String(message.extras.error_id)
+        : undefined,
+    });
+
+    if (message.cause) activeMcpToolCalls.delete(message.cause);
+    if (message.id) activeMcpToolCalls.delete(message.id);
+  }
+
   switch (message.observation) {
     case ObservationType.RUN: {
-      if (message.extras.hidden) break;
+      if (message.extras?.hidden) break;
       let { content } = message;
 
       if (content.length > 5000) {
@@ -49,12 +88,11 @@ export function handleObservationMessage(message: ObservationMessage) {
     case ObservationType.ERROR:
     case ObservationType.MCP:
     case ObservationType.TASK_TRACKING:
-      break; // We don't display the default message for these observations
+      break;
     default:
       break;
   }
   if (!message.extras?.hidden) {
-    // Convert the message to the appropriate observation type
     const { observation } = message;
 
     switch (observation) {
@@ -85,7 +123,6 @@ export function handleObservationMessage(message: ObservationMessage) {
         }
         break;
       default:
-        // For any unhandled observation types, just ignore them
         break;
     }
   }

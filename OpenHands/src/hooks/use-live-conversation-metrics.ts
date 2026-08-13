@@ -30,6 +30,7 @@ export function useLiveConversationMetrics(
     (state) => state.max_budget_per_task,
   );
   const storeUsage = useMetricsStore((state) => state.usage);
+  const storeObservability = useMetricsStore((state) => state.observability);
   const { data: conversation } = useActiveConversation();
 
   const { data: conversationMetrics } = useConversationMetrics(
@@ -47,6 +48,7 @@ export function useLiveConversationMetrics(
         cost: storeCost,
         max_budget_per_task: storeMaxBudgetPerTask,
         usage: storeUsage,
+        observability: storeObservability,
       };
     }
 
@@ -73,6 +75,7 @@ export function useLiveConversationMetrics(
                 conversationMetrics.accumulated_token_usage.per_turn_token ?? 0,
             }
           : null,
+        observability: storeObservability,
       };
     }
 
@@ -80,6 +83,7 @@ export function useLiveConversationMetrics(
       cost: null,
       max_budget_per_task: null,
       usage: null,
+      observability: storeObservability,
     };
-  }, [conversationMetrics, storeCost, storeMaxBudgetPerTask, storeUsage]);
+  }, [conversationMetrics, storeCost, storeMaxBudgetPerTask, storeUsage, storeObservability]);
 }

@@ -9,22 +9,19 @@ import { UsageSection } from "../metrics-modal/usage-section";
 import { CompactContextButton } from "./compact-context-button";
 import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
+import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
+import { McpPerformanceSection } from "./mcp-performance-section";
 import { getContextWindowUsagePercentage } from "#/utils/format-token-count";
 
 /**
  * "Usage" right-panel tab: context-fill meter with a manual "Compact
- * context" action, accumulated token/cost stats, and the provider credit
- * balance (when the agent server reports one).
- *
- * Metrics come from {@link useLiveConversationMetrics}: live WebSocket
- * updates plus a 30s REST poll while the tab is mounted.
+ * context" action, accumulated token/cost stats, Langfuse timing telemetry,
+ * MCP tool performance breakdown, and provider credit balance.
  */
 export function UsagePanel() {
   const { t } = useTranslation("openhands");
   const metrics = useLiveConversationMetrics();
   const { data: conversation } = useActiveConversation();
-  // ACP conversations (e.g. Claude Code) draw on the CLI's own subscription
-  // plan; the dollar figure is an API-equivalent estimate, not a bill.
   const isAcp = conversation?.agent_kind === "acp";
 
   const { usage } = metrics;
@@ -43,6 +40,8 @@ export function UsagePanel() {
       data-testid="usage-panel"
       className="h-full overflow-y-auto custom-scrollbar-always flex flex-col gap-3 p-3"
     >
+      <ObservabilityLangfuseCard />
+
       {usage !== null && (
         <div className="rounded-md border border-[var(--oh-border)] bg-surface-raised p-3">
           <div className="grid gap-3">
@@ -80,6 +79,8 @@ export function UsagePanel() {
           />
         </div>
       </div>
+
+      <McpPerformanceSection />
 
       <ProviderBalanceCard />
     </main>

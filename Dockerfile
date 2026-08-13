@@ -50,6 +50,9 @@ RUN node -e " \
     'CONFIG_CANVAS_BASE_PATH=' + c.paths.canvasBasePath, \
     'CONFIG_POSTHOG_API_KEY=' + c.telemetry.posthogApiKey, \
     'CONFIG_POSTHOG_HOST=' + c.telemetry.posthogHost, \
+    'CONFIG_LANGFUSE_PUBLIC_KEY=' + c.telemetry.langfusePublicKey, \
+    'CONFIG_LANGFUSE_SECRET_KEY=' + c.telemetry.langfuseSecretKey, \
+    'CONFIG_LANGFUSE_HOST=' + c.telemetry.langfuseHost, \
   ]; \
   require('fs').writeFileSync('/tmp/defaults.env', lines.join('\n') + '\n'); \
 "

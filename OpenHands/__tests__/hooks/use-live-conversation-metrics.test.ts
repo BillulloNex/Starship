@@ -59,6 +59,12 @@ const storeMetrics: MetricsState = {
     context_window: 64_000,
     per_turn_token: 42,
   },
+  observability: {
+    lastTurnDurationMs: null,
+    avgTurnDurationMs: null,
+    totalTurns: 0,
+    mcpToolMetrics: {},
+  },
 };
 
 describe("useLiveConversationMetrics", () => {
@@ -116,6 +122,12 @@ describe("useLiveConversationMetrics", () => {
       cost: 1.23,
       max_budget_per_task: 5,
       usage: null,
+      observability: {
+        lastTurnDurationMs: null,
+        avgTurnDurationMs: null,
+        totalTurns: 0,
+        mcpToolMetrics: {},
+      },
     });
   });
 
@@ -134,6 +146,12 @@ describe("useLiveConversationMetrics", () => {
         cache_write_tokens: 2,
         context_window: 128_000,
         per_turn_token: 500,
+      },
+      observability: {
+        lastTurnDurationMs: null,
+        avgTurnDurationMs: null,
+        totalTurns: 0,
+        mcpToolMetrics: {},
       },
     });
   });

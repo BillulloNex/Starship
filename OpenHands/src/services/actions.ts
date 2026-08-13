@@ -14,6 +14,16 @@ import {
   ActionSecurityRisk,
   useSecurityAnalyzerStore,
 } from "#/stores/security-analyzer-store";
+import { recordGeneration } from "./langfuse-service";
+
+export interface PendingMcpCall {
+  toolName: string;
+  serverName: string;
+  startTime: number;
+  input?: unknown;
+}
+
+export const activeMcpToolCalls = new Map<number | string, PendingMcpCall>();
 
 export function handleActionMessage(message: ActionMessage) {
   if (message.args?.hidden) {
@@ -22,12 +32,42 @@ export function handleActionMessage(message: ActionMessage) {
 
   // Update metrics if available
   if (message.llm_metrics) {
-    const metrics = {
-      cost: message.llm_metrics?.accumulated_cost ?? null,
-      max_budget_per_task: message.llm_metrics?.max_budget_per_task ?? null,
-      usage: message.llm_metrics?.accumulated_token_usage ?? null,
-    };
-    useMetricsStore.getState().setMetrics(metrics);
+    const usage = message.llm_metrics.accumulated_token_usage;
+    const cost = message.llm_metrics.accumulated_cost ?? null;
+    useMetricsStore.getState().setMetrics({
+      cost,
+      max_budget_per_task: message.llm_metrics.max_budget_per_task ?? null,
+      usage,
+    });
+
+    if (usage) {
+      recordGeneration({
+        conversationId: String(message.id ?? "active-conversation"),
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        cost: cost ?? undefined,
+        input: message.message,
+      });
+    }
+  }
+
+  if (
+    message.action === ActionType.MCP ||
+    message.action === "call_tool_mcp" ||
+    (message.args && "name" in message.args)
+  ) {
+    const toolName =
+      (message.args as Record<string, string>)?.name ||
+      (message.args as Record<string, string>)?.command ||
+      message.action;
+    const serverName =
+      (message.args as Record<string, string>)?.server || "mcp-server";
+    activeMcpToolCalls.set(message.id, {
+      toolName,
+      serverName,
+      startTime: Date.now(),
+      input: message.args,
+    });
   }
 
   if (message.action === ActionType.RUN) {
@@ -55,11 +95,8 @@ export function handleActionMessage(message: ActionMessage) {
 }
 
 export function handleStatusMessage(message: StatusMessage) {
-  // Info message with conversation_title indicates new title for conversation
   if (message.type === "info" && message.conversation_title) {
     const conversationId = message.message;
-
-    // Invalidate the conversation query to trigger a refetch with the new title
     queryClient.invalidateQueries({
       queryKey: ["user", "conversation", conversationId],
     });
