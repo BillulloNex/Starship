@@ -21,7 +21,7 @@ RUN npm run build:app
 FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git python3 python3-venv ca-certificates tmux \
+    curl git python3 python3-venv ca-certificates tmux htop nano procps vim less wget zip unzip \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
