@@ -6,9 +6,9 @@ import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 describe("getAgentStateEmoji", () => {
   it.each([
     [ExecutionStatus.RUNNING, "🟢"],
-    [ExecutionStatus.FINISHED, "✅"],
-    [ExecutionStatus.IDLE, "✅"],
-    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "✅"],
+    [ExecutionStatus.FINISHED, null],
+    [ExecutionStatus.IDLE, null],
+    [ExecutionStatus.WAITING_FOR_CONFIRMATION, null],
     [ExecutionStatus.PAUSED, "⚪"],
     [ExecutionStatus.ERROR, "🔴"],
     [ExecutionStatus.STUCK, "🔴"],

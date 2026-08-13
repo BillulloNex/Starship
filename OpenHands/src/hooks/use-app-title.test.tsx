@@ -67,16 +67,16 @@ describe("useAppTitle", () => {
   });
 
   it.each([
-    [ExecutionStatus.RUNNING, "🟢"],
-    [ExecutionStatus.FINISHED, "✅"],
-    [ExecutionStatus.IDLE, "✅"],
-    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "✅"],
-    [ExecutionStatus.PAUSED, "⚪"],
-    [ExecutionStatus.ERROR, "🔴"],
-    [ExecutionStatus.STUCK, "🔴"],
+    [ExecutionStatus.RUNNING, "🟢 My Conversation | OpenHands"],
+    [ExecutionStatus.FINISHED, "My Conversation | OpenHands"],
+    [ExecutionStatus.IDLE, "My Conversation | OpenHands"],
+    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "My Conversation | OpenHands"],
+    [ExecutionStatus.PAUSED, "⚪ My Conversation | OpenHands"],
+    [ExecutionStatus.ERROR, "🔴 My Conversation | OpenHands"],
+    [ExecutionStatus.STUCK, "🔴 My Conversation | OpenHands"],
   ])(
-    "prefixes the title with %s emoji for execution status %s",
-    async (status, emoji) => {
+    "formats the title correctly for execution status %s",
+    async (status, expectedTitle) => {
       mockUseParams.mockReturnValue({ conversationId: "123" });
       mockUseUserConversation.mockReturnValue({
         // @ts-expect-error - only returning partial config for test
@@ -86,9 +86,7 @@ describe("useAppTitle", () => {
 
       const { result } = renderAppTitleHook();
 
-      await waitFor(() =>
-        expect(result.current).toBe(`${emoji} My Conversation | OpenHands`),
-      );
+      await waitFor(() => expect(result.current).toBe(expectedTitle));
     },
   );
 
