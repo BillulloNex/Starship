@@ -609,7 +609,14 @@ export function ConversationWebSocketProvider({
                   event.value.usage_to_metrics,
                 )) {
                   const tokenUsage = metrics.accumulated_token_usage;
-                  if (tokenUsage) {
+                  // Skip entries with no actual token usage (e.g. condenser
+                  // that hasn't fired yet) to avoid creating empty 0-token
+                  // generations in Langfuse alongside the real ones.
+                  if (
+                    tokenUsage &&
+                    (tokenUsage.prompt_tokens > 0 ||
+                      tokenUsage.completion_tokens > 0)
+                  ) {
                     recordStatsGeneration({
                       conversationId,
                       modelName:
