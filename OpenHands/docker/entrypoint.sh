@@ -149,6 +149,20 @@ if [ "${OH_TELEMETRY_EXPORTER:-}" = "posthog" ] && [ -n "${OH_TELEMETRY_POSTHOG_
   export OH_TELEMETRY_POSTHOG_HOST="${OH_TELEMETRY_POSTHOG_HOST:-${VITE_POSTHOG_HOST:-${CONFIG_POSTHOG_HOST:-}}}"
 fi
 
+# ── Langfuse via OpenTelemetry ───────────────────────────────────────────────
+# Route agent-server OTEL traces to Langfuse's OTLP endpoint so ALL models
+# (including Kimi K3) get traced server-side — no browser CORS issues.
+LANGFUSE_PK="${CONFIG_LANGFUSE_PUBLIC_KEY:-pk-lf-3019a7ca-af9b-43cf-9ea0-55cc31714b52}"
+LANGFUSE_SK="${CONFIG_LANGFUSE_SECRET_KEY:-sk-lf-76a883bd-015c-47c8-89d1-cf6ec50797ff}"
+LANGFUSE_HOST="${CONFIG_LANGFUSE_HOST:-https://hipaa.cloud.langfuse.com}"
+
+if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$LANGFUSE_SK" ]; then
+  LANGFUSE_B64="$(printf '%s:%s' "$LANGFUSE_PK" "$LANGFUSE_SK" | base64 | tr -d '\n')"
+  export OTEL_EXPORTER_OTLP_ENDPOINT="${LANGFUSE_HOST}/api/public/otel"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${LANGFUSE_B64},x-langfuse-ingestion-version=4"
+  log "Langfuse OTEL telemetry configured → ${LANGFUSE_HOST}"
+fi
+
 # AGENT_SERVER_URL — needed by automation sandbox callbacks.
 export AGENT_SERVER_URL="${AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
 
