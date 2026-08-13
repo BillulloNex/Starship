@@ -7,35 +7,55 @@ import { cn } from "#/utils/utils";
 import { WaitingForRuntimeMessage } from "../chat/waiting-for-runtime-message";
 import { useAgentState } from "#/hooks/use-agent-state";
 import { useCommandStore } from "#/stores/command-store";
-import { useSendMessage } from "#/hooks/use-send-message";
+import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { useBashCommandRunner } from "#/hooks/use-bash-command-runner";
 
 function Terminal() {
   const { curAgentState } = useAgentState();
   const commands = useCommandStore((state) => state.commands);
   const isExecuting = useCommandStore((state) => state.isExecuting);
   const clearTerminal = useCommandStore((state) => state.clearTerminal);
-  const { send } = useSendMessage();
+
+  const { data: conversation } = useActiveConversation();
+  const conversationUrl = conversation?.conversation_url;
+  const sessionApiKey = conversation?.session_api_key;
+  const workingDir =
+    conversation?.workspace?.working_dir?.trim() || "/root/workspace";
 
   const isRuntimeInactive = RUNTIME_INACTIVE_STATES.includes(curAgentState);
-  const hasOutput = commands.length > 0;
+
+  const runBashCommand = useBashCommandRunner(
+    conversationUrl,
+    sessionApiKey,
+    !isRuntimeInactive && !!conversationUrl,
+  );
 
   const handleExecuteCommand = React.useCallback(
     async (command: string) => {
       if (!command.trim()) return;
+      useCommandStore.getState().setIsExecuting(true);
       try {
-        await send({
-          action: "message",
-          args: { content: `Execute in shell: ${command}` },
-        });
+        const result = await runBashCommand(command, workingDir, 60);
+        const outputParts = [];
+        if (result.stdout) outputParts.push(result.stdout);
+        if (result.stderr) outputParts.push(result.stderr);
+        const combined = outputParts.join("");
+        useCommandStore
+          .getState()
+          .appendOutput(
+            combined || `[Process exited with code ${result.exit_code}]`,
+          );
       } catch (err) {
         useCommandStore
           .getState()
           .appendOutput(
             `\r\nError executing command: ${err instanceof Error ? err.message : String(err)}\r\n`,
           );
+      } finally {
+        useCommandStore.getState().setIsExecuting(false);
       }
     },
-    [send],
+    [runBashCommand, workingDir],
   );
 
   const { ref, terminalRef } = useTerminal({
@@ -105,4 +125,5 @@ function Terminal() {
 }
 
 export default Terminal;
+
 

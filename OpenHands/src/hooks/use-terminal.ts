@@ -14,11 +14,11 @@ const renderCommand = (
   terminal: Terminal,
   isUserInput: boolean = false,
 ) => {
-  const { content, type } = command;
+  const { content, type, source } = command;
 
-  // Skip rendering user input commands that come from the event stream
-  // as they've already been displayed in the terminal as the user typed
-  if (type === "input" && isUserInput) {
+  // Skip rendering user input commands that come from local user typing
+  // as they've already been displayed on the screen as the user typed
+  if (type === "input" && (source === "user" || isUserInput)) {
     return;
   }
 
@@ -167,10 +167,12 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       // Render all commands in array
       if (commands.length > 0) {
         for (let i = 0; i < commands.length; i += 1) {
-          if (commands[i].type === "input") {
+          if (commands[i].type === "input" && commands[i].source !== "user") {
             terminal.current.write("$ ");
+            renderCommand(commands[i], terminal.current, false);
+          } else if (commands[i].type === "output") {
+            renderCommand(commands[i], terminal.current, false);
           }
-          renderCommand(commands[i], terminal.current, false);
         }
         lastCommandIndex.current = commands.length;
       }
@@ -194,7 +196,6 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
             if (cmd) {
               useCommandStore.getState().appendInput(cmd, "user");
-              useCommandStore.getState().setIsExecuting(true);
               if (onExecuteRef.current) {
                 onExecuteRef.current(cmd);
               }
@@ -249,10 +250,12 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       lastCommandIndex.current < commands.length
     ) {
       for (let i = lastCommandIndex.current; i < commands.length; i += 1) {
-        if (commands[i].type === "input") {
+        if (commands[i].type === "input" && commands[i].source !== "user") {
           terminal.current.write("$ ");
+          renderCommand(commands[i], terminal.current, false);
+        } else if (commands[i].type === "output") {
+          renderCommand(commands[i], terminal.current, false);
         }
-        renderCommand(commands[i], terminal.current, false);
       }
       lastCommandIndex.current = commands.length;
 
