@@ -57,6 +57,7 @@ import EventService from "#/api/event-service/event-service.api";
 import { getAgentServerClientOptions } from "#/api/agent-server-client-options";
 import { useConversationStore } from "#/stores/conversation-store";
 import { trackError } from "#/utils/error-handler";
+import { recordStatsGeneration } from "#/services/langfuse-service";
 import { useReadConversationFile } from "#/hooks/mutation/use-read-conversation-file";
 import useMetricsStore, { type MetricsState } from "#/stores/metrics-store";
 import { useConversationHistory } from "#/hooks/query/use-conversation-history";
@@ -600,6 +601,30 @@ export function ConversationWebSocketProvider({
             }
             if (isStatsConversationStateUpdateEvent(event)) {
               updateMetricsFromStats(event);
+
+              // Feed stats into Langfuse so ALL models (including Kimi K3)
+              // get traced, not just those routed through OpenRouter.
+              if (conversationId && event.value.usage_to_metrics) {
+                for (const metrics of Object.values(
+                  event.value.usage_to_metrics,
+                )) {
+                  const tokenUsage = metrics.accumulated_token_usage;
+                  if (tokenUsage) {
+                    recordStatsGeneration({
+                      conversationId,
+                      modelName:
+                        metrics.model_name || tokenUsage.model || "unknown",
+                      accumulatedCost: metrics.accumulated_cost,
+                      promptTokens: tokenUsage.prompt_tokens,
+                      completionTokens: tokenUsage.completion_tokens,
+                      cacheReadTokens: tokenUsage.cache_read_tokens,
+                      cacheWriteTokens: tokenUsage.cache_write_tokens,
+                      reasoningTokens: tokenUsage.reasoning_tokens,
+                      responseLatencies: metrics.response_latencies,
+                    });
+                  }
+                }
+              }
             }
             // Mirror goal status into the store. Intentionally duplicated across
             // the main and planning WebSocket handlers (like the execution_status

@@ -1,4 +1,5 @@
 import { Langfuse } from "langfuse";
+import { displayWarningToast } from "#/utils/custom-toast-handlers";
 
 const publicKey =
   (import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as string | undefined) ||
@@ -11,6 +12,28 @@ const baseUrl =
   "https://hipaa.cloud.langfuse.com";
 
 let langfuseInstance: Langfuse | null = null;
+
+// ---------------------------------------------------------------------------
+// Failure tracking — throttled so we don't spam the user with toasts
+// ---------------------------------------------------------------------------
+let lastWarningTs = 0;
+const WARNING_COOLDOWN_MS = 30_000; // show at most one warning every 30s
+
+function warnLangfuseFailure(context: string, err: unknown) {
+  const msg =
+    err instanceof Error ? err.message : String(err ?? "unknown error");
+  console.warn(`Langfuse ${context} error:`, err);
+
+  const now = Date.now();
+  if (now - lastWarningTs > WARNING_COOLDOWN_MS) {
+    lastWarningTs = now;
+    displayWarningToast(`Langfuse ${context} failed: ${msg}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core client
+// ---------------------------------------------------------------------------
 
 export function getLangfuseBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
@@ -31,12 +54,16 @@ export function getLangfuseClient(): Langfuse | null {
         flushAt: 1, // Flush telemetry fast for real-time responsiveness
       });
     } catch (err) {
-      console.warn("Failed to initialize Langfuse telemetry client:", err);
+      warnLangfuseFailure("initialization", err);
       langfuseInstance = null;
     }
   }
   return langfuseInstance;
 }
+
+// ---------------------------------------------------------------------------
+// Trace helpers
+// ---------------------------------------------------------------------------
 
 export interface StartTraceOptions {
   conversationId: string;
@@ -67,10 +94,14 @@ export function startTrace({
     });
     return trace;
   } catch (err) {
-    console.warn("Langfuse startTrace error:", err);
+    warnLangfuseFailure("startTrace", err);
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Generation recording (original API — kept for backward compat)
+// ---------------------------------------------------------------------------
 
 export interface RecordGenerationOptions {
   traceId?: string;
@@ -126,11 +157,108 @@ export function recordGeneration({
       endTime,
     });
 
-    client.flushAsync().catch(() => {});
+    client.flushAsync().catch((flushErr) => {
+      warnLangfuseFailure("flush (recordGeneration)", flushErr);
+    });
   } catch (err) {
-    console.warn("Langfuse recordGeneration error:", err);
+    warnLangfuseFailure("recordGeneration", err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Stats-based generation recording — wired into the WebSocket event handler
+// ---------------------------------------------------------------------------
+
+export interface RecordStatsGenerationOptions {
+  conversationId: string;
+  modelName: string;
+  accumulatedCost: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  responseLatencies?: Array<{
+    model: string;
+    latency: number;
+    response_id: string;
+  }>;
+}
+
+/**
+ * Records an LLM generation derived from the v1 agent-server
+ * `ConversationStateUpdateEvent` with `key: "stats"`.
+ *
+ * This is the *live* path that the WebSocket handler should call
+ * whenever a stats event arrives with token usage data.
+ */
+export function recordStatsGeneration({
+  conversationId,
+  modelName,
+  accumulatedCost,
+  promptTokens,
+  completionTokens,
+  cacheReadTokens,
+  cacheWriteTokens,
+  reasoningTokens,
+  responseLatencies,
+}: RecordStatsGenerationOptions) {
+  const client = getLangfuseClient();
+  if (!client) return;
+
+  try {
+    const traceId = `${conversationId}-stats-${Date.now()}`;
+    const trace = client.trace({
+      id: traceId,
+      sessionId: conversationId,
+      name: "Agent Stats Update",
+      metadata: {
+        client: "GrokBot Agent Canvas",
+        source: "websocket_stats_event",
+      },
+    });
+
+    // Compute latency from the most recent response if available
+    const lastLatency = responseLatencies?.length
+      ? responseLatencies[responseLatencies.length - 1]
+      : null;
+
+    const endTime = new Date();
+    const startTime = lastLatency
+      ? new Date(endTime.getTime() - lastLatency.latency * 1000)
+      : new Date(endTime.getTime() - 1000);
+
+    trace.generation({
+      name: "LLM Generation",
+      model: modelName,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+      },
+      metadata: {
+        accumulatedCost,
+        cacheReadTokens,
+        cacheWriteTokens,
+        reasoningTokens,
+        responseId: lastLatency?.response_id,
+        latencySeconds: lastLatency?.latency,
+      },
+      startTime,
+      endTime,
+    });
+
+    client.flushAsync().catch((flushErr) => {
+      warnLangfuseFailure("flush (recordStatsGeneration)", flushErr);
+    });
+  } catch (err) {
+    warnLangfuseFailure("recordStatsGeneration", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MCP tool call recording
+// ---------------------------------------------------------------------------
 
 export interface RecordMcpToolOptions {
   traceId?: string;
@@ -184,11 +312,17 @@ export function recordMcpToolCall({
       endTime,
     });
 
-    client.flushAsync().catch(() => {});
+    client.flushAsync().catch((flushErr) => {
+      warnLangfuseFailure("flush (recordMcpToolCall)", flushErr);
+    });
   } catch (err) {
-    console.warn("Langfuse recordMcpToolCall error:", err);
+    warnLangfuseFailure("recordMcpToolCall", err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
 
 export function getLangfuseSessionUrl(conversationId: string): string {
   const base = getLangfuseBaseUrl();
