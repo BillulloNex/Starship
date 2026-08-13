@@ -67,7 +67,14 @@ function Terminal() {
 
       useCommandStore.getState().setIsExecuting(true, currentSessionId);
       try {
-        const execCommand = `export TERM=xterm-256color; ${trimmed}`;
+        const firstWord = trimmed.split(/\s+/)[0];
+        const ttyCommands = ["htop", "top", "vim", "vi", "nano", "less", "more", "man"];
+        let execCommand = `export TERM=xterm-256color; ${trimmed}`;
+
+        if (ttyCommands.includes(firstWord)) {
+          execCommand = `export TERM=xterm-256color; python3 -c "import pty, sys; pty.spawn(sys.argv[1:])" ${trimmed}`;
+        }
+
         const result = await runBashCommand(execCommand, workingDir, 60);
         const outputParts = [];
         if (result.stdout) outputParts.push(result.stdout);
