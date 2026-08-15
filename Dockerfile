@@ -32,6 +32,16 @@ COPY OpenHands/ .
 # VITE_BASE_PATH="/" so the app serves at grok.beenex.org/ (not /canvas)
 ARG VITE_BASE_PATH="/"
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+
+# Optional Langfuse keys for the browser-side SDK, supplied as Coolify "Build
+# Variables". Never committed to the repo; when absent, browser tracing is
+# disabled and only the server-side OTEL path (runtime env) reports traces.
+ARG VITE_LANGFUSE_PUBLIC_KEY=""
+ARG VITE_LANGFUSE_SECRET_KEY=""
+ARG VITE_LANGFUSE_BASE_URL=""
+ENV VITE_LANGFUSE_PUBLIC_KEY=${VITE_LANGFUSE_PUBLIC_KEY} \
+    VITE_LANGFUSE_SECRET_KEY=${VITE_LANGFUSE_SECRET_KEY} \
+    VITE_LANGFUSE_BASE_URL=${VITE_LANGFUSE_BASE_URL}
 RUN npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
@@ -51,9 +61,9 @@ RUN node -e " \
     'CONFIG_CANVAS_BASE_PATH=' + c.paths.canvasBasePath, \
     'CONFIG_POSTHOG_API_KEY=' + c.telemetry.posthogApiKey, \
     'CONFIG_POSTHOG_HOST=' + c.telemetry.posthogHost, \
-    'CONFIG_LANGFUSE_PUBLIC_KEY=' + c.telemetry.langfusePublicKey, \
-    'CONFIG_LANGFUSE_SECRET_KEY=' + c.telemetry.langfuseSecretKey, \
-    'CONFIG_LANGFUSE_HOST=' + c.telemetry.langfuseHost, \
+    'CONFIG_LANGFUSE_PUBLIC_KEY=' + (c.telemetry.langfusePublicKey || ''), \
+    'CONFIG_LANGFUSE_SECRET_KEY=' + (c.telemetry.langfuseSecretKey || ''), \
+    'CONFIG_LANGFUSE_HOST=' + (c.telemetry.langfuseHost || ''), \
   ]; \
   require('fs').writeFileSync('/tmp/defaults.env', lines.join('\n') + '\n'); \
 "
