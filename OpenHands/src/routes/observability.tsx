@@ -6,16 +6,22 @@ import {
   useDatadogLogs,
   useDatadogMonitors,
 } from "#/hooks/query/use-datadog-observability";
+import { useLiveConversationMetrics } from "#/hooks/use-live-conversation-metrics";
 import {
   ObservabilityHeader,
+  AgentHeroMetrics,
+  TurnWaterfallCard,
+  McpToolBreakdownCard,
+  ModelUsageCostCard,
+  RecentTracesStreamCard,
   ServiceHealthGrid,
-  ApmMetricsCard,
-  LlmObservabilityCard,
   LogsViewerCard,
   MonitorsAlertsCard,
   DatadogSetupGuideCard,
 } from "#/components/features/settings/observability-settings";
 import { I18nKey } from "#/i18n/declaration";
+import { SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "#/utils/utils";
 
 export function ObservabilityScreen() {
   const { t } = useTranslation("openhands");
@@ -23,8 +29,10 @@ export function ObservabilityScreen() {
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<
     number | false
   >(30_000);
+  const [showSystemDiagnostics, setShowSystemDiagnostics] = useState<boolean>(false);
 
   const { data: statusData, isLoading: isLoadingStatus } = useDatadogStatus();
+  const liveMetrics = useLiveConversationMetrics(true);
 
   const {
     data: summaryData,
@@ -80,6 +88,7 @@ export function ObservabilityScreen() {
           />
         ) : null}
 
+        {/* Global Controls & Dual Telemetry Status */}
         <ObservabilityHeader
           timeframe={timeframe}
           setTimeframe={setTimeframe}
@@ -91,25 +100,67 @@ export function ObservabilityScreen() {
           service={service}
         />
 
-        <ServiceHealthGrid site={site} />
+        {/* 1. 4-Tile Agent Hero Metrics */}
+        <AgentHeroMetrics
+          cost={liveMetrics.cost}
+          usage={liveMetrics.usage}
+          observability={liveMetrics.observability}
+          summary={summaryData}
+          isLoading={isLoadingSummary}
+        />
 
-        <ApmMetricsCard summary={summaryData} isLoading={isLoadingSummary} />
+        {/* 2. Centerpiece: Turn Execution Lifecycle Waterfall */}
+        <TurnWaterfallCard site={site} />
 
-        <LlmObservabilityCard site={site} />
-
+        {/* 3. Progressive Disclosure: 2-Column Breakdown (MCP & Tools + Model Costs) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <LogsViewerCard
-            logs={logsData?.logs || []}
-            isLoading={isLoadingLogs}
-            timeframe={timeframe}
-            site={site}
-          />
+          <McpToolBreakdownCard observability={liveMetrics.observability} />
+          <ModelUsageCostCard totalCost={liveMetrics.cost} />
+        </div>
 
-          <MonitorsAlertsCard
-            monitors={monitorsData?.monitors || []}
-            isLoading={isLoadingMonitors}
-            site={site}
-          />
+        {/* 4. Recent Traces & Session Runs */}
+        <RecentTracesStreamCard site={site} />
+
+        {/* 5. Collapsible System Diagnostics & Raw Logs (Progressive Disclosure) */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => setShowSystemDiagnostics((prev) => !prev)}
+            className="flex items-center gap-2 text-xs text-[var(--oh-muted)] hover:text-foreground font-medium p-2 rounded hover:bg-surface-raised transition-colors"
+          >
+            <SlidersHorizontal className="size-3.5" />
+            <span>
+              {showSystemDiagnostics
+                ? "Hide System Diagnostics & Container Logs"
+                : "Show System Diagnostics & Container Logs"}
+            </span>
+            {showSystemDiagnostics ? (
+              <ChevronUp className="size-3.5" />
+            ) : (
+              <ChevronDown className="size-3.5" />
+            )}
+          </button>
+
+          {showSystemDiagnostics && (
+            <div className="mt-3 space-y-4 pt-3 border-t border-[var(--oh-border-subtle)]">
+              <ServiceHealthGrid site={site} />
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <LogsViewerCard
+                  logs={logsData?.logs || []}
+                  isLoading={isLoadingLogs}
+                  timeframe={timeframe}
+                  site={site}
+                />
+
+                <MonitorsAlertsCard
+                  monitors={monitorsData?.monitors || []}
+                  isLoading={isLoadingMonitors}
+                  site={site}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>

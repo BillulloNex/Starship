@@ -26,7 +26,7 @@ describe("ObservabilityScreen", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the observability screen and service health cards", async () => {
+  it("renders the redesigned agent observability cockpit", async () => {
     vi.spyOn(DatadogService, "getStatus").mockResolvedValue({
       enabled: true,
       hasApiKey: true,
@@ -78,11 +78,11 @@ describe("ObservabilityScreen", () => {
     renderObservabilityScreen();
 
     await screen.findByTestId("observability-screen");
-    expect(await screen.findByText("Datadog Observability")).toBeInTheDocument();
-    expect(await screen.findByText("Agent Server")).toBeInTheDocument();
-    expect(await screen.findByText("Automation Server")).toBeInTheDocument();
-    expect(await screen.findByText("Frontend & Ingress")).toBeInTheDocument();
-    expect(await screen.findByText("Datadog Sidecar")).toBeInTheDocument();
-    expect(screen.getByText("Total Requests")).toBeInTheDocument();
+    expect(await screen.findByText("Agent Observability Cockpit")).toBeInTheDocument();
+    expect(screen.getByText("Estimated Cost & Spend")).toBeInTheDocument();
+    expect(screen.getByText("Avg Turn Duration")).toBeInTheDocument();
+    expect(screen.getByText("Turn Execution Lifecycle Waterfall")).toBeInTheDocument();
+    expect(screen.getByText("MCP & Tool Performance Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Model Usage & Cost Attribution")).toBeInTheDocument();
   });
 });
