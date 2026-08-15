@@ -2,6 +2,8 @@
 public/locales/**/*
 src/i18n/declaration.ts
 .env
+.env.local
+.env*.local
 .envrc
 node_modules/
 build/

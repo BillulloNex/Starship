@@ -16,6 +16,7 @@ import {
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import type { TelemetryConfig } from "#/services/telemetry";
 import { TelemetryProvider } from "./telemetry-provider";
+import { DatadogProvider } from "./datadog-provider";
 import {
   AgentServerUIRoot,
   type AgentServerUIRootProps,
@@ -96,7 +97,9 @@ export function AgentServerUIProviders({
         }
       : false;
   const content = (
-    <TelemetryProvider config={posthogConfig}>{children}</TelemetryProvider>
+    <DatadogProvider>
+      <TelemetryProvider config={posthogConfig}>{children}</TelemetryProvider>
+    </DatadogProvider>
   );
 
   const wrappedContent = withStyleRoot ? (
