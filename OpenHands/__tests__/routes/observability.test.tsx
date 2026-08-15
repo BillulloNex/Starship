@@ -84,5 +84,11 @@ describe("ObservabilityScreen", () => {
     expect(screen.getByText("Turn Execution Lifecycle Waterfall")).toBeInTheDocument();
     expect(screen.getByText("MCP & Tool Performance Breakdown")).toBeInTheDocument();
     expect(screen.getByText("Model Usage & Cost Attribution")).toBeInTheDocument();
+
+    // Verify empty states render (no events/metrics in test context)
+    expect(screen.getByText("No turns recorded yet")).toBeInTheDocument();
+    expect(screen.getByText("No model usage data yet")).toBeInTheDocument();
+    expect(screen.getByText("No tool executions recorded yet")).toBeInTheDocument();
+    expect(screen.getByText("No traces recorded yet")).toBeInTheDocument();
   });
 });

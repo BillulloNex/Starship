@@ -31,6 +31,9 @@ export function useLiveConversationMetrics(
   );
   const storeUsage = useMetricsStore((state) => state.usage);
   const storeObservability = useMetricsStore((state) => state.observability);
+  const storePerModelMetrics = useMetricsStore(
+    (state) => state.perModelMetrics,
+  );
   const { data: conversation } = useActiveConversation();
 
   const { data: conversationMetrics } = useConversationMetrics(
@@ -48,6 +51,7 @@ export function useLiveConversationMetrics(
         cost: storeCost,
         max_budget_per_task: storeMaxBudgetPerTask,
         usage: storeUsage,
+        perModelMetrics: storePerModelMetrics,
         observability: storeObservability,
       };
     }
@@ -76,6 +80,7 @@ export function useLiveConversationMetrics(
             }
           : null,
         observability: storeObservability,
+        perModelMetrics: storePerModelMetrics,
       };
     }
 
@@ -83,7 +88,15 @@ export function useLiveConversationMetrics(
       cost: null,
       max_budget_per_task: null,
       usage: null,
+      perModelMetrics: storePerModelMetrics,
       observability: storeObservability,
     };
-  }, [conversationMetrics, storeCost, storeMaxBudgetPerTask, storeUsage, storeObservability]);
+  }, [
+    conversationMetrics,
+    storeCost,
+    storeMaxBudgetPerTask,
+    storeUsage,
+    storeObservability,
+    storePerModelMetrics,
+  ]);
 }

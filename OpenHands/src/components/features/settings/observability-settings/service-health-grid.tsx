@@ -1,11 +1,16 @@
 import React from "react";
 import { Server, Cpu, Globe, ShieldCheck } from "lucide-react";
+import { DatadogSummaryResponse } from "#/api/observability-service/datadog.types";
 
 export interface ServiceHealthGridProps {
   site?: string;
+  summary?: DatadogSummaryResponse;
 }
 
-export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthGridProps) {
+export function ServiceHealthGrid({
+  site = "us5.datadoghq.com",
+  summary,
+}: ServiceHealthGridProps) {
   const services = [
     {
       id: "agent-server",
@@ -13,7 +18,7 @@ export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthG
       service: "grokbot-agent-server",
       port: 18000,
       tracer: "ddtrace-run (Python)",
-      status: "healthy",
+      status: summary?.services?.agentServer?.status ?? "unknown",
       icon: <Server className="size-4 text-sky-400" />,
       tag: "APM Traced",
     },
@@ -23,7 +28,7 @@ export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthG
       service: "grokbot-automation",
       port: 18001,
       tracer: "ddtrace-run (FastAPI)",
-      status: "healthy",
+      status: summary?.services?.automation?.status ?? "unknown",
       icon: <Cpu className="size-4 text-amber-400" />,
       tag: "APM Traced",
     },
@@ -33,7 +38,7 @@ export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthG
       service: "grokbot-frontend",
       port: 8000,
       tracer: "Datadog RUM + Logs SDK",
-      status: "healthy",
+      status: summary?.services?.frontend?.status ?? "unknown",
       icon: <Globe className="size-4 text-emerald-400" />,
       tag: "RUM Active",
     },
@@ -43,11 +48,37 @@ export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthG
       service: "datadog-agent",
       port: 8126,
       tracer: site,
-      status: "connected",
+      status: summary?.services?.sidecar?.status ?? "unknown",
       icon: <ShieldCheck className="size-4 text-sky-400" />,
       tag: "Intake Ready",
     },
   ];
+
+  const renderStatusBadge = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "healthy" || s === "connected") {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
+          <span className="size-1 rounded-full bg-emerald-400" />
+          {s === "healthy" ? "Healthy" : "Connected"}
+        </span>
+      );
+    }
+    if (s === "degraded" || s === "error") {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-900/50 text-rose-300 border border-rose-700/50">
+          <span className="size-1 rounded-full bg-rose-400" />
+          {s === "degraded" ? "Degraded" : "Error"}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-800/50 text-zinc-400 border border-zinc-700/50">
+        <span className="size-1 rounded-full bg-zinc-400" />
+        Unknown
+      </span>
+    );
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -70,10 +101,7 @@ export function ServiceHealthGrid({ site = "us5.datadoghq.com" }: ServiceHealthG
                 </span>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">
-              <span className="size-1 rounded-full bg-emerald-400" />
-              {svc.status === "healthy" ? "Healthy" : "Connected"}
-            </span>
+            {renderStatusBadge(svc.status)}
           </div>
 
           <div className="flex items-center justify-between text-[11px] pt-2 border-t border-[var(--oh-border)] text-[var(--oh-muted)]">

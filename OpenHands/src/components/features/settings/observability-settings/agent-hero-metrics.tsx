@@ -35,13 +35,10 @@ export function AgentHeroMetrics({
         ? Math.max(0, 100 - summary.metrics.errorRate)
         : 100;
 
-  const totalTokens = (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0);
+  const totalTokens =
+    (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0);
   const displayCost =
-    cost !== null && cost !== undefined
-      ? `$${cost.toFixed(4)}`
-      : summary?.metrics?.totalRequests
-        ? `$${(summary.metrics.totalRequests * 0.0008).toFixed(4)}`
-        : "$0.0000";
+    cost !== null && cost !== undefined ? `$${cost.toFixed(4)}` : "$0.0000";
 
   const avgLatencySec =
     observability?.avgTurnDurationMs !== null &&
@@ -52,15 +49,9 @@ export function AgentHeroMetrics({
         : "0.00";
 
   const p95LatencyMs =
-    summary?.metrics?.latencyP95Ms ??
-    (observability?.lastTurnDurationMs ?? 0);
+    summary?.metrics?.latencyP95Ms ?? observability?.lastTurnDurationMs ?? 0;
 
-  const totalTurns =
-    observability?.totalTurns && observability.totalTurns > 0
-      ? observability.totalTurns
-      : summary?.metrics?.totalRequests
-        ? Math.max(1, Math.round(summary.metrics.totalRequests / 3))
-        : 0;
+  const totalTurns = observability?.totalTurns ?? 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

@@ -242,11 +242,52 @@ export function ConversationWebSocketProvider({
         { cost: 0, maxBudgetPerTask: null, usage: null },
       );
 
-      useMetricsStore.getState().setMetrics({
+      // Build per-model breakdown preserving individual model data.
+      // usage_to_metrics keys are usage IDs ("default", "condenser", etc.),
+      // but model_name inside carries the actual model identifier.
+      const perModelMetrics: Record<
+        string,
+        import("#/stores/metrics-store").PerModelMetrics
+      > = {};
+      for (const [usageId, metrics] of Object.entries(usageToMetrics)) {
+        const tokenUsage = metrics.accumulated_token_usage;
+        const modelName = metrics.model_name || tokenUsage?.model || "unknown";
+        // Skip entries with no token usage (e.g. condenser not yet fired)
+        if (
+          !tokenUsage ||
+          (tokenUsage.prompt_tokens === 0 && tokenUsage.completion_tokens === 0)
+        ) {
+          continue;
+        }
+        // Merge entries that share the same model_name (e.g. default + profile
+        // usage IDs both using the same model).
+        const existing = perModelMetrics[modelName];
+        if (existing) {
+          existing.cost += metrics.accumulated_cost;
+          existing.promptTokens += tokenUsage.prompt_tokens;
+          existing.completionTokens += tokenUsage.completion_tokens;
+          existing.cacheReadTokens += tokenUsage.cache_read_tokens;
+          existing.cacheWriteTokens += tokenUsage.cache_write_tokens;
+        } else {
+          perModelMetrics[modelName] = {
+            modelName,
+            usageId,
+            cost: metrics.accumulated_cost,
+            promptTokens: tokenUsage.prompt_tokens,
+            completionTokens: tokenUsage.completion_tokens,
+            cacheReadTokens: tokenUsage.cache_read_tokens,
+            cacheWriteTokens: tokenUsage.cache_write_tokens,
+          };
+        }
+      }
+
+      const store = useMetricsStore.getState();
+      store.setMetrics({
         cost: combined.cost,
         max_budget_per_task: combined.maxBudgetPerTask,
         usage: combined.usage,
       });
+      store.setPerModelMetrics(perModelMetrics);
     },
     [],
   );

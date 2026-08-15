@@ -7,7 +7,6 @@ import {
   Wrench,
   Send,
   CheckCircle2,
-  AlertCircle,
   Cpu,
   Layers,
   Bot,
@@ -15,8 +14,17 @@ import {
 } from "lucide-react";
 import { cn } from "#/utils/utils";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
-import { useEventStore } from "#/stores/use-event-store";
-import { getLangfuseSessionUrl, isLangfuseEnabled } from "#/services/langfuse-service";
+import { useEventStore, type OHEvent } from "#/stores/use-event-store";
+import {
+  getLangfuseSessionUrl,
+  isLangfuseEnabled,
+} from "#/services/langfuse-service";
+import {
+  isActionEvent,
+  isObservationEvent,
+  isMessageEvent,
+  isUserMessageEvent,
+} from "#/types/agent-server/type-guards";
 
 export interface TurnStep {
   id: string;
@@ -53,120 +61,164 @@ export interface TurnWaterfallCardProps {
   site?: string;
 }
 
-export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallCardProps) {
+/**
+ * Parse real events from the event store into turn sequences.
+ * A "turn" starts with a user message and ends when the next user message
+ * begins (or the event stream ends).
+ */
+function buildTurnsFromEvents(events: OHEvent[]): TurnData[] {
+  if (events.length === 0) return [];
+
+  // Group events by turn: split on user messages
+  const turnGroups: OHEvent[][] = [];
+  let currentGroup: OHEvent[] = [];
+
+  for (const event of events) {
+    if (isUserMessageEvent(event) && currentGroup.length > 0) {
+      turnGroups.push(currentGroup);
+      currentGroup = [event];
+    } else {
+      currentGroup.push(event);
+    }
+  }
+  if (currentGroup.length > 0) {
+    turnGroups.push(currentGroup);
+  }
+
+  // Take only the last 5 turns to keep the UI manageable
+  const recentGroups = turnGroups.slice(-5);
+
+  return recentGroups.map((group, groupIdx) => {
+    const turnIndex = turnGroups.length - recentGroups.length + groupIdx + 1;
+    const firstTimestamp = "timestamp" in group[0] ? group[0].timestamp : "";
+    const lastEvent = group[group.length - 1];
+    const lastTimestamp = "timestamp" in lastEvent ? lastEvent.timestamp : "";
+
+    const startMs = firstTimestamp ? new Date(firstTimestamp).getTime() : 0;
+    const endMs = lastTimestamp ? new Date(lastTimestamp).getTime() : startMs;
+    const totalDurationMs = Math.max(0, endMs - startMs);
+
+    const steps: TurnStep[] = [];
+    let stepIndex = 0;
+
+    for (const event of group) {
+      const eventTime =
+        "timestamp" in event ? new Date(event.timestamp).getTime() : startMs;
+      const offsetMs = Math.max(0, eventTime - startMs);
+
+      if (isUserMessageEvent(event)) {
+        steps.push({
+          id: `step-${turnIndex}-${stepIndex++}`,
+          type: "prompt",
+          title: "User Prompt Received",
+          subtitle: truncateText(extractMessageText(event), 80),
+          offsetMs,
+          durationMs: 0,
+          status: "success",
+          details: {
+            message: extractMessageText(event),
+          },
+        });
+      } else if (isActionEvent(event)) {
+        const toolName = event.tool_name || event.action?.kind || "unknown";
+        const thought =
+          event.thought?.map((t) => ("text" in t ? t.text : "")).join("") || "";
+        // Find matching observation for duration
+        const matchingObs = events.find(
+          (e) =>
+            isObservationEvent(e) &&
+            "action_id" in e &&
+            e.action_id === event.id,
+        );
+        const obTime =
+          matchingObs && "timestamp" in matchingObs
+            ? new Date(matchingObs.timestamp).getTime()
+            : eventTime;
+        const durationMs = Math.max(0, obTime - eventTime);
+
+        steps.push({
+          id: `step-${turnIndex}-${stepIndex++}`,
+          type: "tool",
+          title: `Tool: ${toolName}`,
+          subtitle: event.summary || truncateText(thought, 80) || undefined,
+          offsetMs,
+          durationMs,
+          status: "success",
+          details: {
+            toolName,
+            message: thought || undefined,
+          },
+        });
+      } else if (
+        isMessageEvent(event) &&
+        event.llm_message?.role === "assistant"
+      ) {
+        steps.push({
+          id: `step-${turnIndex}-${stepIndex++}`,
+          type: "response",
+          title: "Agent Response",
+          subtitle: truncateText(extractMessageText(event), 80),
+          offsetMs,
+          durationMs: 0,
+          status: "success",
+          details: {
+            message: truncateText(extractMessageText(event), 200),
+          },
+        });
+      }
+    }
+
+    return {
+      turnIndex,
+      timestamp: firstTimestamp
+        ? new Date(firstTimestamp).toLocaleTimeString()
+        : `Turn ${turnIndex}`,
+      totalDurationMs,
+      totalTokens: 0,
+      totalCost: 0,
+      steps,
+    };
+  });
+}
+
+function extractMessageText(event: OHEvent): string {
+  if (isMessageEvent(event) && event.llm_message?.content) {
+    return event.llm_message.content
+      .map((c) => ("text" in c ? c.text : ""))
+      .join("")
+      .trim();
+  }
+  return "";
+}
+
+function truncateText(text: string, maxLen: number): string {
+  if (!text) return "";
+  return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
+}
+
+export function TurnWaterfallCard({
+  site = "us5.datadoghq.com",
+}: TurnWaterfallCardProps) {
   const { data: conversation } = useActiveConversation();
   const conversationId = conversation?.id;
   const events = useEventStore((state) => state.events);
 
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(
-    new Set(["step-llm-1", "step-tool-1"]),
+    new Set(),
   );
-  const [selectedTurnIndex, setSelectedTurnIndex] = useState<number>(0);
+  const [selectedTurnIndex, setSelectedTurnIndex] = useState<number>(-1);
 
-  // Synthesize realistic or actual turn lifecycles from events or provide a rich live breakdown
-  const turns: TurnData[] = useMemo(() => {
-    // If we have actual events in store, map them into turn sequences
-    // Or generate a rich inspection breakdown
-    return [
-      {
-        turnIndex: 1,
-        timestamp: "Latest Turn",
-        totalDurationMs: 4850,
-        totalTokens: 5280,
-        totalCost: 0.0028,
-        steps: [
-          {
-            id: "step-prompt",
-            type: "prompt",
-            title: "User Prompt Dispatched & Context Assembly",
-            subtitle: "Agent Canvas Ingress -> Task Payload Context",
-            offsetMs: 0,
-            durationMs: 45,
-            status: "success",
-            details: {
-              message: "User message received, loaded workspace git tree & open tabs context.",
-              promptTokens: 1850,
-            },
-          },
-          {
-            id: "step-runtime",
-            type: "runtime",
-            title: "Runtime Environment & MCP Tools Initialization",
-            subtitle: "Docker Container :18000 + 4 Active MCP Servers",
-            offsetMs: 45,
-            durationMs: 110,
-            status: "success",
-            details: {
-              message: "Sandbox container active. Paper, Jira, GitHub, and Chrome DevTools MCP servers ready.",
-            },
-          },
-          {
-            id: "step-llm-1",
-            type: "llm",
-            title: "LLM Step Inference #1 (Gemini 2.5 Flash)",
-            subtitle: "Model generation with tool call planning",
-            offsetMs: 155,
-            durationMs: 1620,
-            status: "success",
-            details: {
-              model: "gemini-2.5-flash",
-              promptTokens: 3420,
-              completionTokens: 290,
-              cost: 0.0012,
-              message: "Decided to run tests via terminal tool `run_command`.",
-            },
-          },
-          {
-            id: "step-tool-1",
-            type: "tool",
-            title: "Tool Execution: run_command (`npm test`)",
-            subtitle: "Subprocess executed in agent sandbox container",
-            offsetMs: 1775,
-            durationMs: 1850,
-            status: "success",
-            details: {
-              toolName: "run_command",
-              serverName: "system",
-              command: "npm --prefix OpenHands test __tests__/routes/observability.test.tsx",
-              exitCode: 0,
-              output: "PASS __tests__/routes/observability.test.tsx\n  ObservabilityScreen\n    ✓ renders the observability screen and service health cards (120ms)\n\nTest Suites: 1 passed, 1 total\nTests: 1 passed, 1 total",
-            },
-          },
-          {
-            id: "step-llm-2",
-            type: "llm",
-            title: "LLM Step Inference #2 (Gemini 2.5 Flash)",
-            subtitle: "Evaluation of test results & file edit decision",
-            offsetMs: 3625,
-            durationMs: 980,
-            status: "success",
-            details: {
-              model: "gemini-2.5-flash",
-              promptTokens: 4150,
-              completionTokens: 380,
-              cost: 0.0016,
-              message: "Constructed solution summary and response stream.",
-            },
-          },
-          {
-            id: "step-response",
-            type: "response",
-            title: "Final Response & UI Stream Delivered",
-            subtitle: "Streamed markdown & code artifacts to user canvas",
-            offsetMs: 4605,
-            durationMs: 245,
-            status: "success",
-            details: {
-              message: "Complete response successfully rendered on the client.",
-              completionTokens: 380,
-            },
-          },
-        ],
-      },
-    ];
-  }, [events]);
+  const turns: TurnData[] = useMemo(
+    () => buildTurnsFromEvents(events),
+    [events],
+  );
 
-  const currentTurn = turns[selectedTurnIndex] || turns[0];
+  // Auto-select the last turn
+  const effectiveTurnIdx =
+    selectedTurnIndex >= 0 && selectedTurnIndex < turns.length
+      ? selectedTurnIndex
+      : turns.length - 1;
+  const currentTurn = turns[effectiveTurnIdx];
 
   const toggleStep = (id: string) => {
     setExpandedStepIds((prev) => {
@@ -197,8 +249,32 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
     }
   };
 
-  const langfuseUrl = conversationId ? getLangfuseSessionUrl(conversationId) : undefined;
+  const langfuseUrl = conversationId
+    ? getLangfuseSessionUrl(conversationId)
+    : undefined;
   const datadogUrl = `https://app.${site}/apm/services/grokbot`;
+
+  if (!currentTurn) {
+    return (
+      <div className="rounded-lg border border-[var(--oh-border)] bg-surface-raised p-4 transition-all">
+        <div className="flex items-center gap-2 pb-3 border-b border-[var(--oh-border)] mb-4">
+          <Bot className="size-4 text-emerald-400" />
+          <h3 className="text-base font-semibold text-foreground">
+            Turn Execution Lifecycle Waterfall
+          </h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Bot className="size-6 text-[var(--oh-muted)] mb-2" />
+          <p className="text-xs text-[var(--oh-muted)]">
+            No turns recorded yet
+          </p>
+          <p className="text-[10px] text-[var(--oh-muted)] mt-1">
+            Send a message to see the agent&apos;s execution timeline
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-[var(--oh-border)] bg-surface-raised p-4 transition-all">
@@ -212,7 +288,7 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
             </h3>
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-700/40">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Real-Time Trace
+              Live
             </span>
           </div>
           <p className="text-xs text-[var(--oh-muted)] mt-0.5">
@@ -220,20 +296,32 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
           </p>
         </div>
 
-        {/* Turn Summary Pills & Console Links */}
+        {/* Turn selector & Console Links */}
         <div className="flex flex-wrap items-center gap-2">
+          {turns.length > 1 && (
+            <select
+              value={effectiveTurnIdx}
+              onChange={(e) => setSelectedTurnIndex(Number(e.target.value))}
+              className="px-2 py-1 rounded bg-surface border border-[var(--oh-border)] text-xs font-mono text-foreground"
+            >
+              {turns.map((t, i) => (
+                <option key={t.turnIndex} value={i}>
+                  Turn #{t.turnIndex} ({t.timestamp})
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="flex items-center gap-2 px-2.5 py-1 rounded bg-surface border border-[var(--oh-border)] text-xs font-mono">
             <span className="text-[var(--oh-muted)] flex items-center gap-1">
               <Clock className="size-3" />
-              {(currentTurn.totalDurationMs / 1000).toFixed(2)}s
+              {currentTurn.totalDurationMs > 0
+                ? `${(currentTurn.totalDurationMs / 1000).toFixed(2)}s`
+                : "<1s"}
             </span>
             <span className="text-[var(--oh-border)]">•</span>
             <span className="text-sky-400">
-              {currentTurn.totalTokens.toLocaleString()} tok
-            </span>
-            <span className="text-[var(--oh-border)]">•</span>
-            <span className="text-emerald-400">
-              ${currentTurn.totalCost.toFixed(4)}
+              {currentTurn.steps.length} steps
             </span>
           </div>
 
@@ -263,11 +351,15 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
 
       {/* Waterfall Vertical Timeline */}
       <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-[var(--oh-border)]">
-        {currentTurn.steps.map((step, idx) => {
+        {currentTurn.steps.map((step) => {
           const isExpanded = expandedStepIds.has(step.id);
+          const maxDuration = Math.max(
+            ...currentTurn.steps.map((s) => s.durationMs),
+            1,
+          );
           const percentWidth = Math.max(
             8,
-            Math.min(100, (step.durationMs / currentTurn.totalDurationMs) * 100),
+            Math.min(100, (step.durationMs / maxDuration) * 100),
           );
 
           return (
@@ -323,14 +415,16 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
 
                   {/* Timing & Duration Visual Bar */}
                   <div className="flex items-center gap-3 shrink-0 sm:self-center">
-                    <div className="w-24 hidden md:block">
-                      <div className="w-full bg-surface-deep rounded-full h-1.5 overflow-hidden border border-[var(--oh-border-subtle)]">
-                        <div
-                          className="h-1.5 rounded-full bg-sky-400 transition-all duration-300"
-                          style={{ width: `${percentWidth}%` }}
-                        />
+                    {step.durationMs > 0 && (
+                      <div className="w-24 hidden md:block">
+                        <div className="w-full bg-surface-deep rounded-full h-1.5 overflow-hidden border border-[var(--oh-border-subtle)]">
+                          <div
+                            className="h-1.5 rounded-full bg-sky-400 transition-all duration-300"
+                            style={{ width: `${percentWidth}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <span className="font-mono text-xs font-semibold text-foreground px-2 py-0.5 rounded bg-surface-deep border border-[var(--oh-border-subtle)]">
                       {step.durationMs < 1000
@@ -343,61 +437,24 @@ export function TurnWaterfallCard({ site = "us5.datadoghq.com" }: TurnWaterfallC
                 {/* Expanded Details Drawer */}
                 {isExpanded && step.details && (
                   <div className="p-3.5 bg-surface-deep border-t border-[var(--oh-border-subtle)] text-xs space-y-2.5">
-                    {/* LLM Inference Details */}
-                    {step.type === "llm" && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
-                        <div className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)]">
-                          <span className="text-[var(--oh-muted)] block text-[10px]">Model</span>
-                          <span className="font-semibold text-emerald-300">{step.details.model}</span>
-                        </div>
-                        <div className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)]">
-                          <span className="text-[var(--oh-muted)] block text-[10px]">Prompt In</span>
-                          <span className="font-semibold text-foreground">
-                            {step.details.promptTokens?.toLocaleString()} tok
-                          </span>
-                        </div>
-                        <div className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)]">
-                          <span className="text-[var(--oh-muted)] block text-[10px]">Completion Out</span>
-                          <span className="font-semibold text-foreground">
-                            {step.details.completionTokens?.toLocaleString()} tok
-                          </span>
-                        </div>
-                        <div className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)]">
-                          <span className="text-[var(--oh-muted)] block text-[10px]">Estimated Cost</span>
-                          <span className="font-semibold text-emerald-400">
-                            ${step.details.cost?.toFixed(4)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tool Execution Details & Output */}
-                    {step.type === "tool" && (
-                      <div className="space-y-2">
-                        {step.details.command && (
-                          <div>
-                            <span className="text-[10px] text-[var(--oh-muted)] font-mono block mb-1">Command Executed:</span>
-                            <pre className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-foreground font-mono text-[11px] overflow-x-auto">
-                              {step.details.command}
-                            </pre>
-                          </div>
-                        )}
-                        {step.details.output && (
-                          <div>
-                            <span className="text-[10px] text-[var(--oh-muted)] font-mono block mb-1">Execution Output (Exit Code: {step.details.exitCode ?? 0}):</span>
-                            <pre className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-foreground font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
-                              {step.details.output}
-                            </pre>
-                          </div>
-                        )}
+                    {/* Tool Execution Details */}
+                    {step.type === "tool" && step.details.toolName && (
+                      <div className="font-mono text-[11px]">
+                        <span className="text-[var(--oh-muted)] block text-[10px] mb-1">
+                          Tool
+                        </span>
+                        <span className="font-semibold text-amber-300">
+                          {step.details.toolName}
+                        </span>
                       </div>
                     )}
 
                     {/* Generic Message / Log */}
                     {step.details.message && (
-                      <div className="text-[11px] text-[var(--oh-muted)] flex items-center gap-1.5">
-                        <span className="size-1.5 rounded-full bg-sky-400 shrink-0" />
-                        <span>{step.details.message}</span>
+                      <div className="text-[11px] text-[var(--oh-muted)]">
+                        <pre className="p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-foreground font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                          {step.details.message}
+                        </pre>
                       </div>
                     )}
                   </div>

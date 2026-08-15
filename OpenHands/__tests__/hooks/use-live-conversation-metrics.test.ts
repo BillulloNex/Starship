@@ -65,6 +65,7 @@ const storeMetrics: MetricsState = {
     totalTurns: 0,
     mcpToolMetrics: {},
   },
+  perModelMetrics: {},
 };
 
 describe("useLiveConversationMetrics", () => {
@@ -122,6 +123,7 @@ describe("useLiveConversationMetrics", () => {
       cost: 1.23,
       max_budget_per_task: 5,
       usage: null,
+      perModelMetrics: {},
       observability: {
         lastTurnDurationMs: null,
         avgTurnDurationMs: null,
@@ -147,6 +149,7 @@ describe("useLiveConversationMetrics", () => {
         context_window: 128_000,
         per_turn_token: 500,
       },
+      perModelMetrics: {},
       observability: {
         lastTurnDurationMs: null,
         avgTurnDurationMs: null,

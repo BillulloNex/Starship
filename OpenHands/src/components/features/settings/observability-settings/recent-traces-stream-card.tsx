@@ -1,15 +1,112 @@
-import React from "react";
-import { Layers, ArrowUpRight, CheckCircle2, Clock } from "lucide-react";
+import React, { useMemo } from "react";
+import {
+  Layers,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
-import { getLangfuseSessionUrl, isLangfuseEnabled } from "#/services/langfuse-service";
+import {
+  getLangfuseSessionUrl,
+  isLangfuseEnabled,
+} from "#/services/langfuse-service";
+import { useEventStore, type OHEvent } from "#/stores/use-event-store";
+import {
+  isUserMessageEvent,
+  isActionEvent,
+} from "#/types/agent-server/type-guards";
 
 export interface RecentTracesStreamCardProps {
   site?: string;
 }
 
-export function RecentTracesStreamCard({ site = "us5.datadoghq.com" }: RecentTracesStreamCardProps) {
+interface TraceSummary {
+  id: string;
+  turn: string;
+  timestamp: string;
+  duration: string;
+  steps: number;
+  status: "success" | "error";
+}
+
+/**
+ * Build per-turn trace summaries from real events.
+ */
+function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
+  if (events.length === 0) return [];
+
+  // Group events by turn: split on user messages
+  const turnGroups: OHEvent[][] = [];
+  let currentGroup: OHEvent[] = [];
+
+  for (const event of events) {
+    if (isUserMessageEvent(event) && currentGroup.length > 0) {
+      turnGroups.push(currentGroup);
+      currentGroup = [event];
+    } else {
+      currentGroup.push(event);
+    }
+  }
+  if (currentGroup.length > 0) {
+    turnGroups.push(currentGroup);
+  }
+
+  // Build summaries, most recent first
+  return turnGroups
+    .map((group, idx) => {
+      const turnNumber = idx + 1;
+      const firstTimestamp = "timestamp" in group[0] ? group[0].timestamp : "";
+      const lastEvent = group[group.length - 1];
+      const lastTimestamp = "timestamp" in lastEvent ? lastEvent.timestamp : "";
+
+      const startMs = firstTimestamp ? new Date(firstTimestamp).getTime() : 0;
+      const endMs = lastTimestamp ? new Date(lastTimestamp).getTime() : startMs;
+      const durationMs = Math.max(0, endMs - startMs);
+
+      const toolCallCount = group.filter((e) => isActionEvent(e)).length;
+
+      const durationStr =
+        durationMs >= 1000
+          ? `${(durationMs / 1000).toFixed(2)}s`
+          : `${durationMs}ms`;
+
+      const relativeTime = firstTimestamp
+        ? formatRelativeTime(new Date(firstTimestamp))
+        : "";
+
+      return {
+        id: `trace-turn-${turnNumber}`,
+        turn: `Turn #${turnNumber}`,
+        timestamp: relativeTime,
+        duration: durationStr,
+        steps: toolCallCount,
+        status: "success" as const,
+      };
+    })
+    .reverse()
+    .slice(0, 10);
+}
+
+function formatRelativeTime(date: Date): string {
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? "" : "s"} ago`;
+  if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? "" : "s"} ago`;
+  return date.toLocaleDateString();
+}
+
+export function RecentTracesStreamCard({
+  site = "us5.datadoghq.com",
+}: RecentTracesStreamCardProps) {
   const { data: conversation } = useActiveConversation();
   const conversationId = conversation?.id;
+  const events = useEventStore((state) => state.events);
 
   const langfuseUrl = conversationId
     ? getLangfuseSessionUrl(conversationId)
@@ -17,38 +114,7 @@ export function RecentTracesStreamCard({ site = "us5.datadoghq.com" }: RecentTra
 
   const datadogUrl = `https://app.${site}/apm/services/grokbot`;
 
-  const traces = [
-    {
-      id: "trace-turn-3",
-      turn: "Turn #3",
-      timestamp: "1 min ago",
-      duration: "4.85s",
-      tokens: "5,280",
-      cost: "$0.0028",
-      toolCalls: 2,
-      status: "success",
-    },
-    {
-      id: "trace-turn-2",
-      turn: "Turn #2",
-      timestamp: "4 mins ago",
-      duration: "2.10s",
-      tokens: "2,450",
-      cost: "$0.0011",
-      toolCalls: 1,
-      status: "success",
-    },
-    {
-      id: "trace-turn-1",
-      turn: "Turn #1",
-      timestamp: "8 mins ago",
-      duration: "1.45s",
-      tokens: "1,820",
-      cost: "$0.0009",
-      toolCalls: 1,
-      status: "success",
-    },
-  ];
+  const traces = useMemo(() => buildTracesFromEvents(events), [events]);
 
   return (
     <div className="rounded-lg border border-[var(--oh-border)] bg-surface-raised p-4 transition-all">
@@ -84,41 +150,55 @@ export function RecentTracesStreamCard({ site = "us5.datadoghq.com" }: RecentTra
         </div>
       </div>
 
-      <div className="rounded border border-[var(--oh-border)] bg-surface overflow-hidden">
-        <div className="divide-y divide-[var(--oh-border-subtle)] font-mono text-xs">
-          {traces.map((trace) => (
-            <div
-              key={trace.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 hover:bg-surface-raised/40 transition-colors gap-2"
-            >
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/40">
-                  <CheckCircle2 className="size-3" />
-                  OK
-                </span>
-                <div>
-                  <span className="font-semibold text-foreground">
-                    {trace.turn}
+      {traces.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Layers className="size-6 text-[var(--oh-muted)] mb-2" />
+          <p className="text-xs text-[var(--oh-muted)]">
+            No traces recorded yet
+          </p>
+          <p className="text-[10px] text-[var(--oh-muted)] mt-1">
+            Traces appear as the agent processes turns in a conversation
+          </p>
+        </div>
+      ) : (
+        <div className="rounded border border-[var(--oh-border)] bg-surface overflow-hidden">
+          <div className="divide-y divide-[var(--oh-border-subtle)] font-mono text-xs">
+            {traces.map((trace) => (
+              <div
+                key={trace.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 hover:bg-surface-raised/40 transition-colors gap-2"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/40">
+                    {trace.status === "success" ? (
+                      <CheckCircle2 className="size-3" />
+                    ) : (
+                      <AlertCircle className="size-3" />
+                    )}
+                    {trace.status === "success" ? "OK" : "ERR"}
                   </span>
-                  <span className="text-[10px] text-[var(--oh-muted)] ml-2">
-                    {trace.timestamp}
+                  <div>
+                    <span className="font-semibold text-foreground">
+                      {trace.turn}
+                    </span>
+                    <span className="text-[10px] text-[var(--oh-muted)] ml-2">
+                      {trace.timestamp}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-[11px] text-[var(--oh-muted)]">
+                  <span className="flex items-center gap-1">
+                    <Clock className="size-3" />
+                    {trace.duration}
                   </span>
+                  <span>{trace.steps} tool calls</span>
                 </div>
               </div>
-
-              <div className="flex items-center gap-4 text-[11px] text-[var(--oh-muted)]">
-                <span className="flex items-center gap-1">
-                  <Clock className="size-3" />
-                  {trace.duration}
-                </span>
-                <span>{trace.tokens} tok</span>
-                <span className="text-emerald-400">{trace.cost}</span>
-                <span>{trace.toolCalls} tool calls</span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

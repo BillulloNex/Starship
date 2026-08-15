@@ -17,6 +17,20 @@ export interface ObservabilityMetrics {
   mcpToolMetrics: Record<string, McpToolStat>;
 }
 
+/**
+ * Per-model token/cost breakdown, keyed by model name.
+ * Populated from the `usage_to_metrics` WebSocket stats event.
+ */
+export interface PerModelMetrics {
+  modelName: string;
+  usageId: string;
+  cost: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}
+
 export interface MetricsState {
   cost: number | null;
   max_budget_per_task: number | null;
@@ -28,11 +42,13 @@ export interface MetricsState {
     context_window: number;
     per_turn_token: number;
   } | null;
+  perModelMetrics: Record<string, PerModelMetrics>;
   observability: ObservabilityMetrics;
 }
 
 export interface MetricsStore extends MetricsState {
   setMetrics: (metrics: Partial<MetricsState>) => void;
+  setPerModelMetrics: (metrics: Record<string, PerModelMetrics>) => void;
   recordTurnDuration: (durationMs: number) => void;
   recordMcpToolExecution: (
     toolName: string,
@@ -54,12 +70,15 @@ const EMPTY_METRICS: MetricsState = {
   cost: null,
   max_budget_per_task: null,
   usage: null,
+  perModelMetrics: {},
   observability: EMPTY_OBSERVABILITY,
 };
 
 const useMetricsStore = create<MetricsStore>((set, get) => ({
   ...EMPTY_METRICS,
   setMetrics: (metrics) => set((state) => ({ ...state, ...metrics })),
+  setPerModelMetrics: (metrics) =>
+    set((state) => ({ ...state, perModelMetrics: metrics })),
   recordTurnDuration: (durationMs: number) => {
     const { observability } = get();
     const newTotalTurns = observability.totalTurns + 1;
