@@ -21,7 +21,6 @@ import {
 } from "#/components/features/settings/observability-settings";
 import { I18nKey } from "#/i18n/declaration";
 import { SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
-import { cn } from "#/utils/utils";
 
 export function ObservabilityScreen() {
   const { t } = useTranslation("openhands");
