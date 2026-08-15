@@ -52,14 +52,20 @@ jobs:
 
       - name: Report Deployment to Datadog
         if: success()
+        continue-on-error: true
         env:
           DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
           DATADOG_SITE: ${{ secrets.DATADOG_SITE || 'us5.datadoghq.com' }}
         run: |
           if [ -n "$DATADOG_API_KEY" ]; then
-            npx -y @datadog/datadog-ci deployment mark \
-              --env production \
-              --service grokbot \
-              --revision ${{ github.sha }} \
-              --is-rollback false
+            curl -sf -X POST "https://api.${DATADOG_SITE}/api/v1/events" \
+              -H "DD-API-KEY: ${DATADOG_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "title": "Grokbot Deployment '${{ github.sha }}'",
+                "text": "Deployed Grokbot to production on '${{ github.ref_name }}'",
+                "alert_type": "info",
+                "source_type_name": "deployment",
+                "tags": ["env:production", "service:grokbot", "version:'${{ github.sha }}'"]
+              }' || true
           fi
