@@ -1,0 +1,71 @@
+name: Version Guard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Grokbot version bump
+        run: |
+          set -euo pipefail
+          # On pull_request, compare against base; on push to main, compare against parent commit
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            # Fallback for first push / empty before
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="HEAD~1"
+            fi
+          fi
+          echo "BASE=$BASE HEAD=$HEAD"
+
+          # Ensure files exist at HEAD
+          if ! git cat-file -e "$HEAD:VERSION" 2>/dev/null; then
+            echo "::error::VERSION file missing at HEAD"
+            exit 1
+          fi
+          NEW_VER=$(git show "$HEAD:VERSION" | tr -d ' \r\n')
+          echo "New VERSION: $NEW_VER"
+
+          # Validate semver format
+          if ! echo "$NEW_VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION must be x.y.z (semver), got: $NEW_VER"
+            exit 1
+          fi
+
+          # On PR, ensure VERSION changed vs base
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            OLD_VER=$(git show "$BASE:VERSION" 2>/dev/null | tr -d ' \r\n' || echo "0.0.0")
+            echo "Old VERSION: $OLD_VER"
+            if [ "$NEW_VER" = "$OLD_VER" ]; then
+              echo "::error::VERSION not bumped. Old=$OLD_VER New=$NEW_VER — run: node scripts/bump-version.mjs patch|minor|major"
+              exit 1
+            fi
+            # Ensure new > old (semver compare via sort -V)
+            HIGHEST=$(printf "%s\n%s\n" "$OLD_VER" "$NEW_VER" | sort -V | tail -n1)
+            if [ "$HIGHEST" != "$NEW_VER" ]; then
+              echo "::error::VERSION must increase. Old=$OLD_VER New=$NEW_VER"
+              exit 1
+            fi
+          fi
+
+          # Ensure TS mirror matches VERSION
+          TS_VER=$(git show "$HEAD:OpenHands/src/constants/grokbot-version.ts" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+          echo "TS GROKBOT_VERSION: $TS_VER"
+          if [ "$TS_VER" != "$NEW_VER" ]; then
+            echo "::error::OpenHands/src/constants/grokbot-version.ts ($TS_VER) out of sync with VERSION ($NEW_VER)"
+            exit 1
+          fi
+
+          echo "✓ Version guard passed: $NEW_VER"

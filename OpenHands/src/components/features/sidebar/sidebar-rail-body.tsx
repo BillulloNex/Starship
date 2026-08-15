@@ -22,6 +22,7 @@ import { BackendSelector } from "#/components/features/backends/backend-selector
 import { BackendStatusDot } from "#/components/features/backends/backend-status-dot";
 import { CommandMenuTrigger } from "#/components/features/command-menu/command-menu-trigger";
 import { AgentCanvasVersionTile } from "#/components/features/settings/agent-canvas-version-tile";
+import { GrokbotVersionBadge } from "./grokbot-version-badge";
 import { SidebarConversationList } from "./sidebar-conversation-list";
 import AutomationsIcon from "#/icons/automations.svg?react";
 import {
@@ -97,8 +98,9 @@ export function SidebarRailBody({
             className={cn(
               collapsed &&
                 showCollapseToggle &&
-                "flex h-full w-full items-center justify-start pl-2.5 transition-opacity duration-150",
+                "flex h-full w-full items-center justify-start gap-1.5 pl-2.5 transition-opacity duration-150",
               collapsed && showCollapsedExpandButton && "opacity-0",
+              !collapsed && !showCollapseToggle && "flex items-center gap-1.5",
             )}
           >
             <OpenHandsLogoButton
@@ -107,6 +109,7 @@ export function SidebarRailBody({
               logoClassName="max-w-none"
               className={cn(SIDEBAR_ICON_SLOT_CLASS, "overflow-visible")}
             />
+            {!collapsed ? <GrokbotVersionBadge /> : null}
           </div>
           {collapsed && showCollapseToggle ? (
             <button
