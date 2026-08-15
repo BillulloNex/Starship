@@ -32,6 +32,7 @@ import {
   isServerInfoRequest,
   proxyServerInfoRequest,
 } from "./proxy-utils.mjs";
+import { handleDatadogProxy } from "./datadog-proxy.mjs";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -151,6 +152,19 @@ export function startIngress(config) {
   const uninstallDiagnostics = proxy.installDiagnostics();
 
   const server = createServer((req, res) => {
+    const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+    if (parsedUrl.pathname.startsWith("/api/observability/datadog")) {
+      const query = Object.fromEntries(parsedUrl.searchParams.entries());
+      handleDatadogProxy(req, res, parsedUrl.pathname, query).catch((err) => {
+        console.error("Datadog proxy error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
     const backend = route(req.url ?? "/");
 
     if (!backend) {
