@@ -1,15 +1,16 @@
 import { Langfuse } from "langfuse";
 import { displayWarningToast } from "#/utils/custom-toast-handlers";
 
-const publicKey =
-  (import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as string | undefined) ||
-  "pk-lf-3019a7ca-af9b-43cf-9ea0-55cc31714b52";
-const secretKey =
-  (import.meta.env.VITE_LANGFUSE_SECRET_KEY as string | undefined) ||
-  "sk-lf-76a883bd-015c-47c8-89d1-cf6ec50797ff";
-const baseUrl =
-  (import.meta.env.VITE_LANGFUSE_BASE_URL as string | undefined) ||
-  "https://hipaa.cloud.langfuse.com";
+// Keys come only from build-time env (Coolify build variables) so no secrets
+// live in this repo. When unset, browser-side tracing disables itself; the
+// server-side OTEL path (docker/entrypoint.sh) still traces all models.
+const publicKey = import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as
+  | string
+  | undefined;
+const secretKey = import.meta.env.VITE_LANGFUSE_SECRET_KEY as
+  | string
+  | undefined;
+const baseUrl = import.meta.env.VITE_LANGFUSE_BASE_URL as string | undefined;
 
 let langfuseInstance: Langfuse | null = null;
 
@@ -36,7 +37,7 @@ function warnLangfuseFailure(context: string, err: unknown) {
 // ---------------------------------------------------------------------------
 
 export function getLangfuseBaseUrl(): string {
-  return baseUrl.replace(/\/$/, "");
+  return (baseUrl ?? "").replace(/\/$/, "");
 }
 
 export function isLangfuseEnabled(): boolean {
