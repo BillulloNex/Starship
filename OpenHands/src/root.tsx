@@ -9,10 +9,16 @@ import {
   useLocation,
   useNavigate,
   useNavigation as useRouterNavigation,
+  useRouteError,
+  isRouteErrorResponse,
 } from "react-router";
 import "./tailwind.css";
 import "./index.css";
 import React from "react";
+import {
+  isChunkLoadError,
+  reloadOnChunkError,
+} from "#/utils/handle-chunk-load-error";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import {
@@ -376,5 +382,60 @@ export default function App() {
       <Outlet />
       <TelemetryConsentBanner />
     </>
+  );
+}
+
+/* eslint-disable i18next/no-literal-string */
+export function ErrorBoundary() {
+  const error = useRouteError();
+
+  React.useEffect(() => {
+    if (isChunkLoadError(error)) {
+      reloadOnChunkError();
+    }
+  }, [error]);
+
+  if (isRouteErrorResponse(error)) {
+    return (
+      <main className="min-h-screen bg-base flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="max-w-md rounded-2xl border border-white/10 bg-base/80 p-8 shadow-2xl space-y-4">
+          <h2 className="text-xl font-bold">
+            {error.status} {error.statusText}
+          </h2>
+          <p className="text-sm text-neutral-400">
+            {error.data instanceof Object
+              ? JSON.stringify(error.data)
+              : String(error.data || "")}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+          >
+            Reload Page
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-base flex flex-col items-center justify-center p-6 text-white text-center">
+      <div className="max-w-md rounded-2xl border border-white/10 bg-base/80 p-8 shadow-2xl space-y-4">
+        <h2 className="text-xl font-bold">Application Error</h2>
+        <p className="text-sm text-neutral-400">
+          {error instanceof Error
+            ? error.message
+            : "An unexpected error occurred while loading the application."}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+        >
+          Reload Page
+        </button>
+      </div>
+    </main>
   );
 }
