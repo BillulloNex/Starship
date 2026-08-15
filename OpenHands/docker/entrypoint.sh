@@ -155,7 +155,7 @@ fi
 # Precedence: container env (Coolify) > defaults.env > OTEL disabled.
 LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-${CONFIG_LANGFUSE_PUBLIC_KEY:-}}"
 LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-${CONFIG_LANGFUSE_SECRET_KEY:-}}"
-LANGFUSE_HOST="${LANGFUSE_BASE_URL:-${LANGFUSE_HOST:-${CONFIG_LANGFUSE_HOST:-https://hipaa.cloud.langfuse.com}}}"
+LANGFUSE_HOST="${LANGFUSE_BASE_URL:-${LANGFUSE_HOST:-${CONFIG_LANGFUSE_HOST:-}}}"
 
 if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$LANGFUSE_SK" ]; then
   LANGFUSE_B64="$(printf '%s:%s' "$LANGFUSE_PK" "$LANGFUSE_SK" | base64 | tr -d '\n')"
