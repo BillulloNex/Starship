@@ -37,8 +37,8 @@
   "telemetry": {
     "posthogApiKey": "phc_kBtz5nKmxVRRQ7HtPwr2QX9eMC5j65zE86QKocVNwb4U",
     "posthogHost": "https://us.i.posthog.com",
-    "langfusePublicKey": "pk-lf-3019a7ca-af9b-43cf-9ea0-55cc31714b52",
-    "langfuseSecretKey": "sk-lf-76a883bd-015c-47c8-89d1-cf6ec50797ff",
-    "langfuseHost": "https://hipaa.cloud.langfuse.com"
+    "langfusePublicKey": "",
+    "langfuseSecretKey": "",
+    "langfuseHost": ""
   }
 }
