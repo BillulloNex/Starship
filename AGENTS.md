@@ -31,7 +31,13 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 - `Dockerfile` builds a combined image (agent-server + automation + frontend) and deploys via Coolify on push to `main`.
 - `OpenHands/config/defaults.json` holds version pins; `OpenHands/package.json` is the upstream npm version — do not confuse with Grokbot's `VERSION`.
 
-## Workflow
+## Deployment Workflow (CRITICAL — Auto-Deploy via GitHub App)
 
-- Branch from `main`, commit, push, open PR with `create_pr` tool. Never push directly to `main`.
+- **Pushing or merging to `main` automatically triggers Coolify deployment.** Coolify is connected to GitHub via the GitHub App and automatically queues a build upon every push.
+- **NEVER call the manual Coolify `deploy` tool after pushing to `main`.** Doing so creates a duplicate deployment of the exact same commit.
+- **How to monitor and verify deployment:**
+  1. Commit and push/merge to `main`.
+  2. Coolify will automatically start building within ~5 seconds.
+  3. Use `list_deployments` or `deployment(action: "get")` (read-only monitoring) to watch the build until status is `finished`.
+  4. Verify production health via `curl -s http://grok.beenex.org/health`.
 - Run `npm --prefix OpenHands run lint` / `build` when touching frontend code; keep diffs minimal.
