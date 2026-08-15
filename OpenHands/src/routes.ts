@@ -19,6 +19,7 @@ export default [
     route("skills", "routes/skills-settings.tsx"),
     route("plugins", "routes/skills-plugins.tsx"),
     route("mcp", "routes/mcp.tsx"),
+    route("observability", "routes/observability.tsx"),
     route("settings", "routes/settings.tsx", [
       index("routes/settings-index.tsx"),
       route("llm", "routes/llm-settings.tsx"),
@@ -29,7 +30,6 @@ export default [
       route("verification", "routes/verification-settings.tsx"),
       route("app", "routes/app-settings.tsx"),
       route("secrets", "routes/secrets-settings.tsx"),
-      route("observability", "routes/observability-settings.tsx"),
     ]),
     route("oauth/device/verify", "routes/device-verify.tsx"),
     route("automations", "routes/automations-list.tsx"),

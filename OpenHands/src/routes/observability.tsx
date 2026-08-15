@@ -15,12 +15,9 @@ import {
   MonitorsAlertsCard,
   DatadogSetupGuideCard,
 } from "#/components/features/settings/observability-settings";
-import { Typography } from "#/ui/typography";
 import { I18nKey } from "#/i18n/declaration";
 
-export const handle = { hideTitle: true };
-
-export function ObservabilitySettingsScreen() {
+export function ObservabilityScreen() {
   const { t } = useTranslation("openhands");
   const [timeframe, setTimeframe] = useState<string>("1h");
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<
@@ -60,63 +57,63 @@ export function ObservabilitySettingsScreen() {
   const service = statusData?.service || summaryData?.service || "grokbot";
 
   return (
-    <div
-      data-testid="observability-settings-screen"
-      className="flex flex-col gap-5 max-w-6xl"
+    <main
+      data-testid="observability-screen"
+      className="h-full flex-1 overflow-y-auto p-6"
     >
-      <div className="space-y-1">
-        <Typography.H2>
-          {t(I18nKey.SETTINGS$NAV_OBSERVABILITY)}
-        </Typography.H2>
-        <p
-          data-testid="settings-page-subtitle"
-          className="text-sm leading-5 text-tertiary-light"
-        >
-          {t(I18nKey.SETTINGS$PAGE_OBSERVABILITY_SUBLINE)}
-        </p>
-      </div>
+      <div className="mx-auto max-w-6xl space-y-4">
+        {/* Header */}
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-content">
+            {t(I18nKey.SETTINGS$NAV_OBSERVABILITY)}
+          </h1>
+          <p className="text-sm text-muted">
+            {t(I18nKey.SETTINGS$PAGE_OBSERVABILITY_SUBLINE)}
+          </p>
+        </div>
 
-      {!isLoadingStatus && !isConfigured ? (
-        <DatadogSetupGuideCard
-          site={site}
-          hasApiKey={statusData?.hasApiKey}
-          hasAppKey={statusData?.hasAppKey}
-        />
-      ) : null}
+        {!isLoadingStatus && !isConfigured ? (
+          <DatadogSetupGuideCard
+            site={site}
+            hasApiKey={statusData?.hasApiKey}
+            hasAppKey={statusData?.hasAppKey}
+          />
+        ) : null}
 
-      <ObservabilityHeader
-        timeframe={timeframe}
-        setTimeframe={setTimeframe}
-        isFetching={isFetchingSummary}
-        onRefresh={handleManualRefresh}
-        autoRefreshInterval={autoRefreshInterval}
-        setAutoRefreshInterval={setAutoRefreshInterval}
-        site={site}
-        service={service}
-      />
-
-      <ServiceHealthGrid site={site} />
-
-      <ApmMetricsCard summary={summaryData} isLoading={isLoadingSummary} />
-
-      <LlmObservabilityCard site={site} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <LogsViewerCard
-          logs={logsData?.logs || []}
-          isLoading={isLoadingLogs}
+        <ObservabilityHeader
           timeframe={timeframe}
+          setTimeframe={setTimeframe}
+          isFetching={isFetchingSummary}
+          onRefresh={handleManualRefresh}
+          autoRefreshInterval={autoRefreshInterval}
+          setAutoRefreshInterval={setAutoRefreshInterval}
           site={site}
+          service={service}
         />
 
-        <MonitorsAlertsCard
-          monitors={monitorsData?.monitors || []}
-          isLoading={isLoadingMonitors}
-          site={site}
-        />
+        <ServiceHealthGrid site={site} />
+
+        <ApmMetricsCard summary={summaryData} isLoading={isLoadingSummary} />
+
+        <LlmObservabilityCard site={site} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <LogsViewerCard
+            logs={logsData?.logs || []}
+            isLoading={isLoadingLogs}
+            timeframe={timeframe}
+            site={site}
+          />
+
+          <MonitorsAlertsCard
+            monitors={monitorsData?.monitors || []}
+            isLoading={isLoadingMonitors}
+            site={site}
+          />
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
 
-export default ObservabilitySettingsScreen;
+export default ObservabilityScreen;
