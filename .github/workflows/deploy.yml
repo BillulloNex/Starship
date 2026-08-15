@@ -45,4 +45,15 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"uuid": "b13aardv73k5fyl01a80ggzc", "force": false}'
 
-
+      - name: Report Deployment to Datadog
+        if: success()
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        run: |
+          if [ -n "$DD_API_KEY" ]; then
+            npx -y @datadog/datadog-ci deployment mark \
+              --env production \
+              --service grokbot \
+              --revision ${{ github.sha }} \
+              --is-rollback false
+          fi

@@ -166,6 +166,33 @@ if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$
   log "Langfuse OTEL telemetry configured → ${LANGFUSE_HOST}"
 fi
 
+# ── Datadog APM + LLM Observability ──────────────────────────────────────────
+# When DD_API_KEY is set (via Coolify env), enable Datadog tracing on the
+# Python services. The Datadog Agent sidecar collects traces on its default
+# port (8126). DD_ENV, DD_SERVICE, DD_VERSION are standard Unified Service
+# Tagging variables.
+if [ -n "${DD_API_KEY:-}" ]; then
+  export DD_ENV="${DD_ENV:-production}"
+  export DD_SERVICE="${DD_SERVICE:-grokbot}"
+  export DD_VERSION="${DD_VERSION:-$(cat /opt/agent-canvas/VERSION 2>/dev/null || echo 'unknown')}"
+  # Enable APM
+  export DD_TRACE_ENABLED="${DD_TRACE_ENABLED:-true}"
+  # Enable Application Security Monitoring
+  export DD_APPSEC_ENABLED="${DD_APPSEC_ENABLED:-true}"
+  # Enable LLM Observability
+  export DD_LLMOBS_ENABLED="${DD_LLMOBS_ENABLED:-true}"
+  export DD_LLMOBS_ML_APP="${DD_LLMOBS_ML_APP:-grokbot}"
+  export DD_LLMOBS_AGENTLESS_ENABLED="${DD_LLMOBS_AGENTLESS_ENABLED:-false}"
+  # Log injection for correlated logs
+  export DD_LOGS_INJECTION="${DD_LOGS_INJECTION:-true}"
+  # Trace agent host (sidecar container or localhost)
+  export DD_AGENT_HOST="${DD_AGENT_HOST:-127.0.0.1}"
+  log "Datadog APM + LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE})"
+  DD_ENABLED=true
+else
+  DD_ENABLED=false
+fi
+
 # AGENT_SERVER_URL — needed by automation sandbox callbacks.
 export AGENT_SERVER_URL="${AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
 
@@ -197,15 +224,25 @@ trap cleanup EXIT SIGINT SIGTERM
 # ── 1. Start Agent Server ────────────────────────────────────────────────────
 log "Starting agent-server on port $AGENT_SERVER_PORT..."
 
-if command -v openhands-agent-server >/dev/null 2>&1; then
-  # Binary build (production image)
-  openhands-agent-server --port "$AGENT_SERVER_PORT" &
-elif [ -x /agent-server/.venv/bin/python ]; then
-  # Source build (development image)
-  /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+if [ "$DD_ENABLED" = "true" ] && command -v ddtrace-run >/dev/null 2>&1; then
+  log "Agent server will be traced by Datadog"
+  if command -v openhands-agent-server >/dev/null 2>&1; then
+    DD_SERVICE="grokbot-agent-server" ddtrace-run openhands-agent-server --port "$AGENT_SERVER_PORT" &
+  elif [ -x /agent-server/.venv/bin/python ]; then
+    DD_SERVICE="grokbot-agent-server" ddtrace-run /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+  else
+    log_error "Cannot find agent-server binary or source venv."
+    exit 1
+  fi
 else
-  log_error "Cannot find agent-server binary or source venv."
-  exit 1
+  if command -v openhands-agent-server >/dev/null 2>&1; then
+    openhands-agent-server --port "$AGENT_SERVER_PORT" &
+  elif [ -x /agent-server/.venv/bin/python ]; then
+    /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+  else
+    log_error "Cannot find agent-server binary or source venv."
+    exit 1
+  fi
 fi
 PIDS+=($!)
 
@@ -240,18 +277,35 @@ if [ -z "${AUTOMATION_DB_URL:-}" ]; then
 fi
 
 # The automation server uses uvicorn. Set AUTOMATION_PORT via its CLI.
-if command -v uvicorn >/dev/null 2>&1; then
-  uvicorn openhands.automation.app:app \
-    --host 0.0.0.0 \
-    --port "$AUTOMATION_PORT" &
-  PIDS+=($!)
-elif python -c "import openhands.automation" 2>/dev/null; then
-  python -m uvicorn openhands.automation.app:app \
-    --host 0.0.0.0 \
-    --port "$AUTOMATION_PORT" &
-  PIDS+=($!)
+if [ "$DD_ENABLED" = "true" ] && command -v ddtrace-run >/dev/null 2>&1; then
+  log "Automation server will be traced by Datadog"
+  if command -v uvicorn >/dev/null 2>&1; then
+    DD_SERVICE="grokbot-automation" ddtrace-run uvicorn openhands.automation.app:app \
+      --host 0.0.0.0 \
+      --port "$AUTOMATION_PORT" &
+    PIDS+=($!)
+  elif python -c "import openhands.automation" 2>/dev/null; then
+    DD_SERVICE="grokbot-automation" ddtrace-run python -m uvicorn openhands.automation.app:app \
+      --host 0.0.0.0 \
+      --port "$AUTOMATION_PORT" &
+    PIDS+=($!)
+  else
+    log "WARNING: Automation server not found, skipping."
+  fi
 else
-  log "WARNING: Automation server not found, skipping."
+  if command -v uvicorn >/dev/null 2>&1; then
+    uvicorn openhands.automation.app:app \
+      --host 0.0.0.0 \
+      --port "$AUTOMATION_PORT" &
+    PIDS+=($!)
+  elif python -c "import openhands.automation" 2>/dev/null; then
+    python -m uvicorn openhands.automation.app:app \
+      --host 0.0.0.0 \
+      --port "$AUTOMATION_PORT" &
+    PIDS+=($!)
+  else
+    log "WARNING: Automation server not found, skipping."
+  fi
 fi
 
 # ── 3. Wait for backends to be ready ─────────────────────────────────────────

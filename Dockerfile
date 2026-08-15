@@ -42,6 +42,17 @@ ARG VITE_LANGFUSE_BASE_URL=""
 ENV VITE_LANGFUSE_PUBLIC_KEY=${VITE_LANGFUSE_PUBLIC_KEY} \
     VITE_LANGFUSE_SECRET_KEY=${VITE_LANGFUSE_SECRET_KEY} \
     VITE_LANGFUSE_BASE_URL=${VITE_LANGFUSE_BASE_URL}
+
+# Datadog RUM — browser-side client token and app ID, supplied as Coolify
+# "Build Variables". When absent, the Datadog browser SDK is not initialised.
+ARG VITE_DD_APPLICATION_ID=""
+ARG VITE_DD_CLIENT_TOKEN=""
+ARG VITE_DD_SITE=""
+ARG VITE_DD_ENV=""
+ENV VITE_DD_APPLICATION_ID=${VITE_DD_APPLICATION_ID} \
+    VITE_DD_CLIENT_TOKEN=${VITE_DD_CLIENT_TOKEN} \
+    VITE_DD_SITE=${VITE_DD_SITE} \
+    VITE_DD_ENV=${VITE_DD_ENV}
 RUN npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
@@ -64,6 +75,7 @@ RUN node -e " \
     'CONFIG_LANGFUSE_PUBLIC_KEY=' + (c.telemetry.langfusePublicKey || ''), \
     'CONFIG_LANGFUSE_SECRET_KEY=' + (c.telemetry.langfuseSecretKey || ''), \
     'CONFIG_LANGFUSE_HOST=' + (c.telemetry.langfuseHost || ''), \
+    'CONFIG_DD_ENABLED=' + (c.telemetry.datadogEnabled || false), \
   ]; \
   require('fs').writeFileSync('/tmp/defaults.env', lines.join('\n') + '\n'); \
 "
@@ -104,6 +116,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==1.6.0"
 
+# ── Datadog APM + LLM Observability ──────────────────────────────────────────
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system "ddtrace" 2>/dev/null \
+    || pip install --no-cache-dir "ddtrace"
+
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
@@ -135,6 +153,9 @@ COPY OpenHands/tools/ /opt/agent-canvas/tools/
 
 # Copy generated defaults.env (from config/defaults.json via config-gen stage)
 COPY --from=config-gen /tmp/defaults.env /opt/agent-canvas/defaults.env
+
+# Copy the VERSION file for Datadog service tagging
+COPY VERSION /opt/agent-canvas/VERSION
 
 # Copy the entrypoint
 COPY OpenHands/docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh

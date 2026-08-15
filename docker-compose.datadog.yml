@@ -1,0 +1,53 @@
+# Datadog Agent sidecar for GrokBot observability.
+# Deploy alongside the main GrokBot container in Coolify.
+#
+# Required environment variables (set in Coolify):
+#   DD_API_KEY — Your Datadog API key
+#
+# Usage with docker compose:
+#   docker compose -f docker-compose.datadog.yml up -d
+#
+# Or deploy as a separate service in Coolify pointing to this file.
+
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: grokbot-datadog-agent
+    environment:
+      # ── Required ──
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE:-datadoghq.com}
+
+      # ── APM ──
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+
+      # ── Logs ──
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_CONTAINER_EXCLUDE="name:grokbot-datadog-agent"
+
+      # ── Infrastructure ──
+      - DD_PROCESS_AGENT_ENABLED=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+
+      # ── Unified Service Tagging ──
+      - DD_ENV=${DD_ENV:-production}
+      - DD_SERVICE=grokbot
+      - DD_TAGS=project:grokbot
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+
+    ports:
+      - "8126:8126"   # APM traces
+      - "8125:8125"   # DogStatsD metrics
+
+    restart: unless-stopped
+
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "datadog-agent", "service": "datadog-agent"}]'
