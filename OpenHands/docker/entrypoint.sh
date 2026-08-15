@@ -152,9 +152,10 @@ fi
 # ── Langfuse via OpenTelemetry ───────────────────────────────────────────────
 # Route agent-server OTEL traces to Langfuse's OTLP endpoint so ALL models
 # (including Kimi K3) get traced server-side — no browser CORS issues.
-LANGFUSE_PK="${CONFIG_LANGFUSE_PUBLIC_KEY:-pk-lf-3019a7ca-af9b-43cf-9ea0-55cc31714b52}"
-LANGFUSE_SK="${CONFIG_LANGFUSE_SECRET_KEY:-sk-lf-76a883bd-015c-47c8-89d1-cf6ec50797ff}"
-LANGFUSE_HOST="${CONFIG_LANGFUSE_HOST:-https://hipaa.cloud.langfuse.com}"
+# Precedence: container env (Coolify) > defaults.env > OTEL disabled.
+LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-${CONFIG_LANGFUSE_PUBLIC_KEY:-}}"
+LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-${CONFIG_LANGFUSE_SECRET_KEY:-}}"
+LANGFUSE_HOST="${LANGFUSE_BASE_URL:-${LANGFUSE_HOST:-${CONFIG_LANGFUSE_HOST:-https://hipaa.cloud.langfuse.com}}}"
 
 if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$LANGFUSE_SK" ]; then
   LANGFUSE_B64="$(printf '%s:%s' "$LANGFUSE_PK" "$LANGFUSE_SK" | base64 | tr -d '\n')"
