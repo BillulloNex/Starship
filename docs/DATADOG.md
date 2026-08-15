@@ -42,8 +42,9 @@ Set these in **Coolify** as environment variables on the GrokBot service:
 
 | Variable | Required | Description |
 |:---------|:--------:|:------------|
-| `DD_API_KEY` | ✅ | Datadog API key. Enables all backend tracing. |
-| `DD_SITE` | ❌ | Datadog site (default: `datadoghq.com`) |
+| `DD_API_KEY` | ✅ | Datadog API key. Enables all backend tracing and telemetry ingestion. |
+| `DD_APP_KEY` | ❌ | Datadog Application Key. Enables the built-in Observability dashboard (`/settings/observability`). |
+| `DD_SITE` | ❌ | Datadog site (default: `datadoghq.com` or `us5.datadoghq.com`) |
 | `DD_ENV` | ❌ | Environment tag (default: `production`) |
 | `DD_AGENT_HOST` | ❌ | Datadog Agent hostname (default: `127.0.0.1`) |
 | `DD_TRACE_ENABLED` | ❌ | Enable/disable APM (default: `true` when DD_API_KEY set) |
@@ -113,6 +114,19 @@ Or deploy it as a separate service in Coolify pointing to `docker-compose.datado
 - Docker container CPU, memory, disk
 - Process health (3 internal services)
 - Container restart events
+
+## Built-in Observability Dashboard
+
+Grokbot includes a native observability dashboard under **Settings → Observability** (`/settings/observability`).
+
+Features:
+- **Service Health Cards**: Status and port inspection for Agent Server, Automation, Frontend, and Datadog Sidecar.
+- **APM Performance**: Live Requests/sec, p50 and p95 latency percentiles with SVG trend sparklines, error rates, and CPU load.
+- **LLM Observability**: Generative AI tracing, prompt/completion/reasoning token stats, and security guards.
+- **Live Logs Stream**: Real-time error and warning logs with search filtering and detailed JSON inspection.
+- **Monitors & Alerting**: Live alert states (OK, Warning, Alert, No Data) with direct Datadog deep links.
+
+Requires `DD_API_KEY` and `DD_APP_KEY` set as runtime environment variables in Coolify.
 
 ## Jira Integration for Alerts
 
