@@ -13,6 +13,7 @@ import { cn } from "#/utils/utils";
 
 export interface CustomChatInputProps {
   disabled?: boolean;
+  isAgentProcessing?: boolean;
   isNewConversationPending?: boolean;
   hasStartedConversation?: boolean;
   showButton?: boolean;
@@ -29,6 +30,7 @@ export interface CustomChatInputProps {
 
 export function CustomChatInput({
   disabled = false,
+  isAgentProcessing = false,
   isNewConversationPending = false,
   hasStartedConversation,
   showButton = true,
@@ -186,6 +188,7 @@ export function CustomChatInput({
         <ChatInputContainer
           chatContainerRef={chatContainerRef}
           isDragOver={isDragOver}
+          isAgentProcessing={isAgentProcessing}
           disabled={isDisabled}
           canSubmit={canSubmit}
           hasStartedConversation={hasStartedConversation}

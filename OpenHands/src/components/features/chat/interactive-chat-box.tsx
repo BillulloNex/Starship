@@ -63,11 +63,15 @@ export function InteractiveChatBox({
     disabled ||
     curAgentState === AgentState.AWAITING_USER_CONFIRMATION ||
     isTaskPolling(subConversationTaskStatus);
+  const isAgentProcessing =
+    curAgentState === AgentState.RUNNING ||
+    curAgentState === AgentState.LOADING;
 
   return (
     <div data-testid="interactive-chat-box">
       <CustomChatInput
         disabled={isDisabled}
+        isAgentProcessing={isAgentProcessing}
         isNewConversationPending={disabled}
         hasStartedConversation={hasStartedConversation}
         onSubmit={handleSubmit}

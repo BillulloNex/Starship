@@ -11,6 +11,7 @@ import { SlashCommandItem } from "#/hooks/chat/use-slash-command";
 interface ChatInputContainerProps {
   chatContainerRef: React.RefObject<HTMLDivElement | null>;
   isDragOver: boolean;
+  isAgentProcessing: boolean;
   disabled: boolean;
   canSubmit: boolean;
   hasStartedConversation?: boolean;
@@ -37,6 +38,7 @@ interface ChatInputContainerProps {
 export function ChatInputContainer({
   chatContainerRef,
   isDragOver,
+  isAgentProcessing,
   disabled,
   canSubmit,
   hasStartedConversation,
@@ -69,7 +71,10 @@ export function ChatInputContainer({
       className={cn(
         "bg-[var(--oh-surface)] box-border content-stretch flex flex-col items-start justify-center p-4 relative rounded-[15px] w-full",
         conversationMode === "plan" && "border border-[#597FF4]",
+        isAgentProcessing && "chat-input-processing-border",
       )}
+      data-agent-processing={isAgentProcessing || undefined}
+      data-testid="chat-input-shell"
       onDragOver={(e) => onDragOver(e, disabled)}
       onDragLeave={(e) => onDragLeave(e, disabled)}
       onDrop={(e) => onDrop(e, disabled)}

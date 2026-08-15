@@ -632,6 +632,46 @@ button.extension-module-card-interactive {
   animation: gradient-slide 1.25s linear infinite;
 }
 
+@property --chat-input-rainbow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes chat-input-rainbow-flow {
+  to {
+    --chat-input-rainbow-angle: 360deg;
+  }
+}
+
+.chat-input-processing-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--oh-surface), var(--oh-surface)) padding-box,
+    conic-gradient(
+        from var(--chat-input-rainbow-angle),
+        #ff5f6d,
+        #ffc371,
+        #f9f871,
+        #42e695,
+        #45b7d1,
+        #7b61ff,
+        #f368e0,
+        #ff5f6d
+      )
+      border-box;
+  animation: chat-input-rainbow-flow 2.4s linear infinite;
+  box-shadow:
+    0 0 14px rgb(69 183 209 / 16%),
+    0 0 22px rgb(243 104 224 / 10%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-input-processing-border {
+    animation: none;
+  }
+}
+
 /* CTA card gradient and shadow */
 .cta-card-gradient {
   background:
