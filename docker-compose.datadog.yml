@@ -16,7 +16,7 @@ services:
     environment:
       # ── Required ──
       - DD_API_KEY=${DD_API_KEY}
-      - DD_SITE=${DD_SITE:-datadoghq.com}
+      - DD_SITE=${DD_SITE:-us5.datadoghq.com}
 
       # ── APM ──
       - DD_APM_ENABLED=true

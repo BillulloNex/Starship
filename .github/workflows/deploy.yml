@@ -34,6 +34,11 @@ jobs:
           tags: |
             ghcr.io/thomasvunguyen/grokbot:latest
             ghcr.io/thomasvunguyen/grokbot:${{ github.sha }}
+          build-args: |
+            VITE_DD_APPLICATION_ID=${{ secrets.VITE_DD_APPLICATION_ID }}
+            VITE_DD_CLIENT_TOKEN=${{ secrets.VITE_DD_CLIENT_TOKEN }}
+            VITE_DD_SITE=${{ secrets.DATADOG_SITE || 'us5.datadoghq.com' }}
+            VITE_DD_ENV=production
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -48,9 +53,10 @@ jobs:
       - name: Report Deployment to Datadog
         if: success()
         env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
+          DATADOG_SITE: ${{ secrets.DATADOG_SITE || 'us5.datadoghq.com' }}
         run: |
-          if [ -n "$DD_API_KEY" ]; then
+          if [ -n "$DATADOG_API_KEY" ]; then
             npx -y @datadog/datadog-ci deployment mark \
               --env production \
               --service grokbot \

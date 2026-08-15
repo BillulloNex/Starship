@@ -24,7 +24,7 @@ const DD_APPLICATION_ID = import.meta.env.VITE_DD_APPLICATION_ID as
 const DD_CLIENT_TOKEN = import.meta.env.VITE_DD_CLIENT_TOKEN as
   | string
   | undefined;
-const DD_SITE = (import.meta.env.VITE_DD_SITE as string) || "datadoghq.com";
+const DD_SITE = (import.meta.env.VITE_DD_SITE as string) || "us5.datadoghq.com";
 const DD_ENV = (import.meta.env.VITE_DD_ENV as string) || "production";
 const DD_SESSION_SAMPLE_RATE = Number(
   import.meta.env.VITE_DD_SESSION_SAMPLE_RATE ?? "100",

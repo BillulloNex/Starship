@@ -173,6 +173,7 @@ fi
 # Tagging variables.
 if [ -n "${DD_API_KEY:-}" ]; then
   export DD_ENV="${DD_ENV:-production}"
+  export DD_SITE="${DD_SITE:-us5.datadoghq.com}"
   export DD_SERVICE="${DD_SERVICE:-grokbot}"
   export DD_VERSION="${DD_VERSION:-$(cat /opt/agent-canvas/VERSION 2>/dev/null || echo 'unknown')}"
   # Enable APM
