@@ -116,11 +116,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==1.6.0"
 
-# ── Datadog APM + LLM Observability ──────────────────────────────────────────
+# ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system "ddtrace" 2>/dev/null \
-    || pip install --no-cache-dir "ddtrace"
+    uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
+    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"
 
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
