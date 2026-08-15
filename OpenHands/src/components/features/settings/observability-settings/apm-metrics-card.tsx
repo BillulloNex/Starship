@@ -5,7 +5,6 @@ import {
   Clock,
   Cpu,
   Layers,
-  TrendingDown,
 } from "lucide-react";
 import { DatadogSummaryResponse } from "#/api/observability-service/datadog.types";
 import { cn } from "#/utils/utils";
@@ -21,7 +20,7 @@ export interface ApmMetricsCardProps {
 function Sparkline({
   points,
   color = "#38bdf8",
-  height = 36,
+  height = 32,
 }: {
   points?: [number, number][];
   color?: string;
@@ -29,7 +28,7 @@ function Sparkline({
 }) {
   if (!points || points.length < 2) {
     return (
-      <div className="h-[36px] flex items-center justify-center text-[10px] text-[var(--oh-muted)]">
+      <div className="h-[32px] flex items-center justify-center text-[10px] text-[var(--oh-muted)]">
         No trend data
       </div>
     );
@@ -39,11 +38,11 @@ function Sparkline({
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const width = 140;
+  const width = 130;
 
   const pathPoints = points.map((p, idx) => {
     const x = (idx / (points.length - 1)) * width;
-    const y = height - ((p[1] - min) / range) * (height - 8) - 4;
+    const y = height - ((p[1] - min) / range) * (height - 6) - 3;
     return `${x},${y}`;
   });
 
@@ -74,13 +73,13 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
   const cpuUsage = metrics?.cpuUsagePercent ?? null;
 
   return (
-    <div className="rounded-xl border border-[var(--oh-border)] bg-[var(--oh-surface-raised)] p-4 shadow-sm">
-      <div className="flex items-center justify-between pb-3 border-b border-[var(--oh-border)] mb-4">
+    <div className="rounded-md border border-[var(--oh-border)] bg-surface-raised p-3">
+      <div className="flex items-center justify-between pb-2 border-b border-[var(--oh-border)] mb-3">
         <div className="flex items-center gap-2">
           <Layers className="size-4 text-sky-400" />
-          <h3 className="text-sm font-semibold text-foreground">
+          <span className="text-base font-semibold text-foreground">
             APM Performance & System Metrics
-          </h3>
+          </span>
         </div>
         <span className="text-xs text-[var(--oh-muted)]">
           Timeframe: {summary?.timeframe || "1h"}
@@ -89,7 +88,7 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Requests */}
-        <div className="flex flex-col justify-between p-3 rounded-lg border border-[var(--oh-border)] bg-surface">
+        <div className="flex flex-col justify-between p-3 rounded bg-surface border border-[var(--oh-border)]">
           <div>
             <div className="flex items-center justify-between text-xs text-[var(--oh-muted)] mb-1">
               <span>Total Requests</span>
@@ -106,7 +105,7 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
         </div>
 
         {/* p95 Latency */}
-        <div className="flex flex-col justify-between p-3 rounded-lg border border-[var(--oh-border)] bg-surface">
+        <div className="flex flex-col justify-between p-3 rounded bg-surface border border-[var(--oh-border)]">
           <div>
             <div className="flex items-center justify-between text-xs text-[var(--oh-muted)] mb-1">
               <span>p95 Latency</span>
@@ -128,7 +127,7 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
         </div>
 
         {/* Error Rate */}
-        <div className="flex flex-col justify-between p-3 rounded-lg border border-[var(--oh-border)] bg-surface">
+        <div className="flex flex-col justify-between p-3 rounded bg-surface border border-[var(--oh-border)]">
           <div>
             <div className="flex items-center justify-between text-xs text-[var(--oh-muted)] mb-1">
               <span>Error Rate</span>
@@ -158,8 +157,8 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
               className={cn(
                 "px-1.5 py-0.5 rounded text-[10px] font-medium",
                 errorRate === 0
-                  ? "bg-emerald-500/10 text-emerald-300"
-                  : "bg-amber-500/10 text-amber-300",
+                  ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700/50"
+                  : "bg-amber-900/50 text-amber-300 border border-amber-700/50",
               )}
             >
               {errorRate === 0 ? "Optimal (0%)" : "Minor Errors"}
@@ -168,11 +167,11 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
         </div>
 
         {/* Host CPU & Load */}
-        <div className="flex flex-col justify-between p-3 rounded-lg border border-[var(--oh-border)] bg-surface">
+        <div className="flex flex-col justify-between p-3 rounded bg-surface border border-[var(--oh-border)]">
           <div>
             <div className="flex items-center justify-between text-xs text-[var(--oh-muted)] mb-1">
               <span>Host CPU Usage</span>
-              <Cpu className="size-3.5 text-violet-400" />
+              <Cpu className="size-3.5 text-sky-400" />
             </div>
             <div className="font-mono text-2xl font-bold text-foreground">
               {isLoading
@@ -183,7 +182,7 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-[var(--oh-border)]">
-            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-surface-deep rounded-full h-2 overflow-hidden border border-[var(--oh-border-subtle)]">
               <div
                 className={cn(
                   "h-2 rounded-full transition-all duration-500",
