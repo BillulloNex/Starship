@@ -15,16 +15,16 @@ export function DatadogSetupGuideCard({
   const appKeysUrl = `https://${site}/organization-settings/application-keys`;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 text-sm space-y-4">
+    <div className="rounded-md border border-amber-500/30 bg-surface-raised p-3 text-sm space-y-3">
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center size-8 rounded-lg bg-amber-500/20 text-amber-300 shrink-0">
+        <div className="flex items-center justify-center size-8 rounded bg-amber-900/40 border border-amber-700/50 text-amber-300 shrink-0">
           <Key className="size-4" />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-foreground">
-            Datadog Application Key Required for Dashboard
+          <h3 className="text-sm font-semibold text-foreground">
+            Datadog Application Key Required for In-App Dashboard
           </h3>
-          <p className="text-xs text-[var(--oh-muted)] mt-1">
+          <p className="text-xs text-[var(--oh-muted)] mt-0.5">
             While <span className="font-mono text-amber-200">DD_API_KEY</span>{" "}
             allows Grokbot to push logs and traces to Datadog, reading those
             statistics back into this screen requires an Application Key (
@@ -33,8 +33,8 @@ export function DatadogSetupGuideCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-        <div className="p-3 rounded-lg border border-[var(--oh-border)] bg-surface text-xs space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+        <div className="p-3 rounded border border-[var(--oh-border)] bg-surface text-xs space-y-1.5">
           <div className="flex items-center justify-between font-semibold text-foreground">
             <span>1. Generate Key in Datadog</span>
             <a
@@ -50,14 +50,14 @@ export function DatadogSetupGuideCard({
           <p className="text-[var(--oh-muted)]">
             Go to <strong>Organization Settings → Application Keys</strong>,
             click <strong>+ New Key</strong>, name it{" "}
-            <code className="px-1 py-0.5 rounded bg-black/40 text-sky-300">
+            <code className="px-1 py-0.5 rounded bg-surface-deep text-sky-300">
               grokbot-dashboard
             </code>
             , and copy the key value.
           </p>
         </div>
 
-        <div className="p-3 rounded-lg border border-[var(--oh-border)] bg-surface text-xs space-y-2">
+        <div className="p-3 rounded border border-[var(--oh-border)] bg-surface text-xs space-y-1.5">
           <div className="font-semibold text-foreground">
             <span>2. Save to Coolify Environment</span>
           </div>
@@ -74,7 +74,7 @@ export function DatadogSetupGuideCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs pt-2 border-t border-amber-500/20 text-[var(--oh-muted)]">
+      <div className="flex items-center justify-between text-xs pt-2 border-t border-[var(--oh-border)] text-[var(--oh-muted)]">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             {hasApiKey ? (

@@ -59,7 +59,7 @@ export function LogsViewerCard({
     const s = (status || "").toLowerCase();
     if (s === "error" || s === "err") {
       return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-900/50 text-rose-300 border border-rose-700/50">
           <AlertCircle className="size-3" />
           ERROR
         </span>
@@ -67,14 +67,14 @@ export function LogsViewerCard({
     }
     if (s === "warn" || s === "warning") {
       return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-700/50">
           <AlertTriangle className="size-3" />
           WARN
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-900/50 text-sky-300 border border-sky-700/50">
         <Info className="size-3" />
         INFO
       </span>
@@ -96,13 +96,13 @@ export function LogsViewerCard({
   };
 
   return (
-    <div className="rounded-xl border border-[var(--oh-border)] bg-[var(--oh-surface-raised)] p-4 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--oh-border)] mb-4">
+    <div className="rounded-md border border-[var(--oh-border)] bg-surface-raised p-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--oh-border)] mb-3">
         <div className="flex items-center gap-2">
-          <FileText className="size-4 text-violet-400" />
-          <h3 className="text-sm font-semibold text-foreground">
-            Live Logs & Error Stream
-          </h3>
+          <FileText className="size-4 text-amber-400" />
+          <span className="text-base font-semibold text-foreground">
+            Live Logs Stream
+          </span>
           <span className="text-xs text-[var(--oh-muted)]">
             ({filteredLogs.length} events in {timeframe})
           </span>
@@ -115,15 +115,15 @@ export function LogsViewerCard({
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-medium"
           >
-            <span>Datadog Log Explorer</span>
+            <span>Log Explorer</span>
             <ArrowUpRight className="size-3" />
           </a>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
-        <div className="flex items-center rounded-lg border border-[var(--oh-border)] bg-surface p-0.5 text-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3">
+        <div className="flex items-center rounded border border-[var(--oh-border)] bg-surface p-0.5 text-xs">
           {[
             { id: "all", label: "All Logs" },
             { id: "error", label: "Errors" },
@@ -135,9 +135,9 @@ export function LogsViewerCard({
               type="button"
               onClick={() => setFilterSeverity(f.id)}
               className={cn(
-                "px-2.5 py-1 rounded-md font-medium transition-all",
+                "px-2.5 py-1 rounded font-medium transition-colors",
                 filterSeverity === f.id
-                  ? "bg-[var(--oh-surface-raised)] text-white shadow-sm"
+                  ? "bg-surface-raised text-foreground shadow-sm"
                   : "text-[var(--oh-muted)] hover:text-foreground",
               )}
             >
@@ -147,19 +147,19 @@ export function LogsViewerCard({
         </div>
 
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 size-3.5 text-[var(--oh-muted)]" />
+          <Search className="absolute left-2.5 top-2 size-3.5 text-[var(--oh-muted)]" />
           <input
             type="text"
             placeholder="Search logs by message or service..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--oh-border)] bg-surface text-xs text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none focus:border-sky-500"
+            className="w-full pl-8 pr-3 py-1 rounded border border-[var(--oh-border)] bg-surface text-xs text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none focus:border-[var(--oh-color-primary)]"
           />
         </div>
       </div>
 
       {/* Logs Table / List */}
-      <div className="rounded-lg border border-[var(--oh-border)] bg-surface overflow-hidden">
+      <div className="rounded border border-[var(--oh-border)] bg-surface overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-xs text-[var(--oh-muted)]">
             Loading logs from Datadog...
@@ -169,17 +169,17 @@ export function LogsViewerCard({
             No logs matched the selected filters for this time window.
           </div>
         ) : (
-          <div className="divide-y divide-[var(--oh-border)] max-h-[380px] overflow-y-auto font-mono text-xs custom-scrollbar-always">
+          <div className="divide-y divide-[var(--oh-border-subtle)] max-h-[360px] overflow-y-auto font-mono text-xs custom-scrollbar-always">
             {filteredLogs.map((log) => {
               const isExpanded = expandedLogId === log.id;
               return (
                 <div
                   key={log.id}
-                  className="hover:bg-[var(--oh-surface-raised)]/50 transition-colors"
+                  className="hover:bg-surface-raised/40 transition-colors"
                 >
                   <div
                     onClick={() => toggleExpand(log.id)}
-                    className="flex items-start gap-2.5 p-2.5 cursor-pointer select-none"
+                    className="flex items-start gap-2.5 p-2 cursor-pointer select-none"
                   >
                     <button
                       type="button"
@@ -198,7 +198,7 @@ export function LogsViewerCard({
 
                     <div className="shrink-0">{getStatusBadge(log.status)}</div>
 
-                    <span className="text-[11px] font-semibold text-sky-300 px-1.5 py-0.5 rounded bg-sky-950/40 border border-sky-800/40 shrink-0">
+                    <span className="text-[11px] font-semibold text-sky-300 px-1.5 py-0.5 rounded bg-sky-950/60 border border-sky-800/40 shrink-0">
                       {log.service}
                     </span>
 
@@ -208,10 +208,10 @@ export function LogsViewerCard({
                   </div>
 
                   {isExpanded && (
-                    <div className="p-3 bg-black/40 border-t border-[var(--oh-border)] text-[11px] space-y-2">
+                    <div className="p-3 bg-surface-deep border-t border-[var(--oh-border-subtle)] text-[11px] space-y-2">
                       <div>
                         <span className="text-[var(--oh-muted)]">Full Message:</span>
-                        <pre className="mt-1 p-2 rounded bg-black/60 border border-[var(--oh-border)] text-foreground whitespace-pre-wrap break-all font-mono">
+                        <pre className="mt-1 p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-foreground whitespace-pre-wrap break-all font-mono">
                           {log.message}
                         </pre>
                       </div>
@@ -223,7 +223,7 @@ export function LogsViewerCard({
                             {log.tags.map((tag, idx) => (
                               <span
                                 key={idx}
-                                className="px-1.5 py-0.5 rounded bg-surface border border-[var(--oh-border)] text-[10px] text-[var(--oh-muted)]"
+                                className="px-1.5 py-0.5 rounded bg-surface border border-[var(--oh-border-subtle)] text-[10px] text-[var(--oh-muted)]"
                               >
                                 {tag}
                               </span>
@@ -235,7 +235,7 @@ export function LogsViewerCard({
                       {log.attributes && Object.keys(log.attributes).length > 0 && (
                         <div>
                           <span className="text-[var(--oh-muted)]">Attributes:</span>
-                          <pre className="mt-1 p-2 rounded bg-black/60 border border-[var(--oh-border)] text-[10px] text-foreground font-mono overflow-x-auto">
+                          <pre className="mt-1 p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-[10px] text-foreground font-mono overflow-x-auto">
                             {JSON.stringify(log.attributes, null, 2)}
                           </pre>
                         </div>
