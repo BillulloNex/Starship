@@ -1,0 +1,423 @@
+{
+  "title": "Grokbot — Full-Stack Observability",
+  "description": "Unified dashboard for Grokbot: APM, LLM Observability, Frontend RUM, Logs, and Container Health",
+  "layout_type": "ordered",
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "default": "production"
+    },
+    {
+      "name": "service",
+      "prefix": "service",
+      "default": "grokbot*"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "group",
+        "title": " Executive Overview & Key Health Signals",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Total Backend Requests",
+              "requests": [
+                {
+                  "q": "sum:trace.http.request.hits{$env, $service}.as_count()",
+                  "aggregator": "sum"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "p95 API Latency",
+              "requests": [
+                {
+                  "q": "p95:trace.http.request.duration{$env, $service}",
+                  "aggregator": "avg"
+                }
+              ],
+              "autoscale": true,
+              "custom_unit": "s",
+              "precision": 2
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Error Rate %",
+              "requests": [
+                {
+                  "q": "default_zero(sum:trace.http.request.errors{$env, $service}.as_count()) / default_zero(sum:trace.http.request.hits{$env, $service}.as_count()) * 100",
+                  "aggregator": "avg"
+                }
+              ],
+              "autoscale": true,
+              "custom_unit": "%",
+              "precision": 2
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Active RUM Sessions",
+              "requests": [
+                {
+                  "rum_query": {
+                    "search": {
+                      "query": "@type:session"
+                    },
+                    "compute": {
+                      "aggregation": "cardinality",
+                      "metric": "@session.id"
+                    },
+                    "group_by": []
+                  }
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "🤖 LLM Observability & Intelligence (LiteLLM & Agents)",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "LLM Requests by Model",
+              "requests": [
+                {
+                  "q": "sum:trace.litellm.completion.hits{$env} by {model}.as_count()",
+                  "display_type": "bars"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "LLM Response Latency (p50 vs p95 vs p99)",
+              "requests": [
+                {
+                  "q": "p50:trace.litellm.completion.duration{$env}",
+                  "display_type": "line",
+                  "style": { "palette": "purple", "line_type": "solid", "line_width": "normal" }
+                },
+                {
+                  "q": "p95:trace.litellm.completion.duration{$env}",
+                  "display_type": "line",
+                  "style": { "palette": "orange", "line_type": "solid", "line_width": "normal" }
+                },
+                {
+                  "q": "p99:trace.litellm.completion.duration{$env}",
+                  "display_type": "line",
+                  "style": { "palette": "red", "line_type": "dashed", "line_width": "thick" }
+                }
+              ],
+              "show_legend": true,
+              "yaxis": {
+                "label": "Seconds",
+                "include_zero": true
+              }
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Token Usage Over Time (Prompt vs Completion)",
+              "requests": [
+                {
+                  "q": "sum:trace.litellm.prompt_tokens{$env}.as_count()",
+                  "display_type": "area",
+                  "style": { "palette": "blue" }
+                },
+                {
+                  "q": "sum:trace.litellm.completion_tokens{$env}.as_count()",
+                  "display_type": "area",
+                  "style": { "palette": "green" }
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Top Models by Token Consumption",
+              "requests": [
+                {
+                  "q": "top(sum:trace.litellm.total_tokens{$env} by {model}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "⚙️ Backend APM & WebSocket Performance",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Request Throughput by Endpoint",
+              "requests": [
+                {
+                  "q": "sum:trace.http.request.hits{$env, $service} by {resource_name}.as_count()",
+                  "display_type": "bars"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Backend Latency Percentiles (Agent Server & Automation)",
+              "requests": [
+                {
+                  "q": "p50:trace.http.request.duration{$env, $service} by {service}",
+                  "display_type": "line"
+                },
+                {
+                  "q": "p95:trace.http.request.duration{$env, $service} by {service}",
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "HTTP Status Codes (2xx, 4xx, 5xx)",
+              "requests": [
+                {
+                  "q": "sum:trace.http.request.hits{$env, $service} by {http.status_code}.as_count()",
+                  "display_type": "bars"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "WebSocket Connection Events & Message Latency",
+              "requests": [
+                {
+                  "q": "sum:trace.websocket.message.hits{$env, $service}.as_count()",
+                  "display_type": "line"
+                },
+                {
+                  "q": "p95:trace.websocket.message.duration{$env, $service}",
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "💻 Frontend Real User Monitoring (RUM & Core Web Vitals)",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Core Web Vitals — Largest Contentful Paint (LCP)",
+              "requests": [
+                {
+                  "rum_query": {
+                    "search": {
+                      "query": "@type:view"
+                    },
+                    "compute": {
+                      "aggregation": "p75",
+                      "metric": "@view.largest_contentful_paint"
+                    },
+                    "group_by": []
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Core Web Vitals — Cumulative Layout Shift (CLS)",
+              "requests": [
+                {
+                  "rum_query": {
+                    "search": {
+                      "query": "@type:view"
+                    },
+                    "compute": {
+                      "aggregation": "p75",
+                      "metric": "@view.cumulative_layout_shift"
+                    },
+                    "group_by": []
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Top Frontend Errors & Exceptions",
+              "requests": [
+                {
+                  "rum_query": {
+                    "search": {
+                      "query": "@type:error"
+                    },
+                    "compute": {
+                      "aggregation": "count"
+                    },
+                    "group_by": [
+                      {
+                        "facet": "@error.message",
+                        "limit": 10,
+                        "sort": {
+                          "aggregation": "count",
+                          "order": "desc"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "User Actions & Click Heatmap",
+              "requests": [
+                {
+                  "rum_query": {
+                    "search": {
+                      "query": "@type:action"
+                    },
+                    "compute": {
+                      "aggregation": "count"
+                    },
+                    "group_by": [
+                      {
+                        "facet": "@action.name",
+                        "limit": 5,
+                        "sort": {
+                          "aggregation": "count",
+                          "order": "desc"
+                        }
+                      }
+                    ]
+                  },
+                  "display_type": "bars"
+                }
+              ],
+              "show_legend": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "🖥️ Host & Container Infrastructure Health",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Container CPU Usage %",
+              "requests": [
+                {
+                  "q": "avg:docker.cpu.usage{container_name:grokbot*} by {container_name}",
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true,
+              "yaxis": {
+                "max": "100",
+                "min": "0"
+              }
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Container Memory (RSS / Working Set)",
+              "requests": [
+                {
+                  "q": "avg:docker.mem.rss{container_name:grokbot*} by {container_name}",
+                  "display_type": "area"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Network I/O (Bytes In vs Out)",
+              "requests": [
+                {
+                  "q": "avg:docker.net.bytes_rcvd{container_name:grokbot*} by {container_name}",
+                  "display_type": "line"
+                },
+                {
+                  "q": "avg:docker.net.bytes_sent{container_name:grokbot*} by {container_name}",
+                  "display_type": "line"
+                }
+              ],
+              "show_legend": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Container Restart Count",
+              "requests": [
+                {
+                  "q": "sum:docker.containers.restarts{container_name:grokbot*}.as_count()",
+                  "display_type": "bars"
+                }
+              ],
+              "show_legend": true
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

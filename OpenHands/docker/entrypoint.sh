@@ -159,11 +159,11 @@ LANGFUSE_HOST="${LANGFUSE_BASE_URL:-${LANGFUSE_HOST:-${CONFIG_LANGFUSE_HOST:-}}}
 
 if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$LANGFUSE_SK" ]; then
   LANGFUSE_B64="$(printf '%s:%s' "$LANGFUSE_PK" "$LANGFUSE_SK" | base64 | tr -d '\n')"
+  export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
   export OTEL_EXPORTER_OTLP_ENDPOINT="${LANGFUSE_HOST}/api/public/otel"
-  # gRPC metadata keys must be lowercase ("Authorization" is rejected with
-  # "Illegal header key"); lowercase is also valid for HTTP (case-insensitive).
-  export OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic ${LANGFUSE_B64},x-langfuse-ingestion-version=4"
-  log "Langfuse OTEL telemetry configured → ${LANGFUSE_HOST}"
+  export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${LANGFUSE_HOST}/api/public/otel/v1/traces"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${LANGFUSE_B64},x-langfuse-ingestion-version=4"
+  log "Langfuse OTEL telemetry configured (HTTP/protobuf) → ${LANGFUSE_HOST}"
 fi
 
 # ── Datadog APM + LLM Observability ──────────────────────────────────────────
