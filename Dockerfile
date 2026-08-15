@@ -70,6 +70,16 @@ ENV AGENT_CANVAS_BASE_PATH=${VITE_BASE_PATH}
 
 USER root
 
+# The frontend already supports stdio MCP servers, but JavaScript-based servers
+# need node/npm/npx in the production image so the agent-server can spawn them.
+# Reuse the pinned Node build stage instead of installing from an external APT
+# repository or relying on the agent-server base image to provide Node.js.
+COPY --from=frontend-build /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend-build /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
+    node --version && npm --version && npx --version
+
 # Install system deps required by automation's transitive dependencies
 # (asyncpg needs libpq, which the agent-server base image may not include).
 RUN if command -v apt-get >/dev/null 2>&1; then \
