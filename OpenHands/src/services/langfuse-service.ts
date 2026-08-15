@@ -2,14 +2,11 @@ import { Langfuse } from "langfuse";
 import { displayWarningToast } from "#/utils/custom-toast-handlers";
 
 const publicKey =
-  (import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as string | undefined) ||
-  "pk-lf-3019a7ca-af9b-43cf-9ea0-55cc31714b52";
+  (import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as string | undefined) || "";
 const secretKey =
-  (import.meta.env.VITE_LANGFUSE_SECRET_KEY as string | undefined) ||
-  "sk-lf-76a883bd-015c-47c8-89d1-cf6ec50797ff";
+  (import.meta.env.VITE_LANGFUSE_SECRET_KEY as string | undefined) || "";
 const baseUrl =
-  (import.meta.env.VITE_LANGFUSE_BASE_URL as string | undefined) ||
-  "https://hipaa.cloud.langfuse.com";
+  (import.meta.env.VITE_LANGFUSE_BASE_URL as string | undefined) || "";
 
 let langfuseInstance: Langfuse | null = null;
 
