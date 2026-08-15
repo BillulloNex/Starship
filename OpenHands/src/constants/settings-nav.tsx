@@ -1,4 +1,4 @@
-import { AppWindow, Brain, Shield } from "lucide-react";
+import { Activity, AppWindow, Brain, Shield } from "lucide-react";
 import KeyIcon from "#/icons/key.svg?react";
 import MemoryIcon from "#/icons/memory_icon.svg?react";
 import CircuitIcon from "#/icons/u-circuit.svg?react";
@@ -64,5 +64,11 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/secrets",
     text: "SETTINGS$NAV_SECRETS",
     subtitle: "SETTINGS$PAGE_SECRETS_SUBLINE",
+  },
+  {
+    icon: <Activity className="size-4" strokeWidth={2} aria-hidden />,
+    to: "/settings/observability",
+    text: "SETTINGS$NAV_OBSERVABILITY",
+    subtitle: "SETTINGS$PAGE_OBSERVABILITY_SUBLINE",
   },
 ];
