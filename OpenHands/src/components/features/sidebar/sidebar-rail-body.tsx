@@ -96,11 +96,11 @@ export function SidebarRailBody({
         >
           <div
             className={cn(
+              "flex items-center gap-1.5",
               collapsed &&
                 showCollapseToggle &&
-                "flex h-full w-full items-center justify-start gap-1.5 pl-2.5 transition-opacity duration-150",
+                "h-full w-full justify-start pl-2.5 transition-opacity duration-150",
               collapsed && showCollapsedExpandButton && "opacity-0",
-              !collapsed && !showCollapseToggle && "flex items-center gap-1.5",
             )}
           >
             <OpenHandsLogoButton

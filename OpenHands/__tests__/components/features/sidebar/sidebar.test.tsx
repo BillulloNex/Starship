@@ -267,6 +267,17 @@ describe("Sidebar", () => {
     });
   });
 
+  it("keeps the version badge directly beside the logo", () => {
+    renderSidebar("/conversations");
+
+    const logo = screen.getByTestId("logo-button");
+    const versionBadge = screen.getByTestId("grokbot-version");
+    const logoRow = logo.parentElement;
+
+    expect(logoRow).toHaveClass("flex", "items-center");
+    expect(logo.nextElementSibling).toBe(versionBadge);
+  });
+
   it("toggles between expanded and collapsed states and persists the choice", () => {
     const { unmount } = renderSidebar("/conversations");
 
