@@ -65,10 +65,4 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     text: "SETTINGS$NAV_SECRETS",
     subtitle: "SETTINGS$PAGE_SECRETS_SUBLINE",
   },
-  {
-    icon: <Activity className="size-4" strokeWidth={2} aria-hidden />,
-    to: "/settings/observability",
-    text: "SETTINGS$NAV_OBSERVABILITY",
-    subtitle: "SETTINGS$PAGE_OBSERVABILITY_SUBLINE",
-  },
 ];

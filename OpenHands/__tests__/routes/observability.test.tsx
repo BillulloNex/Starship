@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ObservabilitySettingsScreen } from "#/routes/observability-settings";
+import { ObservabilityScreen } from "#/routes/observability";
 import { DatadogService } from "#/api/observability-service/datadog-service.api";
 
-function renderObservabilitySettingsScreen() {
-  return render(<ObservabilitySettingsScreen />, {
-    wrapper: ({ children }) => (
+function renderObservabilityScreen() {
+  return render(
+    <MemoryRouter initialEntries={["/observability"]}>
       <QueryClientProvider
         client={
           new QueryClient({
@@ -14,13 +15,13 @@ function renderObservabilitySettingsScreen() {
           })
         }
       >
-        {children}
+        <ObservabilityScreen />
       </QueryClientProvider>
-    ),
-  });
+    </MemoryRouter>,
+  );
 }
 
-describe("ObservabilitySettingsScreen", () => {
+describe("ObservabilityScreen", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -74,9 +75,9 @@ describe("ObservabilitySettingsScreen", () => {
       monitors: [],
     });
 
-    renderObservabilitySettingsScreen();
+    renderObservabilityScreen();
 
-    await screen.findByTestId("observability-settings-screen");
+    await screen.findByTestId("observability-screen");
     expect(await screen.findByText("Datadog Observability")).toBeInTheDocument();
     expect(await screen.findByText("Agent Server")).toBeInTheDocument();
     expect(await screen.findByText("Automation Server")).toBeInTheDocument();
