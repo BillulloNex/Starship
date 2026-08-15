@@ -36,14 +36,14 @@ export interface ProcessedTitle {
  * @example
  * extractRepoName("ThomasVuNguyen/GrokBot") // "GrokBot"
  * extractRepoName("my-repo")                // "my-repo"
- * extractRepoName(null)                     // "playground"
+ * extractRepoName(null)                     // null
  */
 export function extractRepoName(
   selectedRepository: string | null | undefined,
-): string {
-  if (!selectedRepository) return "playground";
+): string | null {
+  if (!selectedRepository) return null;
   const parts = selectedRepository.split("/");
-  return parts[parts.length - 1] || "playground";
+  return parts[parts.length - 1] || null;
 }
 
 /**
@@ -95,10 +95,12 @@ export function processConversationTitle(
     };
   }
 
-  // 3. Add project prefix (skip if already prefixed — idempotent)
+  // 3. Add project prefix when a repo is attached (skip if already prefixed)
   if (!hasProjectPrefix(cleaned)) {
     const prefix = extractRepoName(selectedRepository);
-    cleaned = `${prefix}: ${cleaned}`;
+    if (prefix) {
+      cleaned = `${prefix}: ${cleaned}`;
+    }
   }
 
   // 4. Enforce max length — truncate the action part, never the prefix

@@ -14,16 +14,16 @@ describe("extractRepoName", () => {
     expect(extractRepoName("my-repo")).toBe("my-repo");
   });
 
-  it("returns 'playground' for null", () => {
-    expect(extractRepoName(null)).toBe("playground");
+  it("returns null for null", () => {
+    expect(extractRepoName(null)).toBeNull();
   });
 
-  it("returns 'playground' for undefined", () => {
-    expect(extractRepoName(undefined)).toBe("playground");
+  it("returns null for undefined", () => {
+    expect(extractRepoName(undefined)).toBeNull();
   });
 
-  it("returns 'playground' for empty string", () => {
-    expect(extractRepoName("")).toBe("playground");
+  it("returns null for empty string", () => {
+    expect(extractRepoName("")).toBeNull();
   });
 
   it("handles deeply nested paths", () => {
@@ -90,14 +90,14 @@ describe("processConversationTitle", () => {
     expect(result.title).toBe("GrokBot: Casual greeting");
   });
 
-  it("adds 'playground' prefix when no repo", () => {
+  it("does not add a prefix when no repo is attached", () => {
     const result = processConversationTitle(
       "Deploy to production",
       "abc-123",
       null,
     );
     expect(result.isPlaceholder).toBe(false);
-    expect(result.title).toBe("playground: Deploy to production");
+    expect(result.title).toBe("Deploy to production");
   });
 
   it("enforces 50-char max with ellipsis", () => {
