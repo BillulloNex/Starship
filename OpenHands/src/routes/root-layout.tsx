@@ -38,9 +38,20 @@ const CommandMenu = React.lazy(() =>
   })),
 );
 
+import {
+  isChunkLoadError,
+  reloadOnChunkError,
+} from "#/utils/handle-chunk-load-error";
+
 export function ErrorBoundary() {
   const error = useRouteError();
   const { t } = useTranslation("openhands");
+
+  React.useEffect(() => {
+    if (isChunkLoadError(error)) {
+      reloadOnChunkError();
+    }
+  }, [error]);
 
   if (isRouteErrorResponse(error)) {
     return (

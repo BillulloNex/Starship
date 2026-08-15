@@ -14,6 +14,10 @@ import {
 import { waitForI18n } from "./i18n";
 import { shouldStartMockWorker } from "./mocks/should-start-mock-worker";
 
+import { setupChunkLoadErrorHandler } from "./utils/handle-chunk-load-error";
+
+setupChunkLoadErrorHandler();
+
 async function prepareApp() {
   await waitForI18n();
 
