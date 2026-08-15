@@ -57,7 +57,7 @@ import EventService from "#/api/event-service/event-service.api";
 import { getAgentServerClientOptions } from "#/api/agent-server-client-options";
 import { useConversationStore } from "#/stores/conversation-store";
 import { trackError } from "#/utils/error-handler";
-import { recordStatsGeneration } from "#/services/langfuse-service";
+import { fanoutGeneration } from "#/services/observability-fanout";
 import { useReadConversationFile } from "#/hooks/mutation/use-read-conversation-file";
 import useMetricsStore, { type MetricsState } from "#/stores/metrics-store";
 import { useConversationHistory } from "#/hooks/query/use-conversation-history";
@@ -658,7 +658,7 @@ export function ConversationWebSocketProvider({
                     (tokenUsage.prompt_tokens > 0 ||
                       tokenUsage.completion_tokens > 0)
                   ) {
-                    recordStatsGeneration({
+                    fanoutGeneration({
                       conversationId,
                       modelName:
                         metrics.model_name || tokenUsage.model || "unknown",

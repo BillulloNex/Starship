@@ -6,7 +6,7 @@ import { useAgentStore } from "#/stores/agent-store";
 import { AgentState } from "#/types/agent-state";
 import useMetricsStore from "#/stores/metrics-store";
 import { activeMcpToolCalls } from "./actions";
-import { recordMcpToolCall } from "./langfuse-service";
+import { fanoutToolCall } from "./observability-fanout";
 
 export function handleObservationMessage(message: ObservationMessage) {
   if (
@@ -28,7 +28,7 @@ export function handleObservationMessage(message: ObservationMessage) {
       .getState()
       .recordMcpToolExecution(toolName, serverName, durationMs, success);
 
-    recordMcpToolCall({
+    fanoutToolCall({
       conversationId: String(message.id ?? "active-conversation"),
       toolName,
       serverName,
