@@ -26,7 +26,6 @@ stryker*
 .env
 .env.*
 !.env.sample
-!OpenHands/.env
 .DS_Store
 dist
 coverage

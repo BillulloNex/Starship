@@ -72,7 +72,24 @@ ARG VITE_LANGWATCH_BASE_URL=""
 ENV VITE_LANGWATCH_API_KEY=${VITE_LANGWATCH_API_KEY} \
     VITE_LANGWATCH_BASE_URL=${VITE_LANGWATCH_BASE_URL}
 
-RUN rm -rf build && npm run build
+# Write a .env file from the ARG values so Vite picks them up at build time.
+# This avoids committing secrets to the repo — values come from Coolify build vars.
+RUN printf '%s\n' \
+      "VITE_POSTHOG_AI_ENABLED=${VITE_POSTHOG_AI_ENABLED}" \
+      "VITE_OPIK_API_KEY=${VITE_OPIK_API_KEY}" \
+      "VITE_OPIK_BASE_URL=${VITE_OPIK_BASE_URL}" \
+      "VITE_OPIK_WORKSPACE=${VITE_OPIK_WORKSPACE}" \
+      "VITE_LANGWATCH_API_KEY=${VITE_LANGWATCH_API_KEY}" \
+      "VITE_LANGWATCH_BASE_URL=${VITE_LANGWATCH_BASE_URL}" \
+      "VITE_LANGFUSE_PUBLIC_KEY=${VITE_LANGFUSE_PUBLIC_KEY}" \
+      "VITE_LANGFUSE_SECRET_KEY=${VITE_LANGFUSE_SECRET_KEY}" \
+      "VITE_LANGFUSE_BASE_URL=${VITE_LANGFUSE_BASE_URL}" \
+      "VITE_DD_APPLICATION_ID=${VITE_DD_APPLICATION_ID}" \
+      "VITE_DD_CLIENT_TOKEN=${VITE_DD_CLIENT_TOKEN}" \
+      "VITE_DD_SITE=${VITE_DD_SITE}" \
+      "VITE_DD_ENV=${VITE_DD_ENV}" \
+      > .env \
+    && rm -rf build && npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
 # This avoids needing jq/python at container runtime to parse the JSON.
