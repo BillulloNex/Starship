@@ -230,13 +230,41 @@ export function configureTelemetry(config: TelemetryConfiguration): void {
   }
 }
 
+function getRuntimeObsConfig(key: string): string | undefined {
+  if (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.[key]) {
+    return window.__OBSERVABILITY_CONFIG__[key];
+  }
+  return undefined;
+}
+
 function getResolvedTelemetryConfig(): Required<TelemetryConfig> | null {
   if (telemetryDisabled) return null;
 
+  const apiKey =
+    telemetryConfig.apiKey ||
+    getRuntimeObsConfig("VITE_POSTHOG_API_KEY") ||
+    getRuntimeObsConfig("POSTHOG_API_KEY") ||
+    (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
+    defaults.telemetry.posthogApiKey;
+
+  const apiHost =
+    telemetryConfig.apiHost ||
+    getRuntimeObsConfig("VITE_POSTHOG_HOST") ||
+    getRuntimeObsConfig("POSTHOG_HOST") ||
+    (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||
+    defaults.telemetry.posthogHost ||
+    "https://us.i.posthog.com";
+
+  const uiHost =
+    telemetryConfig.uiHost ||
+    getRuntimeObsConfig("VITE_POSTHOG_UI_HOST") ||
+    (import.meta.env.VITE_POSTHOG_UI_HOST as string | undefined) ||
+    DEFAULT_POSTHOG_UI_HOST;
+
   return {
-    apiKey: telemetryConfig.apiKey || DEFAULT_POSTHOG_API_KEY,
-    apiHost: telemetryConfig.apiHost || DEFAULT_POSTHOG_HOST,
-    uiHost: telemetryConfig.uiHost || DEFAULT_POSTHOG_UI_HOST,
+    apiKey,
+    apiHost,
+    uiHost,
   };
 }
 

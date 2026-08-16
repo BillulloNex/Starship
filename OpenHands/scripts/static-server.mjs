@@ -337,6 +337,11 @@ function makeConfigInjectionScript(
     "VITE_LANGWATCH_API_KEY",
     "VITE_LANGWATCH_BASE_URL",
     "VITE_POSTHOG_AI_ENABLED",
+    "VITE_POSTHOG_API_KEY",
+    "POSTHOG_API_KEY",
+    "VITE_POSTHOG_HOST",
+    "POSTHOG_HOST",
+    "VITE_POSTHOG_UI_HOST",
   ];
   for (const key of obsKeys) {
     if (process.env[key]) obsConfig[key] = process.env[key];
