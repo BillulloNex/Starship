@@ -207,6 +207,7 @@ export AUTOMATION_AGENT_SERVER_URL="${AUTOMATION_AGENT_SERVER_URL:-http://127.0.
 # Keep the legacy canvas_ui_tool module importable when the agent-server restores
 # conversations whose persisted metadata still references its module qualname.
 export OH_EXTRA_PYTHON_PATH="${OH_EXTRA_PYTHON_PATH:-/opt/agent-canvas/tools}"
+export PYTHONPATH="/opt/agent-canvas/tools:${PYTHONPATH:-}"
 
 # Track child PIDs so we can clean up on exit.
 PIDS=()
