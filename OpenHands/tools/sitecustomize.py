@@ -85,6 +85,11 @@ def _init_llmobs():
             def _create_span(self, kwargs, response_obj, start_time, end_time):
                 """Create an LLMObs span from a litellm call."""
                 try:
+                    print(
+                        f"[grokbot-dd-callback] _create_span called! "
+                        f"model={kwargs.get('model', '?')}",
+                        file=sys.stderr, flush=True,
+                    )
                     model = kwargs.get("model", "unknown")
                     messages = kwargs.get("messages", [])
                     provider = kwargs.get("custom_llm_provider", "litellm")
@@ -131,11 +136,19 @@ def _init_llmobs():
                             },
                         )
 
+                    print(
+                        f"[grokbot-dd-callback] span created OK "
+                        f"model={model} tokens={prompt_tokens}+{completion_tokens}",
+                        file=sys.stderr, flush=True,
+                    )
+
                 except Exception as e:
+                    import traceback
                     print(
                         f"[grokbot-dd-callback] span creation error: {type(e).__name__}: {e}",
                         file=sys.stderr, flush=True,
                     )
+                    traceback.print_exc(file=sys.stderr)
 
             def log_success_event(self, kwargs, response_obj, start_time, end_time):
                 """Sync success callback."""
@@ -143,6 +156,10 @@ def _init_llmobs():
 
             async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
                 """Async success callback — called for litellm.acompletion."""
+                print(
+                    f"[grokbot-dd-callback] async_log_success_event fired",
+                    file=sys.stderr, flush=True,
+                )
                 self._create_span(kwargs, response_obj, start_time, end_time)
 
             def log_failure_event(self, kwargs, response_obj, start_time, end_time):
@@ -167,15 +184,33 @@ def _init_llmobs():
                 """Async failure callback."""
                 self.log_failure_event(kwargs, response_obj, start_time, end_time)
 
-        # Register the callback
+        # Register the callback via multiple mechanisms for compatibility
         callback_instance = DatadogLLMObsCallback()
+
+        # Method 1: litellm.callbacks (newer litellm)
         if not hasattr(litellm, "callbacks") or litellm.callbacks is None:
             litellm.callbacks = []
         litellm.callbacks.append(callback_instance)
 
+        # Method 2: litellm.success_callback / failure_callback (older litellm)
+        if hasattr(litellm, "success_callback"):
+            if not isinstance(litellm.success_callback, list):
+                litellm.success_callback = []
+            litellm.success_callback.append(callback_instance)
+
+        if hasattr(litellm, "failure_callback"):
+            if not isinstance(litellm.failure_callback, list):
+                litellm.failure_callback = []
+            litellm.failure_callback.append(callback_instance)
+
+        # Log litellm version and callback state
+        lv = getattr(litellm, "__version__", "unknown")
+        cb_count = len(litellm.callbacks) if hasattr(litellm, "callbacks") else 0
+        sc_count = len(litellm.success_callback) if hasattr(litellm, "success_callback") and isinstance(litellm.success_callback, list) else 0
+
         print(
             f"[grokbot-sitecustomize] Datadog LLMObs callback registered "
-            f"(litellm.callbacks has {len(litellm.callbacks)} handler(s))",
+            f"(litellm={lv}, callbacks={cb_count}, success_callback={sc_count})",
             file=sys.stderr, flush=True,
         )
 
