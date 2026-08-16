@@ -59,10 +59,10 @@ check() {
   local name="$1" ok="$2" detail="${3:-}"
   if [[ "$ok" == "true" ]]; then
     RESULTS+=("✅ $name")
-    ((PASS++))
+    ((PASS++)) || true
   else
     RESULTS+=("❌ $name${detail:+ — $detail}")
-    ((FAIL++))
+    ((FAIL++)) || true
   fi
 }
 
@@ -114,6 +114,10 @@ check "PostHog API key valid" "$PH_VALID"
 echo "📋 Step 4: Creating test conversation..."
 CREATE_BODY=$(cat <<EOF
 {
+  "workspace": {
+    "working_dir": "/tmp/smoke-test",
+    "kind": "LocalWorkspace"
+  },
   "initial_message": {
     "content": [{"text": "Say exactly: SMOKE_TEST_OK. Nothing else."}]
   },
@@ -128,7 +132,7 @@ EOF
 )
 
 CREATE_RESP=$(api POST "/api/conversations" -d "$CREATE_BODY" 2>/dev/null) || CREATE_RESP=""
-CONV_ID=$(echo "$CREATE_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('conversation_id',''))" 2>/dev/null) || CONV_ID=""
+CONV_ID=$(echo "$CREATE_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('conversation_id', d.get('id', '')))" 2>/dev/null) || CONV_ID=""
 
 if [[ -n "$CONV_ID" ]]; then
   check "Conversation created" "true"
@@ -156,15 +160,17 @@ while [[ $ELAPSED -lt $TIMEOUT ]]; do
   ELAPSED=$((ELAPSED + 3))
 
   CONV_DETAIL=$(api GET "/api/conversations/$CONV_ID" 2>/dev/null) || CONV_DETAIL="{}"
-  AGENT_STATUS=$(echo "$CONV_DETAIL" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null) || AGENT_STATUS=""
+  AGENT_STATUS=$(echo "$CONV_DETAIL" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('execution_status', d.get('status', '')))" 2>/dev/null) || AGENT_STATUS=""
 
-  if [[ "$AGENT_STATUS" == "IDLE" || "$AGENT_STATUS" == "STOPPED" || "$AGENT_STATUS" == "FINISHED" ]]; then
+  if [[ "$AGENT_STATUS" == "idle" || "$AGENT_STATUS" == "stopped" || "$AGENT_STATUS" == "finished" || \
+        "$AGENT_STATUS" == "IDLE" || "$AGENT_STATUS" == "STOPPED" || "$AGENT_STATUS" == "FINISHED" ]]; then
     HAS_RESPONSE=true
     break
   fi
 
   # Also check for error states
-  if [[ "$AGENT_STATUS" == "ERROR" || "$AGENT_STATUS" == "PAUSED" ]]; then
+  if [[ "$AGENT_STATUS" == "ERROR" || "$AGENT_STATUS" == "PAUSED" || \
+        "$AGENT_STATUS" == "error" || "$AGENT_STATUS" == "paused" ]]; then
     break
   fi
 
@@ -177,14 +183,12 @@ check "Agent responded" "$HAS_RESPONSE" "status=$AGENT_STATUS after ${ELAPSED}s"
 # ── 6. Verify Events ──
 if [[ "$HAS_RESPONSE" == "true" ]]; then
   echo "📋 Step 6: Checking conversation events..."
-  EVENTS=$(api GET "/api/conversations/$CONV_ID/events" 2>/dev/null) || EVENTS="[]"
+  EVENTS=$(api GET "/api/conversations/$CONV_ID/events/search?source=agent&limit=5" 2>/dev/null) || EVENTS="[]"
   EVENT_COUNT=$(echo "$EVENTS" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-events = data if isinstance(data, list) else data.get('events', data.get('results', []))
-# Count assistant message events
-assistant = [e for e in events if isinstance(e, dict) and e.get('source') == 'agent']
-print(len(assistant))
+events = data if isinstance(data, list) else data.get('events', data.get('results', data.get('items', [])))
+print(len(events))
 " 2>/dev/null) || EVENT_COUNT="0"
 
   check "Agent events received" "$([[ "${EVENT_COUNT:-0}" -gt 0 ]] && echo true || echo false)" "count=$EVENT_COUNT"
