@@ -156,7 +156,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
-    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"
+    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"; \
+    if [ -d /agent-server/.venv ]; then \
+      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+    fi; \
+    if [ -d /openhands/.venv ]; then \
+      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+    fi
 
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous

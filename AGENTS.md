@@ -41,3 +41,16 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
   3. Use `list_deployments` or `deployment(action: "get")` (read-only monitoring) to watch the build until status is `finished`.
   4. Verify production health via `curl -s http://grok.beenex.org/health`.
 - Run `npm --prefix OpenHands run lint` / `build` when touching frontend code; keep diffs minimal.
+
+## Environment Variables (Coolify as Source of Truth)
+
+- **Coolify is the single source of truth for production configuration and secrets.**
+- **Never commit secrets, tokens, or environment values to Git.** (`.env.local` is strictly for local machine testing and is git-ignored).
+- **Managing Environment Variables:**
+  - **Runtime Variables** (backend API keys, server settings, ports): Configure in Coolify under `grokbot` $\rightarrow$ Environment Variables with **Build-Time: No**. Updating these requires a container restart/redeploy.
+  - **Build-Time Variables** (frontend `VITE_*` variables): Configure in Coolify under `grokbot` $\rightarrow$ Environment Variables with **Build-Time: Yes**. Updating these requires a full rebuild/redeploy so Vite bakes them into the static assets.
+- **Introducing New Variables in Code:**
+  1. Frontend: Declare the `ARG` and `ENV` in `Dockerfile` (lines 33–60) and access via `import.meta.env.VITE_*`.
+  2. Backend: Access via `process.env.*` or `os.environ.get(*)`.
+  3. Bump version, commit code changes to Git, and set the actual value in Coolify.
+
