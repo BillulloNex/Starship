@@ -96,8 +96,10 @@ class OpikBackend implements ObservabilityBackend {
       project_name: "grokbot",
       start_time: now,
       end_time: now,
-      input: { conversationId: data.conversationId },
-      output: {},
+      input: data.input
+        ? { prompt: data.input, conversationId: data.conversationId }
+        : { conversationId: data.conversationId },
+      output: data.output ? { response: data.output } : {},
       metadata: { cost: data.accumulatedCost },
       tags: [],
     });

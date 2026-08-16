@@ -90,8 +90,8 @@ class LangwatchBackend implements ObservabilityBackend {
       span_id: spanId,
       vendor: getProviderFromModel(data.modelName),
       model: data.modelName,
-      input: { type: "text", value: "Agent generation" },
-      output: { type: "text", value: "Generation completed" },
+      input: { type: "text", value: data.input || "Agent generation" },
+      output: { type: "text", value: data.output || "Generation completed" },
       metrics: {
         prompt_tokens: data.promptTokens,
         completion_tokens: data.completionTokens,

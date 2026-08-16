@@ -62,9 +62,8 @@ class PostHogAIBackend implements ObservabilityBackend {
   recordGeneration(data: GenerationData): void {
     if (!this.enabled) return;
 
-    // Skip stats-only events that arrive before the assistant response.
-    // The enriched event (with input/output text) fires separately when
-    // the assistant message is received, avoiding the race condition.
+    // Skip generations without input or output to avoid creating empty
+    // trace nodes in PostHog AI.
     if (!data.input && !data.output) return;
 
     let latencySeconds: number | undefined;
@@ -73,7 +72,7 @@ class PostHogAIBackend implements ObservabilityBackend {
       latencySeconds = last.latency; // already in seconds from agent-server
     }
 
-    this.capture("$ai_generation", {
+    const properties: Record<string, unknown> = {
       $ai_model: data.modelName,
       $ai_provider: getProviderFromModel(data.modelName),
       $ai_input_tokens: data.promptTokens,
@@ -81,12 +80,33 @@ class PostHogAIBackend implements ObservabilityBackend {
       $ai_total_cost_usd: data.accumulatedCost,
       $ai_latency: latencySeconds,
       $ai_trace_id: data.conversationId,
-      $ai_input: data.input,
-      $ai_output: data.output,
       cache_read_tokens: data.cacheReadTokens,
       cache_write_tokens: data.cacheWriteTokens,
       reasoning_tokens: data.reasoningTokens,
-    });
+    };
+
+    if (data.input) {
+      // PostHog AI conversation view expects $ai_input as an array of messages
+      properties.$ai_input = [
+        {
+          role: "user",
+          content: data.input,
+        },
+      ];
+    }
+
+    if (data.output) {
+      // PostHog AI conversation view expects $ai_output_choices or $ai_output
+      properties.$ai_output_choices = [
+        {
+          role: "assistant",
+          content: data.output,
+        },
+      ];
+      properties.$ai_output = data.output;
+    }
+
+    this.capture("$ai_generation", properties);
   }
 
   recordToolCall(data: ToolCallData): void {

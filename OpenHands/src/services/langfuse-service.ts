@@ -184,6 +184,8 @@ export interface RecordStatsGenerationOptions {
     latency: number;
     response_id: string;
   }>;
+  input?: unknown;
+  output?: unknown;
 }
 
 /**
@@ -203,6 +205,8 @@ export function recordStatsGeneration({
   cacheWriteTokens,
   reasoningTokens,
   responseLatencies,
+  input,
+  output,
 }: RecordStatsGenerationOptions) {
   const client = getLangfuseClient();
   if (!client) return;
@@ -245,6 +249,12 @@ export function recordStatsGeneration({
         responseId: lastLatency?.response_id,
         latencySeconds: lastLatency?.latency,
       },
+      input: input
+        ? [{ role: "user", content: input }]
+        : undefined,
+      output: output
+        ? [{ role: "assistant", content: output }]
+        : undefined,
       startTime,
       endTime,
     });
