@@ -9,14 +9,27 @@ import { OPIK_API_KEY, OPIK_BASE_URL, OPIK_WORKSPACE } from "./observability-con
 /**
  * Observability backend adapter for Comet Opik.
  * Sends traces and spans via REST API using fetch with simple batching.
+ *
+ * `enabled` is a getter evaluated at runtime (not build time) so Vite
+ * cannot tree-shake this module when the API key comes from runtime
+ * config injection (window.__OBSERVABILITY_CONFIG__).
  */
 class OpikBackend implements ObservabilityBackend {
   readonly name = "Opik";
-  readonly enabled = !!OPIK_API_KEY;
 
-  private apiKey = OPIK_API_KEY;
-  private baseUrl = OPIK_BASE_URL;
-  private workspace = OPIK_WORKSPACE;
+  get enabled(): boolean {
+    return !!OPIK_API_KEY;
+  }
+
+  private get apiKey() {
+    return OPIK_API_KEY;
+  }
+  private get baseUrl() {
+    return OPIK_BASE_URL;
+  }
+  private get workspace() {
+    return OPIK_WORKSPACE;
+  }
 
   private tracesBatch: Record<string, unknown>[] = [];
   private spansBatch: Record<string, unknown>[] = [];

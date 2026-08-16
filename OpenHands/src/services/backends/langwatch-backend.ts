@@ -18,13 +18,24 @@ function getProviderFromModel(modelName: string): string {
 /**
  * Observability backend adapter for Langwatch.
  * Sends traces and spans via REST collector API using fetch with simple batching.
+ *
+ * `enabled` is a getter evaluated at runtime (not build time) so Vite
+ * cannot tree-shake this module when the API key comes from runtime
+ * config injection (window.__OBSERVABILITY_CONFIG__).
  */
 class LangwatchBackend implements ObservabilityBackend {
   readonly name = "Langwatch";
-  readonly enabled = !!LANGWATCH_API_KEY;
 
-  private apiKey = LANGWATCH_API_KEY;
-  private endpoint = LANGWATCH_BASE_URL;
+  get enabled(): boolean {
+    return !!LANGWATCH_API_KEY;
+  }
+
+  private get apiKey() {
+    return LANGWATCH_API_KEY;
+  }
+  private get endpoint() {
+    return LANGWATCH_BASE_URL;
+  }
 
   // Mapping conversationId to their collected spans
   private tracesBatch: Record<string, unknown[]> = {};

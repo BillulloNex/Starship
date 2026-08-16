@@ -9,6 +9,15 @@
  * Adding a new backend = implement the interface + register it here.
  */
 
+import {
+  OPIK_API_KEY,
+  OPIK_BASE_URL,
+  OPIK_WORKSPACE,
+  LANGWATCH_API_KEY,
+  LANGWATCH_BASE_URL,
+  POSTHOG_AI_ENABLED,
+} from "./backends/observability-config";
+
 // ---------------------------------------------------------------------------
 // Shared data types — the canonical shapes for generation & tool events
 // ---------------------------------------------------------------------------
@@ -71,55 +80,51 @@ export function registerBackend(backend: ObservabilityBackend): void {
 // ---------------------------------------------------------------------------
 
 export function fanoutGeneration(data: GenerationData): void {
-  void ensureBackends().then(() => {
-    for (const backend of backends) {
-      if (!backend.enabled) continue;
-      try {
-        backend.recordGeneration(data);
-      } catch (err) {
-        console.warn(
-          `[observability:${backend.name}] recordGeneration error:`,
-          err,
-        );
-      }
+  for (const backend of backends) {
+    if (!backend.enabled) continue;
+    try {
+      backend.recordGeneration(data);
+    } catch (err) {
+      console.warn(
+        `[observability:${backend.name}] recordGeneration error:`,
+        err,
+      );
     }
-  });
+  }
 }
 
 export function fanoutToolCall(data: ToolCallData): void {
-  void ensureBackends().then(() => {
-    for (const backend of backends) {
-      if (!backend.enabled) continue;
-      try {
-        backend.recordToolCall(data);
-      } catch (err) {
-        console.warn(
-          `[observability:${backend.name}] recordToolCall error:`,
-          err,
-        );
-      }
+  for (const backend of backends) {
+    if (!backend.enabled) continue;
+    try {
+      backend.recordToolCall(data);
+    } catch (err) {
+      console.warn(
+        `[observability:${backend.name}] recordToolCall error:`,
+        err,
+      );
     }
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Lazy backend initialization — loaded on first event, never blocks render
-// ---------------------------------------------------------------------------
-
-let backendsLoaded = false;
-
-async function ensureBackends(): Promise<void> {
-  if (backendsLoaded) return;
-  backendsLoaded = true;
-
-  try {
-    await Promise.allSettled([
-      import("./backends/langfuse-backend"),
-      import("./backends/posthog-ai-backend"),
-      import("./backends/opik-backend"),
-      import("./backends/langwatch-backend"),
-    ]);
-  } catch (e) {
-    console.warn("[observability] Failed to load some backends:", e);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Backend initialization — backends are registered eagerly at module load.
+// Their `enabled` checks read from window.__OBSERVABILITY_CONFIG__ at
+// runtime, so they work even when build-time env vars are empty.
+//
+// We use a console.log side effect to prevent Vite from tree-shaking
+// the imports. This is intentional — observability must always load.
+// ---------------------------------------------------------------------------
+
+// Side-effect imports: each module calls registerBackend() at load time.
+import "./backends/langfuse-backend";
+import "./backends/posthog-ai-backend";
+import "./backends/opik-backend";
+import "./backends/langwatch-backend";
+
+// Force Vite to treat this module as having side effects by logging
+// at module evaluation time. This prevents tree-shaking.
+console.debug(
+  `[observability] ${backends.length} backends registered:`,
+  backends.map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", "),
+);

@@ -16,6 +16,11 @@ import { shouldStartMockWorker } from "./mocks/should-start-mock-worker";
 
 import { setupChunkLoadErrorHandler } from "./utils/handle-chunk-load-error";
 
+// Eagerly initialize observability backends so they're registered before
+// any app events fire. This import MUST be at the entry point level to
+// prevent Vite from tree-shaking the backend modules.
+import "./services/observability-fanout";
+
 setupChunkLoadErrorHandler();
 
 async function prepareApp() {

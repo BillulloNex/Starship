@@ -22,10 +22,16 @@ function getProviderFromModel(modelName: string): string {
 /**
  * Observability backend adapter for PostHog AI.
  * Captures events via the shared PostHog client when telemetry is enabled.
+ *
+ * `enabled` is a getter evaluated at runtime (not build time) so Vite
+ * cannot tree-shake this module.
  */
 class PostHogAIBackend implements ObservabilityBackend {
   readonly name = "PostHogAI";
-  readonly enabled = POSTHOG_AI_ENABLED;
+
+  get enabled(): boolean {
+    return POSTHOG_AI_ENABLED;
+  }
 
   private async capture(
     eventName: string,
