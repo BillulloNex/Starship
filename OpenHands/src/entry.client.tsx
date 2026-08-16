@@ -16,8 +16,7 @@ import { shouldStartMockWorker } from "./mocks/should-start-mock-worker";
 
 import { setupChunkLoadErrorHandler } from "./utils/handle-chunk-load-error";
 
-// TEMPORARILY DISABLED for debugging — see real error
-// setupChunkLoadErrorHandler();
+setupChunkLoadErrorHandler();
 
 async function prepareApp() {
   await waitForI18n();

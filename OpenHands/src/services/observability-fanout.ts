@@ -71,38 +71,55 @@ export function registerBackend(backend: ObservabilityBackend): void {
 // ---------------------------------------------------------------------------
 
 export function fanoutGeneration(data: GenerationData): void {
-  for (const backend of backends) {
-    if (!backend.enabled) continue;
-    try {
-      backend.recordGeneration(data);
-    } catch (err) {
-      console.warn(
-        `[observability:${backend.name}] recordGeneration error:`,
-        err,
-      );
+  void ensureBackends().then(() => {
+    for (const backend of backends) {
+      if (!backend.enabled) continue;
+      try {
+        backend.recordGeneration(data);
+      } catch (err) {
+        console.warn(
+          `[observability:${backend.name}] recordGeneration error:`,
+          err,
+        );
+      }
     }
-  }
+  });
 }
 
 export function fanoutToolCall(data: ToolCallData): void {
-  for (const backend of backends) {
-    if (!backend.enabled) continue;
-    try {
-      backend.recordToolCall(data);
-    } catch (err) {
-      console.warn(
-        `[observability:${backend.name}] recordToolCall error:`,
-        err,
-      );
+  void ensureBackends().then(() => {
+    for (const backend of backends) {
+      if (!backend.enabled) continue;
+      try {
+        backend.recordToolCall(data);
+      } catch (err) {
+        console.warn(
+          `[observability:${backend.name}] recordToolCall error:`,
+          err,
+        );
+      }
     }
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Backend imports — each self-registers on load
+// Lazy backend initialization — loaded on first event, never blocks render
 // ---------------------------------------------------------------------------
 
-import "./backends/langfuse-backend";
-import "./backends/posthog-ai-backend";
-import "./backends/opik-backend";
-import "./backends/langwatch-backend";
+let backendsLoaded = false;
+
+async function ensureBackends(): Promise<void> {
+  if (backendsLoaded) return;
+  backendsLoaded = true;
+
+  try {
+    await Promise.allSettled([
+      import("./backends/langfuse-backend"),
+      import("./backends/posthog-ai-backend"),
+      import("./backends/opik-backend"),
+      import("./backends/langwatch-backend"),
+    ]);
+  } catch (e) {
+    console.warn("[observability] Failed to load some backends:", e);
+  }
+}
