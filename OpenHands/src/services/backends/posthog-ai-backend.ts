@@ -41,18 +41,44 @@ class PostHogAIBackend implements ObservabilityBackend {
     if (!this.enabled || !isTelemetryEnabled()) return;
 
     try {
-      // Pass enableCapturing=true so PostHog is initialized with
-      // opt_out_capturing_by_default=false. If already initialized, this
-      // is a no-op (returns cached instance).
+      const apiKey =
+        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_API_KEY"]) ||
+        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["POSTHOG_API_KEY"]) ||
+        (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
+        "phc_uAcMi6kFo9gVGsUTtTxSRHQuspXojDphT9ZkcsbhSQt9";
+
+      const apiHost =
+        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_HOST"]) ||
+        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["POSTHOG_HOST"]) ||
+        (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||
+        "https://us.i.posthog.com";
+
+      // 1. Direct REST fetch to PostHog's capture API for instant delivery
+      if (apiKey) {
+        fetch(`${apiHost.replace(/\/$/, "")}/capture/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: apiKey,
+            event: eventName,
+            distinct_id: properties.$ai_trace_id || "grokbot-user",
+            properties,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch((err) => {
+          console.warn("[PostHogAI] direct capture fetch failed:", err);
+        });
+      }
+
+      // 2. Also pass to PostHog JS client instance
       const posthog = await initializePostHogClient(true);
-      console.debug("[PostHogAI] posthog instance:", posthog ? "loaded" : "null",
-        "has_opted_out:", posthog?.has_opted_out_capturing?.(),
-        "config.opt_out_default:", posthog?.config?.opt_out_capturing_by_default);
       if (posthog) {
-        // Ensure capturing is enabled — belt and suspenders
         posthog.opt_in_capturing();
         console.debug("[PostHogAI] calling posthog.capture:", eventName);
-        posthog.capture(eventName, properties);
+        posthog.capture(eventName, properties, { send_instantly: true });
+        if (typeof (posthog as unknown as { flush?: () => void }).flush === "function") {
+          (posthog as unknown as { flush: () => void }).flush();
+        }
       }
     } catch (e) {
       console.warn("Failed to capture PostHog AI event", e);
