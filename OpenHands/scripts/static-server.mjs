@@ -325,6 +325,27 @@ function makeConfigInjectionScript(
     );
   }
 
+  // Observability backend config — injected from runtime env vars so the
+  // pre-built bundle can reach Opik, Langwatch, etc. without needing the
+  // keys baked in at Vite build time.
+  const obsConfig = {};
+  const obsKeys = [
+    "VITE_OPIK_API_KEY",
+    "VITE_OPIK_BASE_URL",
+    "VITE_OPIK_WORKSPACE",
+    "VITE_LANGWATCH_API_KEY",
+    "VITE_LANGWATCH_BASE_URL",
+    "VITE_POSTHOG_AI_ENABLED",
+  ];
+  for (const key of obsKeys) {
+    if (process.env[key]) obsConfig[key] = process.env[key];
+  }
+  if (Object.keys(obsConfig).length > 0) {
+    parts.push(
+      `window.__OBSERVABILITY_CONFIG__=${JSON.stringify(obsConfig)};`,
+    );
+  }
+
   if (parts.length === 0) return "";
 
   return `<script>(function(){${parts.join("")}}());</script>`;
