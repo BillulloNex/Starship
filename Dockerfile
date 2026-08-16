@@ -54,9 +54,13 @@ ENV VITE_DD_APPLICATION_ID=${VITE_DD_APPLICATION_ID} \
     VITE_DD_SITE=${VITE_DD_SITE} \
     VITE_DD_ENV=${VITE_DD_ENV}
 
-# PostHog AI — enabled by default (reuses existing PostHog key)
+# PostHog — project API key, ingestion host, and AI feature flag
+ARG VITE_POSTHOG_API_KEY=""
+ARG VITE_POSTHOG_HOST=""
 ARG VITE_POSTHOG_AI_ENABLED=""
-ENV VITE_POSTHOG_AI_ENABLED=${VITE_POSTHOG_AI_ENABLED}
+ENV VITE_POSTHOG_API_KEY=${VITE_POSTHOG_API_KEY} \
+    VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST} \
+    VITE_POSTHOG_AI_ENABLED=${VITE_POSTHOG_AI_ENABLED}
 
 # Telemetry auto-consent — when "true", pre-grants telemetry consent in
 # localStorage so PostHog AI and other backends work without a consent banner.
@@ -80,6 +84,8 @@ ENV VITE_LANGWATCH_API_KEY=${VITE_LANGWATCH_API_KEY} \
 # Write a .env file from the ARG values so Vite picks them up at build time.
 # This avoids committing secrets to the repo — values come from Coolify build vars.
 RUN printf '%s\n' \
+      "VITE_POSTHOG_API_KEY=${VITE_POSTHOG_API_KEY}" \
+      "VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}" \
       "VITE_POSTHOG_AI_ENABLED=${VITE_POSTHOG_AI_ENABLED}" \
       "VITE_OPIK_API_KEY=${VITE_OPIK_API_KEY}" \
       "VITE_OPIK_BASE_URL=${VITE_OPIK_BASE_URL}" \
