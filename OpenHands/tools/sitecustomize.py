@@ -1,36 +1,56 @@
 """
-Grokbot sitecustomize — Auto-loaded by Python on startup.
+Grokbot sitecustomize — Datadog LLM Observability initialization.
 
-This file is intentionally minimal. Datadog LLM Observability is handled
-entirely by `ddtrace-run` which wraps the agent-server process. The
-following environment variables (set in entrypoint.sh) control behavior:
+Auto-loaded by Python on startup (via PYTHONPATH=/opt/agent-canvas/tools).
 
-  DD_LLMOBS_ENABLED=1
-  DD_LLMOBS_ML_APP=grokbot
-  DD_LLMOBS_AGENTLESS_ENABLED=1
-  DD_SITE=us5.datadoghq.com
-  DD_API_KEY=<from Coolify>
+Architecture:
+  - ddtrace-run handles APM patching (litellm, httpx, etc.)
+  - This file handles LLMObs initialization (agentless mode → llmobs-intake.{DD_SITE})
+  - We do NOT call ddtrace.auto or patch() here — that would conflict with ddtrace-run.
+  - We DO call LLMObs.enable() because ddtrace-run alone does not init LLMObs in
+    agentless mode; it requires a programmatic call or DD_LLMOBS_AGENTLESS_ENABLED=1
+    plus an explicit enable.
 
-ddtrace-run auto-patches litellm.completion / litellm.acompletion and
-sends LLM spans directly to Datadog's LLMObs intake. No manual patching
-or LLMObs.enable() call is needed here — doing so causes double-init
-conflicts that silently prevent spans from being submitted.
-
-This file only provides a lightweight startup log for debugging.
+The OTEL_EXPORTER_OTLP_ENDPOINT env var is set to Langfuse for OpenHands' native
+OTEL spans. DD_TRACE_OTEL_ENABLED=false prevents ddtrace from using that endpoint.
+LLMObs sends data to llmobs-intake.{DD_SITE} independently.
 """
 import os
 import sys
 
-_api_key = os.environ.get("DD_API_KEY", "")
-_llmobs = os.environ.get("DD_LLMOBS_ENABLED", "0")
-_ml_app = os.environ.get("DD_LLMOBS_ML_APP", "")
-_site = os.environ.get("DD_SITE", "")
-_agentless = os.environ.get("DD_LLMOBS_AGENTLESS_ENABLED", "0")
 
-if _api_key and _llmobs in ("1", "true", "yes"):
-    print(
-        f"[grokbot-sitecustomize] LLMObs config detected — "
-        f"ml_app={_ml_app}, site={_site}, agentless={_agentless}. "
-        f"Tracing is handled by ddtrace-run (no manual init here).",
-        file=sys.stderr, flush=True,
-    )
+def _init_llmobs():
+    dd_api_key = os.environ.get("DD_API_KEY", "").strip()
+    if not dd_api_key:
+        return
+
+    llmobs_flag = os.environ.get("DD_LLMOBS_ENABLED", "0").strip().lower()
+    if llmobs_flag not in ("1", "true", "yes"):
+        return
+
+    site = os.environ.get("DD_SITE", "us5.datadoghq.com").strip()
+    ml_app = os.environ.get("DD_LLMOBS_ML_APP", "grokbot").strip()
+    agentless = os.environ.get("DD_LLMOBS_AGENTLESS_ENABLED", "1").strip().lower() in ("1", "true", "yes")
+
+    try:
+        from ddtrace.llmobs import LLMObs
+
+        LLMObs.enable(
+            ml_app=ml_app,
+            api_key=dd_api_key,
+            site=site,
+            agentless_enabled=agentless,
+        )
+        print(
+            f"[grokbot-sitecustomize] LLMObs.enable() OK — "
+            f"ml_app={ml_app}, site={site}, agentless={agentless}",
+            file=sys.stderr, flush=True,
+        )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] LLMObs.enable() FAILED: {e}",
+            file=sys.stderr, flush=True,
+        )
+
+
+_init_llmobs()
