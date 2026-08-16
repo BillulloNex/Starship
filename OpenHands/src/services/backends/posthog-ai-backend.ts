@@ -37,16 +37,19 @@ class PostHogAIBackend implements ObservabilityBackend {
     eventName: string,
     properties: Record<string, unknown>,
   ) {
+    console.debug("[PostHogAI] capture called:", eventName, "enabled:", this.enabled, "telemetryEnabled:", isTelemetryEnabled());
     if (!this.enabled || !isTelemetryEnabled()) return;
 
     try {
       const posthog = await initializePostHogClient();
+      console.debug("[PostHogAI] posthog instance:", posthog ? "loaded" : "null");
       if (posthog) {
         // PostHog initializes with opt_out_capturing_by_default=true.
         // We've already verified consent via isTelemetryEnabled() above,
         // so unconditionally opt in before each capture to ensure the
         // event is not silently discarded.
         posthog.opt_in_capturing();
+        console.debug("[PostHogAI] calling posthog.capture:", eventName);
         posthog.capture(eventName, properties);
       }
     } catch (e) {
