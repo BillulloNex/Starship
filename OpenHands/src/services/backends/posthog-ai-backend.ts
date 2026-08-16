@@ -62,6 +62,11 @@ class PostHogAIBackend implements ObservabilityBackend {
   recordGeneration(data: GenerationData): void {
     if (!this.enabled) return;
 
+    // Skip stats-only events that arrive before the assistant response.
+    // The enriched event (with input/output text) fires separately when
+    // the assistant message is received, avoiding the race condition.
+    if (!data.input && !data.output) return;
+
     let latencySeconds: number | undefined;
     if (data.responseLatencies && data.responseLatencies.length > 0) {
       const last = data.responseLatencies[data.responseLatencies.length - 1];

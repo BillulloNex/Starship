@@ -184,6 +184,10 @@ export function ConversationWebSocketProvider({
   // Track the last user prompt for observability (PostHog AI input/output).
   const lastUserPromptRef = useRef<string | undefined>(undefined);
   const lastAssistantOutputRef = useRef<string | undefined>(undefined);
+  // Store the latest generation stats so we can fire PostHog AI events
+  // *after* the assistant response arrives (avoiding the race where stats
+  // events fire before the response text is available).
+  const pendingGenerationRef = useRef<Omit<import("#/services/observability-fanout").GenerationData, "input" | "output"> | undefined>(undefined);
 
   const isPlanFilePath = (path: string | null): boolean =>
     path?.toUpperCase().endsWith("PLAN.MD") ?? false;
@@ -633,6 +637,16 @@ export function ConversationWebSocketProvider({
           // Track assistant messages for observability (PostHog AI output)
           if (isMessageEvent(event) && event.llm_message.role === "assistant") {
             lastAssistantOutputRef.current = extractMessageEventText(event);
+            // Now that we have both input and output, fire the PostHog AI
+            // generation event using the stats we stored earlier.
+            if (pendingGenerationRef.current && lastUserPromptRef.current) {
+              fanoutGeneration({
+                ...pendingGenerationRef.current,
+                input: lastUserPromptRef.current,
+                output: lastAssistantOutputRef.current,
+              });
+              pendingGenerationRef.current = undefined;
+            }
           }
 
           // Handle cache invalidation for ActionEvent
@@ -673,7 +687,11 @@ export function ConversationWebSocketProvider({
                     (tokenUsage.prompt_tokens > 0 ||
                       tokenUsage.completion_tokens > 0)
                   ) {
-                    fanoutGeneration({
+                    // Store the latest stats for PostHog AI — we'll
+                    // fire the enriched event (with input/output text)
+                    // when the assistant response arrives, avoiding the
+                    // race condition where stats fire before the response.
+                    const genData = {
                       conversationId,
                       modelName:
                         metrics.model_name || tokenUsage.model || "unknown",
@@ -684,9 +702,13 @@ export function ConversationWebSocketProvider({
                       cacheWriteTokens: tokenUsage.cache_write_tokens,
                       reasoningTokens: tokenUsage.reasoning_tokens,
                       responseLatencies: metrics.response_latencies,
-                      input: lastUserPromptRef.current,
-                      output: lastAssistantOutputRef.current,
-                    });
+                    };
+                    pendingGenerationRef.current = genData;
+                    // Fire to Langfuse and other backends immediately
+                    // (they don't need input/output text). PostHog AI
+                    // will receive a separate call with text when the
+                    // assistant message arrives.
+                    fanoutGeneration(genData);
                   }
                 }
               }
