@@ -72,7 +72,7 @@ ARG VITE_LANGWATCH_BASE_URL=""
 ENV VITE_LANGWATCH_API_KEY=${VITE_LANGWATCH_API_KEY} \
     VITE_LANGWATCH_BASE_URL=${VITE_LANGWATCH_BASE_URL}
 
-RUN npm run build
+RUN rm -rf build && npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
 # This avoids needing jq/python at container runtime to parse the JSON.
