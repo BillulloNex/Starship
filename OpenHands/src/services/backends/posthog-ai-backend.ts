@@ -42,13 +42,11 @@ class PostHogAIBackend implements ObservabilityBackend {
     try {
       const posthog = await initializePostHogClient();
       if (posthog) {
-        // Heal opt-out drift: PostHog initializes with
-        // opt_out_capturing_by_default=true, but we've verified consent
-        // above via isTelemetryEnabled(). Explicitly opt in so capture()
-        // doesn't silently discard the event.
-        if (posthog.has_opted_out_capturing?.()) {
-          posthog.opt_in_capturing();
-        }
+        // PostHog initializes with opt_out_capturing_by_default=true.
+        // We've already verified consent via isTelemetryEnabled() above,
+        // so unconditionally opt in before each capture to ensure the
+        // event is not silently discarded.
+        posthog.opt_in_capturing();
         posthog.capture(eventName, properties);
       }
     } catch (e) {
