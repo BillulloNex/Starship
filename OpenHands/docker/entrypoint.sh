@@ -183,6 +183,12 @@ if [ -n "${DD_API_KEY:-}" ]; then
   export DD_LLMOBS_ENABLED="${DD_LLMOBS_ENABLED:-1}"
   export DD_LLMOBS_ML_APP="${DD_LLMOBS_ML_APP:-grokbot}"
   export DD_LLMOBS_AGENTLESS_ENABLED="${DD_LLMOBS_AGENTLESS_ENABLED:-1}"
+  # Explicitly enable the LiteLLM auto-instrumentation for LLMObs
+  export DD_TRACE_LITELLM_ENABLED="${DD_TRACE_LITELLM_ENABLED:-true}"
+  # Prevent ddtrace from routing its spans through the Langfuse OTEL exporter
+  # (OTEL_EXPORTER_OTLP_ENDPOINT is set to Langfuse above; ddtrace must use
+  # its own intake at llmobs-intake.{DD_SITE} instead).
+  export DD_TRACE_OTEL_ENABLED="${DD_TRACE_OTEL_ENABLED:-false}"
   # Log injection for correlated logs
   export DD_LOGS_INJECTION="${DD_LOGS_INJECTION:-true}"
   # Trace agent host (sidecar container or localhost)
