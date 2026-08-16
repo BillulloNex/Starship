@@ -1,39 +1,61 @@
 """
-Grokbot sitecustomize — Diagnostic logging only.
+Grokbot sitecustomize — Datadog LLM Observability initialization.
 
-LLMObs is initialized by ddtrace-run via environment variables:
-  - DD_LLMOBS_ENABLED=1
-  - DD_LLMOBS_ML_APP=grokbot
-  - DD_LLMOBS_AGENTLESS_ENABLED=1
-  - DD_API_KEY=<key>
-  - DD_SITE=us5.datadoghq.com
+This runs via PYTHONPATH (auto-loaded by Python). ddtrace-run patches
+modules before this runs, so LLMObs.enable() here is safe — it won't
+conflict with ddtrace-run's APM patching.
 
-We do NOT call LLMObs.enable() here — ddtrace-run handles it natively
-when DD_LLMOBS_ENABLED=1 is set. Calling it in sitecustomize.py may
-conflict with ddtrace-run's initialization order.
+Key insight: ddtrace-run patches litellm for APM traces, but does NOT
+auto-enable LLMObs agentless mode. LLMObs.enable() must be called
+explicitly for agentless operation.
 """
 import os
 import sys
 
 
-def _diag():
+def _init_llmobs():
     dd_api_key = os.environ.get("DD_API_KEY", "").strip()
     if not dd_api_key:
         return
 
-    print(
-        f"[grokbot-sitecustomize] DD env state: "
-        f"DD_API_KEY={'set' if dd_api_key else 'MISSING'}, "
-        f"DD_SITE={os.environ.get('DD_SITE', 'unset')}, "
-        f"DD_LLMOBS_ENABLED={os.environ.get('DD_LLMOBS_ENABLED', 'unset')}, "
-        f"DD_LLMOBS_AGENTLESS_ENABLED={os.environ.get('DD_LLMOBS_AGENTLESS_ENABLED', 'unset')}, "
-        f"DD_LLMOBS_ML_APP={os.environ.get('DD_LLMOBS_ML_APP', 'unset')}, "
-        f"DD_TRACE_ENABLED={os.environ.get('DD_TRACE_ENABLED', 'unset')}, "
-        f"DD_TRACE_LITELLM_ENABLED={os.environ.get('DD_TRACE_LITELLM_ENABLED', 'unset')}, "
-        f"DD_TRACE_OTEL_ENABLED={os.environ.get('DD_TRACE_OTEL_ENABLED', 'unset')}, "
-        f"DD_TRACE_DEBUG={os.environ.get('DD_TRACE_DEBUG', 'unset')}",
-        file=sys.stderr, flush=True,
-    )
+    llmobs_flag = os.environ.get("DD_LLMOBS_ENABLED", "0").strip().lower()
+    if llmobs_flag not in ("1", "true", "yes"):
+        return
+
+    site = os.environ.get("DD_SITE", "us5.datadoghq.com").strip()
+    ml_app = os.environ.get("DD_LLMOBS_ML_APP", "grokbot").strip()
+    agentless = os.environ.get("DD_LLMOBS_AGENTLESS_ENABLED", "1").strip().lower() in ("1", "true", "yes")
+
+    try:
+        from ddtrace.llmobs import LLMObs
+
+        # Check if LLMObs was already initialized by ddtrace-run
+        try:
+            if LLMObs.enabled:
+                print(
+                    f"[grokbot-sitecustomize] LLMObs already enabled by ddtrace-run — skipping",
+                    file=sys.stderr, flush=True,
+                )
+                return
+        except AttributeError:
+            pass  # .enabled may not exist in all versions
+
+        LLMObs.enable(
+            ml_app=ml_app,
+            api_key=dd_api_key,
+            site=site,
+            agentless_enabled=agentless,
+        )
+        print(
+            f"[grokbot-sitecustomize] LLMObs.enable() OK — "
+            f"ml_app={ml_app}, site={site}, agentless={agentless}",
+            file=sys.stderr, flush=True,
+        )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] LLMObs.enable() FAILED: {type(e).__name__}: {e}",
+            file=sys.stderr, flush=True,
+        )
 
 
-_diag()
+_init_llmobs()
