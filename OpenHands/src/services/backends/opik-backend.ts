@@ -4,6 +4,7 @@ import {
   ObservabilityBackend,
   registerBackend,
 } from "../observability-fanout";
+import { OPIK_API_KEY, OPIK_BASE_URL, OPIK_WORKSPACE } from "./observability-config";
 
 /**
  * Observability backend adapter for Comet Opik.
@@ -11,12 +12,11 @@ import {
  */
 class OpikBackend implements ObservabilityBackend {
   readonly name = "Opik";
-  readonly enabled = !!import.meta.env.VITE_OPIK_API_KEY;
+  readonly enabled = !!OPIK_API_KEY;
 
-  private apiKey = import.meta.env.VITE_OPIK_API_KEY;
-  private baseUrl =
-    import.meta.env.VITE_OPIK_BASE_URL || "https://www.comet.com/opik/api";
-  private workspace = import.meta.env.VITE_OPIK_WORKSPACE;
+  private apiKey = OPIK_API_KEY;
+  private baseUrl = OPIK_BASE_URL;
+  private workspace = OPIK_WORKSPACE;
 
   private tracesBatch: Record<string, unknown>[] = [];
   private spansBatch: Record<string, unknown>[] = [];

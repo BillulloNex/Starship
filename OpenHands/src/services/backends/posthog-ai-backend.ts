@@ -4,6 +4,7 @@ import {
   ObservabilityBackend,
   registerBackend,
 } from "../observability-fanout";
+import { POSTHOG_AI_ENABLED } from "./observability-config";
 import {
   isTelemetryEnabled,
   initializePostHogClient,
@@ -24,7 +25,7 @@ function getProviderFromModel(modelName: string): string {
  */
 class PostHogAIBackend implements ObservabilityBackend {
   readonly name = "PostHogAI";
-  readonly enabled = import.meta.env.VITE_POSTHOG_AI_ENABLED !== "false";
+  readonly enabled = POSTHOG_AI_ENABLED;
 
   private async capture(
     eventName: string,

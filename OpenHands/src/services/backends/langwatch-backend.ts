@@ -4,6 +4,7 @@ import {
   ObservabilityBackend,
   registerBackend,
 } from "../observability-fanout";
+import { LANGWATCH_API_KEY, LANGWATCH_BASE_URL } from "./observability-config";
 
 function getProviderFromModel(modelName: string): string {
   const lower = modelName.toLowerCase();
@@ -20,11 +21,10 @@ function getProviderFromModel(modelName: string): string {
  */
 class LangwatchBackend implements ObservabilityBackend {
   readonly name = "Langwatch";
-  readonly enabled = !!import.meta.env.VITE_LANGWATCH_API_KEY;
+  readonly enabled = !!LANGWATCH_API_KEY;
 
-  private apiKey = import.meta.env.VITE_LANGWATCH_API_KEY;
-  private endpoint =
-    import.meta.env.VITE_LANGWATCH_BASE_URL || "https://app.langwatch.ai";
+  private apiKey = LANGWATCH_API_KEY;
+  private endpoint = LANGWATCH_BASE_URL;
 
   // Mapping conversationId to their collected spans
   private tracesBatch: Record<string, unknown[]> = {};
