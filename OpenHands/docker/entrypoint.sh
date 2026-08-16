@@ -198,6 +198,8 @@ if [ -n "${DD_API_KEY:-}" ]; then
   # directly to llmobs-intake.{DD_SITE} via HTTPS independently.
   # Keep DD_TRACE_ENABLED=true so ddtrace-run patches litellm for LLMObs.
   export DD_TRACE_ENABLED="${DD_TRACE_ENABLED:-true}"
+  # Temporary: enable debug logging to diagnose why LLMObs spans aren't appearing
+  export DD_TRACE_DEBUG="${DD_TRACE_DEBUG:-true}"
   log "Datadog LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE}, agentless=${DD_LLMOBS_AGENTLESS_ENABLED})"
   DD_ENABLED=true
 else
