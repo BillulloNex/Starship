@@ -2,18 +2,18 @@
 Grokbot sitecustomize — Datadog LLM Observability initialization.
 
 This module is auto-loaded via PYTHONPATH. It initializes Datadog LLMObs
-in agentless mode and registers a custom litellm callback that creates
-manual LLMObs spans for every LLM call.
+in agentless mode and monkey-patches litellm.completion / litellm.acompletion
+to create manual LLMObs spans for every LLM call.
 
-Why a custom callback instead of ddtrace.patch(litellm=True)?
-  - ddtrace's auto-patching patches litellm.completion/acompletion at the
-    module level, but OpenHands SDK imports litellm through its own
-    abstraction layer, bypassing the patched functions.
-  - litellm's callback system (litellm.callbacks) fires for ALL LLM calls
-    regardless of how litellm is invoked.
+Why monkey-patching instead of litellm callbacks?
+  - OpenHands reinitializes litellm's callback lists, so callbacks
+    registered at startup are lost by the time actual LLM calls happen.
+  - Monkey-patching the functions themselves is immune to callback resets.
 """
 import os
 import sys
+import functools
+import time
 
 
 def _init_llmobs():
@@ -32,197 +32,167 @@ def _init_llmobs():
     # ── Step 1: Enable LLMObs ──
     try:
         from ddtrace.llmobs import LLMObs
-
-        try:
-            if LLMObs.enabled:
-                print(
-                    f"[grokbot-sitecustomize] LLMObs already enabled — skipping",
-                    file=sys.stderr, flush=True,
-                )
-                return
-        except AttributeError:
-            pass
+        import ddtrace
 
         LLMObs.enable(
             ml_app=ml_app,
             api_key=dd_api_key,
             site=site,
             agentless_enabled=agentless,
-            integrations_enabled=False,  # We handle it via custom callback
+            integrations_enabled=True,
         )
         print(
-            f"[grokbot-sitecustomize] LLMObs.enable() OK — "
-            f"ml_app={ml_app}, site={site}, agentless={agentless}",
+            f"[grokbot-sitecustomize] LLMObs.enable() OK — ml_app={ml_app}, "
+            f"site={site}, agentless={agentless}",
             file=sys.stderr, flush=True,
         )
-    except Exception as e:
-        import traceback
-        print(
-            f"[grokbot-sitecustomize] LLMObs.enable() FAILED: {type(e).__name__}: {e}",
-            file=sys.stderr, flush=True,
-        )
-        traceback.print_exc(file=sys.stderr)
-        return
-
-    # Report ddtrace version
-    try:
-        import ddtrace
         print(
             f"[grokbot-sitecustomize] ddtrace={ddtrace.__version__}",
             file=sys.stderr, flush=True,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] LLMObs.enable() FAILED: {e}",
+            file=sys.stderr, flush=True,
+        )
+        return
 
-    # ── Step 2: Register custom litellm callback ──
+    # ── Step 2: Monkey-patch litellm functions ──
+    # Instead of relying on litellm's callback system (which OpenHands may
+    # reinitialize), we wrap the actual functions to guarantee interception.
     try:
         import litellm
-        from litellm.integrations.custom_logger import CustomLogger
 
-        class DatadogLLMObsCallback(CustomLogger):
-            """litellm callback that creates Datadog LLMObs spans."""
+        lv = getattr(litellm, "__version__", "unknown")
 
-            def _create_span(self, kwargs, response_obj, start_time, end_time):
-                """Create an LLMObs span from a litellm call."""
-                try:
-                    print(
-                        f"[grokbot-dd-callback] _create_span called! "
-                        f"model={kwargs.get('model', '?')}",
-                        file=sys.stderr, flush=True,
-                    )
-                    model = kwargs.get("model", "unknown")
-                    messages = kwargs.get("messages", [])
-                    provider = kwargs.get("custom_llm_provider", "litellm")
+        def _create_llmobs_span(kwargs, response_obj):
+            """Create an LLMObs span from a completed litellm call."""
+            try:
+                from ddtrace.llmobs import LLMObs
 
-                    # Extract output text
-                    output_text = ""
-                    if hasattr(response_obj, "choices") and response_obj.choices:
-                        choice = response_obj.choices[0]
-                        if hasattr(choice, "message"):
-                            output_text = getattr(choice.message, "content", "") or ""
+                model = kwargs.get("model", "unknown")
+                messages = kwargs.get("messages", [])
+                provider = kwargs.get("custom_llm_provider", "litellm")
 
-                    # Extract token usage
-                    prompt_tokens = 0
-                    completion_tokens = 0
-                    if hasattr(response_obj, "usage") and response_obj.usage:
-                        prompt_tokens = getattr(response_obj.usage, "prompt_tokens", 0) or 0
-                        completion_tokens = getattr(response_obj.usage, "completion_tokens", 0) or 0
+                # Extract output text
+                output_text = ""
+                if hasattr(response_obj, "choices") and response_obj.choices:
+                    choice = response_obj.choices[0]
+                    if hasattr(choice, "message"):
+                        output_text = getattr(choice.message, "content", "") or ""
 
-                    # Build input_data in the format LLMObs expects
-                    input_data = []
-                    for msg in messages:
-                        if isinstance(msg, dict):
-                            input_data.append({
-                                "role": msg.get("role", "user"),
-                                "content": str(msg.get("content", "")),
-                            })
+                # Extract token usage
+                prompt_tokens = 0
+                completion_tokens = 0
+                total_tokens = 0
+                usage = getattr(response_obj, "usage", None)
+                if usage:
+                    prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+                    completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+                    total_tokens = getattr(usage, "total_tokens", 0) or 0
 
-                    # Build output_data
-                    output_data = output_text if output_text else "No output"
+                # Build input data for LLMObs
+                input_data = []
+                for msg in messages:
+                    if isinstance(msg, dict):
+                        input_data.append({
+                            "role": msg.get("role", "user"),
+                            "content": str(msg.get("content", ""))[:4096],
+                        })
 
-                    with LLMObs.llm(
-                        model_name=model,
-                        name="litellm.completion",
-                        model_provider=provider,
-                    ) as span:
-                        LLMObs.annotate(
-                            span=span,
-                            input_data=input_data,
-                            output_data=output_data,
-                            metrics={
-                                "input_tokens": prompt_tokens,
-                                "output_tokens": completion_tokens,
-                                "total_tokens": prompt_tokens + completion_tokens,
-                            },
-                        )
+                output_data = output_text[:4096] if output_text else ""
 
-                    print(
-                        f"[grokbot-dd-callback] span created OK "
-                        f"model={model} tokens={prompt_tokens}+{completion_tokens}",
-                        file=sys.stderr, flush=True,
+                with LLMObs.llm(
+                    model_name=model,
+                    name="litellm.completion",
+                    model_provider=provider,
+                ) as span:
+                    LLMObs.annotate(
+                        span=span,
+                        input_data=input_data,
+                        output_data=output_data,
+                        metrics={
+                            "input_tokens": prompt_tokens,
+                            "output_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                        },
                     )
 
-                except Exception as e:
-                    import traceback
-                    print(
-                        f"[grokbot-dd-callback] span creation error: {type(e).__name__}: {e}",
-                        file=sys.stderr, flush=True,
-                    )
-                    traceback.print_exc(file=sys.stderr)
-
-            def log_success_event(self, kwargs, response_obj, start_time, end_time):
-                """Sync success callback."""
-                self._create_span(kwargs, response_obj, start_time, end_time)
-
-            async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
-                """Async success callback — called for litellm.acompletion."""
                 print(
-                    f"[grokbot-dd-callback] async_log_success_event fired",
+                    f"[grokbot-dd-obs] span OK model={model} "
+                    f"tokens={prompt_tokens}+{completion_tokens}",
                     file=sys.stderr, flush=True,
                 )
-                self._create_span(kwargs, response_obj, start_time, end_time)
 
-            def log_failure_event(self, kwargs, response_obj, start_time, end_time):
-                """Sync failure callback."""
-                try:
-                    model = kwargs.get("model", "unknown")
-                    error_msg = str(kwargs.get("exception", "unknown error"))
-                    with LLMObs.llm(
-                        model_name=model,
-                        name="litellm.completion",
-                        model_provider=kwargs.get("custom_llm_provider", "litellm"),
-                    ) as span:
-                        LLMObs.annotate(
-                            span=span,
-                            input_data=[{"role": "user", "content": "error"}],
-                            output_data=f"ERROR: {error_msg}",
-                        )
-                except Exception:
-                    pass
+            except Exception as e:
+                import traceback
+                print(
+                    f"[grokbot-dd-obs] span error: {type(e).__name__}: {e}",
+                    file=sys.stderr, flush=True,
+                )
+                traceback.print_exc(file=sys.stderr)
 
-            async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
-                """Async failure callback."""
-                self.log_failure_event(kwargs, response_obj, start_time, end_time)
+        # ── Patch litellm.completion ──
+        _original_completion = litellm.completion
 
-        # Register the callback via multiple mechanisms for compatibility
-        callback_instance = DatadogLLMObsCallback()
+        @functools.wraps(_original_completion)
+        def _patched_completion(*args, **kwargs):
+            print(
+                f"[grokbot-dd-obs] completion() called model={kwargs.get('model', args[0] if args else '?')}",
+                file=sys.stderr, flush=True,
+            )
+            result = _original_completion(*args, **kwargs)
+            _create_llmobs_span(kwargs, result)
+            return result
 
-        # Method 1: litellm.callbacks (newer litellm)
-        if not hasattr(litellm, "callbacks") or litellm.callbacks is None:
-            litellm.callbacks = []
-        litellm.callbacks.append(callback_instance)
+        litellm.completion = _patched_completion
 
-        # Method 2: litellm.success_callback / failure_callback (older litellm)
-        if hasattr(litellm, "success_callback"):
-            if not isinstance(litellm.success_callback, list):
-                litellm.success_callback = []
-            litellm.success_callback.append(callback_instance)
+        # ── Patch litellm.acompletion ──
+        _original_acompletion = litellm.acompletion
 
-        if hasattr(litellm, "failure_callback"):
-            if not isinstance(litellm.failure_callback, list):
-                litellm.failure_callback = []
-            litellm.failure_callback.append(callback_instance)
+        @functools.wraps(_original_acompletion)
+        async def _patched_acompletion(*args, **kwargs):
+            print(
+                f"[grokbot-dd-obs] acompletion() called model={kwargs.get('model', args[0] if args else '?')}",
+                file=sys.stderr, flush=True,
+            )
+            result = await _original_acompletion(*args, **kwargs)
+            _create_llmobs_span(kwargs, result)
+            return result
 
-        # Log litellm version and callback state
-        lv = getattr(litellm, "__version__", "unknown")
-        cb_count = len(litellm.callbacks) if hasattr(litellm, "callbacks") else 0
-        sc_count = len(litellm.success_callback) if hasattr(litellm, "success_callback") and isinstance(litellm.success_callback, list) else 0
+        litellm.acompletion = _patched_acompletion
+
+        # ── Also patch litellm.text_completion if it exists ──
+        if hasattr(litellm, "text_completion"):
+            _original_text_completion = litellm.text_completion
+
+            @functools.wraps(_original_text_completion)
+            def _patched_text_completion(*args, **kwargs):
+                print(
+                    f"[grokbot-dd-obs] text_completion() called",
+                    file=sys.stderr, flush=True,
+                )
+                result = _original_text_completion(*args, **kwargs)
+                _create_llmobs_span(kwargs, result)
+                return result
+
+            litellm.text_completion = _patched_text_completion
 
         print(
-            f"[grokbot-sitecustomize] Datadog LLMObs callback registered "
-            f"(litellm={lv}, callbacks={cb_count}, success_callback={sc_count})",
+            f"[grokbot-sitecustomize] litellm monkey-patched OK "
+            f"(litellm={lv}, completion/acompletion wrapped)",
             file=sys.stderr, flush=True,
         )
 
     except ImportError as e:
         print(
-            f"[grokbot-sitecustomize] litellm callback setup skipped (import error): {e}",
+            f"[grokbot-sitecustomize] litellm patch skipped (import error): {e}",
             file=sys.stderr, flush=True,
         )
     except Exception as e:
         import traceback
         print(
-            f"[grokbot-sitecustomize] litellm callback setup FAILED: {type(e).__name__}: {e}",
+            f"[grokbot-sitecustomize] litellm patch FAILED: {type(e).__name__}: {e}",
             file=sys.stderr, flush=True,
         )
         traceback.print_exc(file=sys.stderr)
