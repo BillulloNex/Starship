@@ -1,5 +1,4 @@
 const RELOAD_KEY = "grokbot_chunk_reload_timestamp";
-const RELOAD_THROTTLE_MS = 10_000;
 
 /**
  * Determines whether a given error or event represents a failed script/chunk load
@@ -37,23 +36,33 @@ export function isChunkLoadError(error: unknown): boolean {
 }
 
 /**
- * Triggers a page reload if a chunk load fails, throttled to prevent reload loops.
+ * Triggers a page reload if a chunk load fails.
+ * Uses the current manifest hash as a version key — only reloads once per
+ * manifest version to prevent infinite loops, while still recovering when
+ * a new deployment arrives.
  */
 export function reloadOnChunkError(): void {
   if (typeof window === "undefined") return;
 
   try {
-    const lastReload = sessionStorage.getItem(RELOAD_KEY);
-    const now = Date.now();
+    // Extract the manifest hash from the page to use as a version key.
+    const manifestScript = document.querySelector(
+      'script[src*="manifest-"]',
+    ) as HTMLScriptElement | null;
+    const manifestSrc = manifestScript?.src || "";
+    const manifestHash =
+      manifestSrc.match(/manifest-([a-z0-9]+)\.js/)?.[1] || "unknown";
+    const versionKey = `${RELOAD_KEY}_${manifestHash}`;
 
-    if (lastReload && now - Number(lastReload) < RELOAD_THROTTLE_MS) {
+    const alreadyReloaded = sessionStorage.getItem(versionKey);
+    if (alreadyReloaded) {
       console.warn(
-        "[Grokbot] Chunk load error detected, but reload was recently attempted. Skipping to prevent loop.",
+        `[Grokbot] Chunk load error detected for manifest ${manifestHash}, but reload was already attempted. Skipping to prevent loop.`,
       );
       return;
     }
 
-    sessionStorage.setItem(RELOAD_KEY, String(now));
+    sessionStorage.setItem(versionKey, String(Date.now()));
     console.warn(
       "[Grokbot] Deployment update or missing chunk detected. Reloading page...",
     );
