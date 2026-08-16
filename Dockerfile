@@ -72,7 +72,13 @@ ARG VITE_LANGWATCH_BASE_URL=""
 ENV VITE_LANGWATCH_API_KEY=${VITE_LANGWATCH_API_KEY} \
     VITE_LANGWATCH_BASE_URL=${VITE_LANGWATCH_BASE_URL}
 
-RUN rm -rf build && npm run build
+RUN echo "=== BUILD ENV CHECK ===" && \
+    echo "VITE_OPIK_API_KEY length: $(echo -n ${VITE_OPIK_API_KEY} | wc -c)" && \
+    echo "VITE_LANGWATCH_API_KEY length: $(echo -n ${VITE_LANGWATCH_API_KEY} | wc -c)" && \
+    echo "VITE_LANGWATCH_BASE_URL: ${VITE_LANGWATCH_BASE_URL}" && \
+    echo "VITE_POSTHOG_AI_ENABLED: ${VITE_POSTHOG_AI_ENABLED}" && \
+    echo "========================" && \
+    rm -rf build && npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
 # This avoids needing jq/python at container runtime to parse the JSON.
