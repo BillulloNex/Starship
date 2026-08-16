@@ -3,10 +3,6 @@ Grokbot sitecustomize — Datadog LLM Observability initialization.
 
 This module is auto-loaded via PYTHONPATH. It initializes Datadog LLMObs
 in agentless mode using in-code setup (without ddtrace-run).
-
-The approach: LLMObs.enable(integrations_enabled=True) patches litellm
-and other LLM libraries automatically. We then explicitly patch litellm
-as well to be safe.
 """
 import os
 import sys
@@ -45,10 +41,10 @@ def _init_llmobs():
             api_key=dd_api_key,
             site=site,
             agentless_enabled=agentless,
-            integrations_enabled=True,  # Auto-patch litellm, openai, etc.
+            integrations_enabled=True,
         )
 
-        # Also explicitly patch litellm to be safe
+        # Also explicitly patch litellm
         try:
             from ddtrace import patch
             patch(litellm=True)
@@ -79,6 +75,57 @@ def _init_llmobs():
             )
         except Exception:
             pass
+
+        # ── Send a test span to verify the full pipeline ──
+        # This creates a minimal LLM span at startup. If this appears in
+        # Datadog, the pipeline is working end-to-end.
+        try:
+            import threading
+
+            def _send_test_span():
+                import time
+                time.sleep(5)  # Let the server finish starting up
+                try:
+                    with LLMObs.llm(
+                        model_name="test-model",
+                        name="grokbot.startup_test",
+                        model_provider="test",
+                    ) as span:
+                        LLMObs.annotate(
+                            span=span,
+                            input_data=[{"role": "user", "content": "startup test"}],
+                            output_data=[{"role": "assistant", "content": "pipeline verified"}],
+                        )
+                    print(
+                        f"[grokbot-sitecustomize] Test LLMObs span sent successfully",
+                        file=sys.stderr, flush=True,
+                    )
+
+                    # Force flush to ensure the span is sent immediately
+                    try:
+                        LLMObs.flush()
+                        print(
+                            f"[grokbot-sitecustomize] LLMObs.flush() OK",
+                            file=sys.stderr, flush=True,
+                        )
+                    except Exception as flush_err:
+                        print(
+                            f"[grokbot-sitecustomize] LLMObs.flush() failed: {flush_err}",
+                            file=sys.stderr, flush=True,
+                        )
+                except Exception as span_err:
+                    print(
+                        f"[grokbot-sitecustomize] Test span FAILED: {type(span_err).__name__}: {span_err}",
+                        file=sys.stderr, flush=True,
+                    )
+
+            t = threading.Thread(target=_send_test_span, daemon=True)
+            t.start()
+        except Exception as thread_err:
+            print(
+                f"[grokbot-sitecustomize] Test span thread failed: {thread_err}",
+                file=sys.stderr, flush=True,
+            )
 
     except Exception as e:
         import traceback
