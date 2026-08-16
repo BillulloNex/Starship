@@ -238,19 +238,35 @@ trap cleanup EXIT SIGINT SIGTERM
 # ── 1. Start Agent Server ────────────────────────────────────────────────────
 log "Starting agent-server on port $AGENT_SERVER_PORT..."
 
-# LLMObs initialization is handled by sitecustomize.py (in-code) via
-# LLMObs.enable(integrations_enabled=True) — no ddtrace-run needed.
-# sitecustomize.py is auto-loaded because /opt/agent-canvas/tools is on PYTHONPATH.
+# When Datadog is enabled, use ddtrace-run to launch the agent-server.
+# ddtrace-run monkey-patches litellm at import time, intercepting ALL LLM calls
+# regardless of how OpenHands wraps them internally. This is more reliable than
+# sitecustomize.py which registers callbacks on a litellm module instance that
+# may not be the same one used for actual API calls.
+#
+# sitecustomize.py still handles LLMObs.enable() for span creation.
 if command -v openhands-agent-server >/dev/null 2>&1; then
   if [ "$DD_ENABLED" = "true" ]; then
-    log "Agent server will be traced by Datadog (in-code via sitecustomize.py)"
+    log "Agent server will be traced by Datadog via ddtrace-run"
+    DD_SERVICE="grokbot-agent-server" \
+    DD_PATCH_MODULES="litellm:true" \
+    DD_LLMOBS_ENABLED=1 \
+    DD_LLMOBS_ML_APP="grokbot" \
+    ddtrace-run openhands-agent-server --port "$AGENT_SERVER_PORT" &
+  else
+    openhands-agent-server --port "$AGENT_SERVER_PORT" &
   fi
-  DD_SERVICE="grokbot-agent-server" openhands-agent-server --port "$AGENT_SERVER_PORT" &
 elif [ -x /agent-server/.venv/bin/python ]; then
   if [ "$DD_ENABLED" = "true" ]; then
-    log "Agent server will be traced by Datadog (in-code via sitecustomize.py)"
+    log "Agent server will be traced by Datadog via ddtrace-run"
+    DD_SERVICE="grokbot-agent-server" \
+    DD_PATCH_MODULES="litellm:true" \
+    DD_LLMOBS_ENABLED=1 \
+    DD_LLMOBS_ML_APP="grokbot" \
+    ddtrace-run /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+  else
+    /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
   fi
-  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
 else
   log_error "Cannot find agent-server binary or source venv."
   exit 1
