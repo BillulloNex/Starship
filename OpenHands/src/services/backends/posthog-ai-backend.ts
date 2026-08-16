@@ -76,6 +76,8 @@ class PostHogAIBackend implements ObservabilityBackend {
       $ai_total_cost_usd: data.accumulatedCost,
       $ai_latency: latencySeconds,
       $ai_trace_id: data.conversationId,
+      $ai_input: data.input,
+      $ai_output: data.output,
       cache_read_tokens: data.cacheReadTokens,
       cache_write_tokens: data.cacheWriteTokens,
       reasoning_tokens: data.reasoningTokens,

@@ -23,6 +23,7 @@ import { useGoalStore } from "#/stores/goal-store";
 import {
   isAgentServerEvent,
   isAgentErrorEvent,
+  isMessageEvent,
   isUserMessageEvent,
   isActionEvent,
   isConversationStateUpdateEvent,
@@ -179,6 +180,10 @@ export function ConversationWebSocketProvider({
     path: string;
     conversationId: string;
   } | null>(null);
+
+  // Track the last user prompt for observability (PostHog AI input/output).
+  const lastUserPromptRef = useRef<string | undefined>(undefined);
+  const lastAssistantOutputRef = useRef<string | undefined>(undefined);
 
   const isPlanFilePath = (path: string | null): boolean =>
     path?.toUpperCase().endsWith("PLAN.MD") ?? false;
@@ -610,14 +615,24 @@ export function ConversationWebSocketProvider({
           // pending entry happens to be oldest — protecting against any
           // out-of-order delivery between conversations or sub-agents.
           if (isUserMessageEvent(event)) {
+            // Track user prompt for observability (PostHog AI input)
+            const userText = extractMessageEventText(event);
+            lastUserPromptRef.current = userText;
+            lastAssistantOutputRef.current = undefined;
+
             if (conversationId) {
               consumeMatchingPendingMessage(
                 conversationId,
-                extractMessageEventText(event),
+                userText,
               );
               // Clear draft from localStorage - message was successfully delivered
               setConversationState(conversationId, { draftMessage: null });
             }
+          }
+
+          // Track assistant messages for observability (PostHog AI output)
+          if (isMessageEvent(event) && event.llm_message.role === "assistant") {
+            lastAssistantOutputRef.current = extractMessageEventText(event);
           }
 
           // Handle cache invalidation for ActionEvent
@@ -669,6 +684,8 @@ export function ConversationWebSocketProvider({
                       cacheWriteTokens: tokenUsage.cache_write_tokens,
                       reasoningTokens: tokenUsage.reasoning_tokens,
                       responseLatencies: metrics.response_latencies,
+                      input: lastUserPromptRef.current,
+                      output: lastAssistantOutputRef.current,
                     });
                   }
                 }

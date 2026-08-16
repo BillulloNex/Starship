@@ -36,6 +36,10 @@ export interface GenerationData {
     latency: number;
     response_id: string;
   }>;
+  /** The user prompt / input messages sent to the LLM. */
+  input?: string;
+  /** The assistant response / output from the LLM. */
+  output?: string;
 }
 
 export interface ToolCallData {
