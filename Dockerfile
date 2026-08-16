@@ -58,6 +58,11 @@ ENV VITE_DD_APPLICATION_ID=${VITE_DD_APPLICATION_ID} \
 ARG VITE_POSTHOG_AI_ENABLED=""
 ENV VITE_POSTHOG_AI_ENABLED=${VITE_POSTHOG_AI_ENABLED}
 
+# Telemetry auto-consent — when "true", pre-grants telemetry consent in
+# localStorage so PostHog AI and other backends work without a consent banner.
+ARG VITE_TELEMETRY_AUTO_CONSENT=""
+ENV VITE_TELEMETRY_AUTO_CONSENT=${VITE_TELEMETRY_AUTO_CONSENT}
+
 # Comet Opik — REST API key and optional workspace/base URL
 ARG VITE_OPIK_API_KEY=""
 ARG VITE_OPIK_BASE_URL=""

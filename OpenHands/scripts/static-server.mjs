@@ -346,6 +346,18 @@ function makeConfigInjectionScript(
     );
   }
 
+  // Auto-grant telemetry consent for self-hosted instances.
+  // When the operator sets VITE_TELEMETRY_AUTO_CONSENT=true, pre-populate
+  // the consent key in localStorage so PostHog AI and other telemetry
+  // backends work immediately without requiring the user to dismiss a
+  // consent banner. Safe because the operator owns all data.
+  if (process.env.VITE_TELEMETRY_AUTO_CONSENT === "true") {
+    parts.push(
+      `try{if(!localStorage.getItem("openhands-telemetry-consent"))` +
+        `{localStorage.setItem("openhands-telemetry-consent","granted");}}catch(e){}`,
+    );
+  }
+
   if (parts.length === 0) return "";
 
   return `<script>(function(){${parts.join("")}}());</script>`;
