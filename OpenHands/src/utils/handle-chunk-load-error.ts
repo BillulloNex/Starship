@@ -45,19 +45,19 @@ export function reloadOnChunkError(): void {
   if (typeof window === "undefined") return;
 
   try {
-    // Extract the manifest hash from the page to use as a version key.
-    const manifestScript = document.querySelector(
-      'script[src*="manifest-"]',
-    ) as HTMLScriptElement | null;
-    const manifestSrc = manifestScript?.src || "";
-    const manifestHash =
-      manifestSrc.match(/manifest-([a-z0-9]+)\.js/)?.[1] || "unknown";
-    const versionKey = `${RELOAD_KEY}_${manifestHash}`;
+    // Use the root CSS hash or entry script hash as a deploy version fingerprint.
+    // The manifest JS is loaded via ES import(), not a <script src> tag.
+    const versionEl =
+      document.querySelector('link[href*="/assets/root-"]') ||
+      document.querySelector('script[src*="/assets/entry.client-"]');
+    const href = versionEl?.getAttribute("href") || versionEl?.getAttribute("src") || "";
+    const buildHash = href.match(/-([a-zA-Z0-9_-]+)\.\w+$/)?.[1] || "unknown";
+    const versionKey = `${RELOAD_KEY}_${buildHash}`;
 
     const alreadyReloaded = sessionStorage.getItem(versionKey);
     if (alreadyReloaded) {
       console.warn(
-        `[Grokbot] Chunk load error detected for manifest ${manifestHash}, but reload was already attempted. Skipping to prevent loop.`,
+        `[Grokbot] Chunk load error detected for build ${buildHash}, but reload was already attempted. Skipping to prevent loop.`,
       );
       return;
     }
