@@ -191,9 +191,14 @@ if [ -n "${DD_API_KEY:-}" ]; then
   export DD_TRACE_OTEL_ENABLED="${DD_TRACE_OTEL_ENABLED:-false}"
   # Log injection for correlated logs
   export DD_LOGS_INJECTION="${DD_LOGS_INJECTION:-true}"
-  # Trace agent host (sidecar container or localhost)
-  export DD_AGENT_HOST="${DD_AGENT_HOST:-127.0.0.1}"
-  log "Datadog APM + LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE}, agentless=${DD_LLMOBS_AGENTLESS_ENABLED})"
+  # Enable startup logs for debugging instrumentation issues
+  export DD_TRACE_STARTUP_LOGS="${DD_TRACE_STARTUP_LOGS:-true}"
+  # APM trace sending: in agentless mode, APM traces fail to reach a local
+  # agent (port 8126) — this is expected and non-fatal. LLMObs data goes
+  # directly to llmobs-intake.{DD_SITE} via HTTPS independently.
+  # Keep DD_TRACE_ENABLED=true so ddtrace-run patches litellm for LLMObs.
+  export DD_TRACE_ENABLED="${DD_TRACE_ENABLED:-true}"
+  log "Datadog LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE}, agentless=${DD_LLMOBS_AGENTLESS_ENABLED})"
   DD_ENABLED=true
 else
   DD_ENABLED=false
