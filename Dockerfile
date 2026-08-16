@@ -93,6 +93,7 @@ RUN printf '%s\n' \
       "VITE_DD_CLIENT_TOKEN=${VITE_DD_CLIENT_TOKEN}" \
       "VITE_DD_SITE=${VITE_DD_SITE}" \
       "VITE_DD_ENV=${VITE_DD_ENV}" \
+      "VITE_TELEMETRY_AUTO_CONSENT=${VITE_TELEMETRY_AUTO_CONSENT}" \
       > .env \
     && rm -rf build && npm run build
 
@@ -185,6 +186,7 @@ COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 COPY OpenHands/scripts/static-server.mjs /opt/agent-canvas/static-server.mjs
 COPY OpenHands/scripts/proxy-utils.mjs /opt/agent-canvas/proxy-utils.mjs
 COPY OpenHands/scripts/datadog-proxy.mjs /opt/agent-canvas/datadog-proxy.mjs
+COPY OpenHands/scripts/posthog-proxy.mjs /opt/agent-canvas/posthog-proxy.mjs
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka

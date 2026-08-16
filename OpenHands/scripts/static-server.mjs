@@ -42,6 +42,7 @@ import {
   proxyServerInfoRequest,
 } from "./proxy-utils.mjs";
 import { handleDatadogProxy } from "./datadog-proxy.mjs";
+import { handlePostHogProxy } from "./posthog-proxy.mjs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPA fallback helpers
@@ -597,6 +598,18 @@ export function startStaticServer(config) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
       handleDatadogProxy(req, res, parsedUrl.pathname, query).catch((err) => {
         console.error("Datadog proxy error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/observability/posthog")) {
+      const query = Object.fromEntries(parsedUrl.searchParams.entries());
+      handlePostHogProxy(req, res, parsedUrl.pathname, query).catch((err) => {
+        console.error("PostHog proxy error:", err);
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: err.message }));
