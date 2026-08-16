@@ -69,9 +69,10 @@ export interface ObservabilityBackend {
 // Registry
 // ---------------------------------------------------------------------------
 
-const backends: ObservabilityBackend[] = [];
+let backends: ObservabilityBackend[] | undefined;
 
 export function registerBackend(backend: ObservabilityBackend): void {
+  if (!backends) backends = [];
   backends.push(backend);
 }
 
@@ -80,6 +81,7 @@ export function registerBackend(backend: ObservabilityBackend): void {
 // ---------------------------------------------------------------------------
 
 export function fanoutGeneration(data: GenerationData): void {
+  if (!backends) return;
   for (const backend of backends) {
     if (!backend.enabled) continue;
     try {
@@ -94,6 +96,7 @@ export function fanoutGeneration(data: GenerationData): void {
 }
 
 export function fanoutToolCall(data: ToolCallData): void {
+  if (!backends) return;
   for (const backend of backends) {
     if (!backend.enabled) continue;
     try {
@@ -125,6 +128,6 @@ import "./backends/langwatch-backend";
 // Force Vite to treat this module as having side effects by logging
 // at module evaluation time. This prevents tree-shaking.
 console.debug(
-  `[observability] ${backends.length} backends registered:`,
-  backends.map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", "),
+  `[observability] ${backends?.length ?? 0} backends registered:`,
+  backends?.map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", ") ?? "none",
 );
