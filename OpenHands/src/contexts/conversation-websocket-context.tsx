@@ -107,12 +107,22 @@ const ConversationWebSocketContext = createContext<
 function extractMessageEventText(
   event: import("#/types/agent-server/core/events/message-event").MessageEvent,
 ): string {
-  return event.llm_message.content
-    .filter(
-      (part): part is { type: "text"; text: string } => part.type === "text",
-    )
-    .map((part) => part.text)
-    .join("");
+  const content = event.llm_message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          if ("text" in part && typeof part.text === "string") return part.text;
+          if ("content" in part && typeof part.content === "string")
+            return part.content;
+        }
+        return "";
+      })
+      .join("");
+  }
+  return "";
 }
 
 export function ConversationWebSocketProvider({
@@ -370,10 +380,20 @@ export function ConversationWebSocketProvider({
 
       for (const event of preloadedHistory.events) {
         if (isUserMessageEvent(event)) {
+          const userText = extractMessageEventText(event);
+          if (userText) {
+            lastUserPromptRef.current = userText;
+          }
           consumeMatchingPendingMessage(
             conversationId,
-            extractMessageEventText(event),
+            userText,
           );
+        }
+        if (isMessageEvent(event) && event.llm_message.role === "assistant") {
+          const assistantText = extractMessageEventText(event);
+          if (assistantText) {
+            lastAssistantOutputRef.current = assistantText;
+          }
         }
       }
     }
