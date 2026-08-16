@@ -168,9 +168,8 @@ fi
 
 # ── Datadog APM + LLM Observability ──────────────────────────────────────────
 # When DD_API_KEY is set (via Coolify env), enable Datadog tracing on the
-# Python services. The Datadog Agent sidecar collects traces on its default
-# port (8126). DD_ENV, DD_SERVICE, DD_VERSION are standard Unified Service
-# Tagging variables.
+# Python services. When DD_LLMOBS_AGENTLESS_ENABLED is true, LLM traces are sent
+# directly via HTTPS to the Datadog intake without needing a local sidecar.
 if [ -n "${DD_API_KEY:-}" ]; then
   export DD_ENV="${DD_ENV:-production}"
   export DD_SITE="${DD_SITE:-us5.datadoghq.com}"
@@ -180,15 +179,15 @@ if [ -n "${DD_API_KEY:-}" ]; then
   export DD_TRACE_ENABLED="${DD_TRACE_ENABLED:-true}"
   # Enable Application Security Monitoring
   export DD_APPSEC_ENABLED="${DD_APPSEC_ENABLED:-true}"
-  # Enable LLM Observability
-  export DD_LLMOBS_ENABLED="${DD_LLMOBS_ENABLED:-true}"
+  # Enable LLM Observability in agentless mode by default
+  export DD_LLMOBS_ENABLED="${DD_LLMOBS_ENABLED:-1}"
   export DD_LLMOBS_ML_APP="${DD_LLMOBS_ML_APP:-grokbot}"
-  export DD_LLMOBS_AGENTLESS_ENABLED="${DD_LLMOBS_AGENTLESS_ENABLED:-false}"
+  export DD_LLMOBS_AGENTLESS_ENABLED="${DD_LLMOBS_AGENTLESS_ENABLED:-1}"
   # Log injection for correlated logs
   export DD_LOGS_INJECTION="${DD_LOGS_INJECTION:-true}"
   # Trace agent host (sidecar container or localhost)
   export DD_AGENT_HOST="${DD_AGENT_HOST:-127.0.0.1}"
-  log "Datadog APM + LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE})"
+  log "Datadog APM + LLM Observability configured (env=${DD_ENV}, service=${DD_SERVICE}, agentless=${DD_LLMOBS_AGENTLESS_ENABLED})"
   DD_ENABLED=true
 else
   DD_ENABLED=false
@@ -225,15 +224,36 @@ trap cleanup EXIT SIGINT SIGTERM
 # ── 1. Start Agent Server ────────────────────────────────────────────────────
 log "Starting agent-server on port $AGENT_SERVER_PORT..."
 
-if [ "$DD_ENABLED" = "true" ] && command -v ddtrace-run >/dev/null 2>&1; then
-  log "Agent server will be traced by Datadog"
-  if command -v openhands-agent-server >/dev/null 2>&1; then
-    DD_SERVICE="grokbot-agent-server" ddtrace-run openhands-agent-server --port "$AGENT_SERVER_PORT" &
-  elif [ -x /agent-server/.venv/bin/python ]; then
-    DD_SERVICE="grokbot-agent-server" ddtrace-run /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+if [ "$DD_ENABLED" = "true" ]; then
+  DD_RUN=""
+  if [ -x /agent-server/.venv/bin/ddtrace-run ]; then
+    DD_RUN="/agent-server/.venv/bin/ddtrace-run"
+  elif [ -x /openhands/.venv/bin/ddtrace-run ]; then
+    DD_RUN="/openhands/.venv/bin/ddtrace-run"
+  elif command -v ddtrace-run >/dev/null 2>&1; then
+    DD_RUN="ddtrace-run"
+  fi
+
+  if [ -n "$DD_RUN" ]; then
+    log "Agent server will be traced by Datadog using $DD_RUN"
+    if command -v openhands-agent-server >/dev/null 2>&1; then
+      DD_SERVICE="grokbot-agent-server" $DD_RUN openhands-agent-server --port "$AGENT_SERVER_PORT" &
+    elif [ -x /agent-server/.venv/bin/python ]; then
+      DD_SERVICE="grokbot-agent-server" $DD_RUN /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+    else
+      log_error "Cannot find agent-server binary or source venv."
+      exit 1
+    fi
   else
-    log_error "Cannot find agent-server binary or source venv."
-    exit 1
+    log "WARNING: ddtrace-run not found for agent-server, starting untraced."
+    if command -v openhands-agent-server >/dev/null 2>&1; then
+      openhands-agent-server --port "$AGENT_SERVER_PORT" &
+    elif [ -x /agent-server/.venv/bin/python ]; then
+      /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+    else
+      log_error "Cannot find agent-server binary or source venv."
+      exit 1
+    fi
   fi
 else
   if command -v openhands-agent-server >/dev/null 2>&1; then

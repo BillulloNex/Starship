@@ -109,6 +109,16 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
 RUN uv pip install --system "openhands-automation==${AUTOMATION_VERSION}" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==${AUTOMATION_VERSION}"
 
+# ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
+RUN uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
+    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"; \
+    if [ -d /agent-server/.venv ]; then \
+      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+    fi; \
+    if [ -d /openhands/.venv ]; then \
+      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+    fi
+
 RUN if [ -n "${AGENT_SERVER_SDK_GIT_REF}" ]; then \
       BASE_GIT_URL="git+https://github.com/OpenHands/software-agent-sdk@${AGENT_SERVER_SDK_GIT_REF}" && \
       uv pip install --system --force-reinstall \
