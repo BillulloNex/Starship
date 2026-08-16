@@ -347,7 +347,10 @@ export async function initializePostHogClient(
       {
         api_host: config.apiHost,
         ui_host: config.uiHost,
-        opt_out_capturing_by_default: !enableCapturing,
+        // If consent is already granted (e.g. auto-consent for self-hosted),
+        // start with capturing enabled so the SDK's internal queue flushes
+        // immediately. Otherwise, default to opted out until explicit consent.
+        opt_out_capturing_by_default: !enableCapturing && getTelemetryConsent() !== "granted",
         persistence: "localStorage",
         persistence_name: POSTHOG_INSTANCE_NAME,
         consent_persistence_name: `${POSTHOG_INSTANCE_NAME}-consent`,
