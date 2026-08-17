@@ -26,7 +26,8 @@ export function UsagePanel() {
   const isAcp = conversation?.agent_kind === "acp";
 
   const { usage } = metrics;
-  const hasMetrics = metrics.cost !== null || usage !== null;
+  const { data: codexQuota } = useCodexUsage();
+  const hasMetrics = metrics.cost !== null || usage !== null || codexQuota !== null || isAcp;
 
   if (!hasMetrics) {
     return (
@@ -42,6 +43,8 @@ export function UsagePanel() {
       className="h-full overflow-y-auto custom-scrollbar-always flex flex-col gap-3 p-3"
     >
       <ObservabilityLangfuseCard />
+
+      <CodexQuotaCard />
 
       {usage !== null && (
         <div className="rounded-md border border-[var(--oh-border)] bg-surface-raised p-3">
@@ -82,8 +85,6 @@ export function UsagePanel() {
       </div>
 
       <McpPerformanceSection />
-
-      <CodexQuotaCard />
 
       <ProviderBalanceCard />
     </main>

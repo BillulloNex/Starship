@@ -123,22 +123,45 @@ export function normalizeWhamUsage(data) {
     return null;
   }
 
-  const planType = typeof data.plan_type === "string" ? data.plan_type : "standard";
-  const rateLimits = Array.isArray(data.rate_limits) ? data.rate_limits : [];
+  const planType = typeof data.plan_type === "string" ? data.plan_type : (data.plan || "standard");
+  const rawLimits = Array.isArray(data.rate_limits)
+    ? [...data.rate_limits]
+    : Array.isArray(data.limits)
+      ? [...data.limits]
+      : Array.isArray(data.windows)
+        ? [...data.windows]
+        : [];
+
+  // If rate_limits is an object with named keys (e.g. { session: {...}, weekly: {...} })
+  if (!Array.isArray(data.rate_limits) && typeof data.rate_limits === "object" && data.rate_limits !== null) {
+    for (const key of Object.keys(data.rate_limits)) {
+      rawLimits.push(data.rate_limits[key]);
+    }
+  }
+
+  // Also check top-level objects
+  if (data.session_limit && typeof data.session_limit === "object") rawLimits.push(data.session_limit);
+  if (data.weekly_limit && typeof data.weekly_limit === "object") rawLimits.push(data.weekly_limit);
+  if (data.primary_window && typeof data.primary_window === "object") rawLimits.push(data.primary_window);
+  if (data.secondary_window && typeof data.secondary_window === "object") rawLimits.push(data.secondary_window);
 
   let primaryWindow = null;
   let secondaryWindow = null;
 
-  for (const limit of rateLimits) {
+  for (const limit of rawLimits) {
     if (!limit || typeof limit !== "object") continue;
 
-    const limitSeconds = Number(limit.limit_window_seconds) || 0;
+    const limitSeconds = Number(limit.limit_window_seconds || limit.window_seconds || limit.window || limit.seconds) || 0;
     const usedPercent = typeof limit.used_percent === "number"
       ? Math.max(0, Math.min(100, Math.round(limit.used_percent * 10) / 10))
-      : 0;
+      : typeof limit.usedPercent === "number"
+        ? Math.max(0, Math.min(100, Math.round(limit.usedPercent * 10) / 10))
+        : typeof limit.percentage === "number"
+          ? Math.max(0, Math.min(100, Math.round(limit.percentage * 10) / 10))
+          : 0;
     const remainingPercent = Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10));
-    const resetAt = Number(limit.reset_at || limit.nextResetTime) || null;
-    const limitReached = Boolean(limit.limit_reached || usedPercent >= 100);
+    const resetAt = Number(limit.reset_at || limit.nextResetTime || limit.resetAt || limit.resets_at) || null;
+    const limitReached = Boolean(limit.limit_reached || limit.limitReached || usedPercent >= 100);
 
     const windowData = {
       limitSeconds,
@@ -148,10 +171,14 @@ export function normalizeWhamUsage(data) {
       limitReached,
     };
 
-    // Primary window is typically 5h (18000s) or shorter session limit
-    if (limitSeconds <= 36000 && !primaryWindow) {
+    // Primary window is typically <= 10h (36000s) session limit
+    if (limitSeconds > 0 && limitSeconds <= 36000 && !primaryWindow) {
       primaryWindow = windowData;
     } else if (limitSeconds > 36000 && !secondaryWindow) {
+      secondaryWindow = windowData;
+    } else if (!primaryWindow) {
+      primaryWindow = windowData;
+    } else if (!secondaryWindow) {
       secondaryWindow = windowData;
     }
   }

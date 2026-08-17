@@ -29,7 +29,22 @@ export class CodexUsageService {
       if (response.status === 400) {
         try {
           const client = new SettingsClient(getAgentServerClientOptions());
-          const secretValue = await client.getSecret("CODEX_AUTH_JSON");
+          let secretValue: string | null = null;
+          try {
+            const raw = await client.getSecret("CODEX_AUTH_JSON");
+            if (raw) secretValue = typeof raw === "string" ? raw : JSON.stringify(raw);
+          } catch {
+            const list = await client.listSecrets().catch(() => ({ secrets: [] }));
+            const match = list.secrets?.find(
+              (s: { name: string }) =>
+                /codex/i.test(s.name) || /chatgpt/i.test(s.name) || /auth_json/i.test(s.name),
+            );
+            if (match) {
+              const res = await client.getSecret(match.name);
+              if (res) secretValue = typeof res === "string" ? res : JSON.stringify(res);
+            }
+          }
+
           if (secretValue) {
             const postRes = await axios.post<CodexUsageQuota>(
               url,
