@@ -96,7 +96,11 @@ export interface UseTerminalOptions {
 }
 
 export const useTerminal = (options: UseTerminalOptions = {}) => {
-  const { onExecuteCommand, isInteractive = true, commands: optionsCommands } = options;
+  const {
+    onExecuteCommand,
+    isInteractive = true,
+    commands: optionsCommands,
+  } = options;
   const storeCommands = useCommandStore((state) => state.commands);
   const commands = optionsCommands ?? storeCommands;
   const terminal = React.useRef<Terminal | null>(null);
@@ -253,10 +257,7 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
       lastCommandIndex.current = 0;
     }
 
-    if (
-      commands.length > 0 &&
-      lastCommandIndex.current < commands.length
-    ) {
+    if (commands.length > 0 && lastCommandIndex.current < commands.length) {
       for (let i = lastCommandIndex.current; i < commands.length; i += 1) {
         if (commands[i].type === "input" && commands[i].source !== "user") {
           terminal.current.write("$ ");
@@ -297,4 +298,3 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
 
   return { ref, terminalRef: terminal };
 };
-

@@ -29,7 +29,8 @@ export function UsagePanel() {
 
   const { usage } = metrics;
   const { data: codexQuota } = useCodexUsage();
-  const hasMetrics = metrics.cost !== null || usage !== null || codexQuota !== null || isAcp;
+  const hasMetrics =
+    metrics.cost !== null || usage !== null || codexQuota !== null || isAcp;
 
   if (!hasMetrics) {
     return (

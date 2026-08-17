@@ -134,7 +134,10 @@ export const useCommandStore = create<CommandState>((set, get) => ({
         s.id === targetId
           ? {
               ...s,
-              commands: [...s.commands, { content, type: "input" as const, source }],
+              commands: [
+                ...s.commands,
+                { content, type: "input" as const, source },
+              ],
             }
           : s,
       );
@@ -195,5 +198,3 @@ export const useCommandStore = create<CommandState>((set, get) => ({
       };
     }),
 }));
-
-

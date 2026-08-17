@@ -48,7 +48,9 @@ describe("color-themes customizable engine", () => {
   });
 
   it("persists and reads custom theme colors in localStorage", () => {
-    expect(readPersistedCustomThemeColors()).toEqual(DEFAULT_CUSTOM_THEME_COLORS);
+    expect(readPersistedCustomThemeColors()).toEqual(
+      DEFAULT_CUSTOM_THEME_COLORS,
+    );
 
     const newColors = {
       background: "#001122",

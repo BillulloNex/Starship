@@ -249,12 +249,8 @@ export function recordStatsGeneration({
         responseId: lastLatency?.response_id,
         latencySeconds: lastLatency?.latency,
       },
-      input: input
-        ? [{ role: "user", content: input }]
-        : undefined,
-      output: output
-        ? [{ role: "assistant", content: output }]
-        : undefined,
+      input: input ? [{ role: "user", content: input }] : undefined,
+      output: output ? [{ role: "assistant", content: output }] : undefined,
       startTime,
       endTime,
     });

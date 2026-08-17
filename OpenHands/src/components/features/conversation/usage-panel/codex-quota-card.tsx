@@ -70,8 +70,13 @@ function WindowMeter({ label, windowData }: WindowMeterProps) {
       <div className="relative h-2 w-full rounded-full bg-tertiary overflow-hidden">
         <div
           data-testid="codex-quota-meter-bar"
-          className={cn("h-full rounded-full transition-all duration-500", tone.bar)}
-          style={{ width: `${Math.max(0, Math.min(100, windowData.remainingPercent))}%` }}
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            tone.bar,
+          )}
+          style={{
+            width: `${Math.max(0, Math.min(100, windowData.remainingPercent))}%`,
+          }}
         />
       </div>
 

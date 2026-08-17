@@ -16,8 +16,10 @@ const MAX_TITLE_LENGTH = 55;
 /**
  * Regex matching emoji characters, symbols, skin tone modifiers, and variation selectors.
  */
+/* eslint-disable no-misleading-character-class */
 const EMOJI_REGEX =
-  /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}✨🚀⚡️🔥💡🎉🎨🐛🔧⭐️✅❌⚠️💬🤖🧪🔍📝🛠️💻🌟✨]/gu;
+  /\p{Extended_Pictographic}|\p{Emoji_Presentation}|[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu;
+/* eslint-enable no-misleading-character-class */
 
 /**
  * Known tech acronyms and proper nouns to preserve casing.
@@ -144,12 +146,15 @@ export function normalizeQuestionToTopic(text: string): string {
   let s = text.trim();
 
   // Strip conversational prefixes
-  s = s.replace(/^(can you please|can you|could you please|could you|please|kindly|hey|hello|hi)\s+/i, "");
+  s = s.replace(
+    /^(can you please|can you|could you please|could you|please|kindly|hey|hello|hi)\s+/i,
+    "",
+  );
 
   // "Who is/was/are the <Topic>?" -> "<Topic> Overview"
   const whoMatch = s.match(/^who\s+(?:is|was|are)\s+(?:the\s+)?(.+)$/i);
   if (whoMatch) {
-    let topic = whoMatch[1]
+    const topic = whoMatch[1]
       .replace(/\?+/g, " ")
       .replace(/\s+/g, " ")
       .replace(/[\s.?!:;]+$/, "")
@@ -161,7 +166,9 @@ export function normalizeQuestionToTopic(text: string): string {
   }
 
   // "What is the chemical formula for <Topic>?" -> "Chemical Formula for <Topic>"
-  const whatFormulaMatch = s.match(/^what\s+(?:is|are)\s+the\s+(chemical\s+formula\s+(?:for|of)\s+.+)$/i);
+  const whatFormulaMatch = s.match(
+    /^what\s+(?:is|are)\s+the\s+(chemical\s+formula\s+(?:for|of)\s+.+)$/i,
+  );
   if (whatFormulaMatch) {
     return whatFormulaMatch[1];
   }
@@ -170,7 +177,9 @@ export function normalizeQuestionToTopic(text: string): string {
   const whatMatch = s.match(/^what\s+(?:is|are)\s+(?:the\s+)?(.+)$/i);
   if (whatMatch) {
     const topic = whatMatch[1].replace(/[\s.?!:;]+$/, "");
-    if (/overview|definition|explanation|analysis|formula|difference/i.test(topic)) {
+    if (
+      /overview|definition|explanation|analysis|formula|difference/i.test(topic)
+    ) {
       return topic;
     }
     return topic;

@@ -37,19 +37,30 @@ class PostHogAIBackend implements ObservabilityBackend {
     eventName: string,
     properties: Record<string, unknown>,
   ) {
-    console.debug("[PostHogAI] capture called:", eventName, "enabled:", this.enabled, "telemetryEnabled:", isTelemetryEnabled());
+    console.debug(
+      "[PostHogAI] capture called:",
+      eventName,
+      "enabled:",
+      this.enabled,
+      "telemetryEnabled:",
+      isTelemetryEnabled(),
+    );
     if (!this.enabled || !isTelemetryEnabled()) return;
 
     try {
       const apiKey =
-        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_API_KEY"]) ||
-        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["POSTHOG_API_KEY"]) ||
+        (typeof window !== "undefined" &&
+          window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_API_KEY"]) ||
+        (typeof window !== "undefined" &&
+          window.__OBSERVABILITY_CONFIG__?.["POSTHOG_API_KEY"]) ||
         (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
         "phc_uAcMi6kFo9gVGsUTtTxSRHQuspXojDphT9ZkcsbhSQt9";
 
       const apiHost =
-        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_HOST"]) ||
-        (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.["POSTHOG_HOST"]) ||
+        (typeof window !== "undefined" &&
+          window.__OBSERVABILITY_CONFIG__?.["VITE_POSTHOG_HOST"]) ||
+        (typeof window !== "undefined" &&
+          window.__OBSERVABILITY_CONFIG__?.["POSTHOG_HOST"]) ||
         (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||
         "https://us.i.posthog.com";
 
@@ -76,7 +87,10 @@ class PostHogAIBackend implements ObservabilityBackend {
         posthog.opt_in_capturing();
         console.debug("[PostHogAI] calling posthog.capture:", eventName);
         posthog.capture(eventName, properties, { send_instantly: true });
-        if (typeof (posthog as unknown as { flush?: () => void }).flush === "function") {
+        if (
+          typeof (posthog as unknown as { flush?: () => void }).flush ===
+          "function"
+        ) {
           (posthog as unknown as { flush: () => void }).flush();
         }
       }

@@ -32,16 +32,23 @@ export class CodexUsageService {
           let secretValue: string | null = null;
           try {
             const raw = await client.getSecret("CODEX_AUTH_JSON");
-            if (raw) secretValue = typeof raw === "string" ? raw : JSON.stringify(raw);
+            if (raw)
+              secretValue = typeof raw === "string" ? raw : JSON.stringify(raw);
           } catch {
-            const list = await client.listSecrets().catch(() => ({ secrets: [] }));
+            const list = await client
+              .listSecrets()
+              .catch(() => ({ secrets: [] }));
             const match = list.secrets?.find(
               (s: { name: string }) =>
-                /codex/i.test(s.name) || /chatgpt/i.test(s.name) || /auth_json/i.test(s.name),
+                /codex/i.test(s.name) ||
+                /chatgpt/i.test(s.name) ||
+                /auth_json/i.test(s.name),
             );
             if (match) {
               const res = await client.getSecret(match.name);
-              if (res) secretValue = typeof res === "string" ? res : JSON.stringify(res);
+              if (res)
+                secretValue =
+                  typeof res === "string" ? res : JSON.stringify(res);
             }
           }
 

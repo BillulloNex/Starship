@@ -1,11 +1,19 @@
 import React from "react";
-import { Bot, Sparkles, DollarSign, ArrowUpRight, ShieldCheck } from "lucide-react";
+import {
+  Bot,
+  Sparkles,
+  DollarSign,
+  ArrowUpRight,
+  ShieldCheck,
+} from "lucide-react";
 
 export interface LlmObservabilityCardProps {
   site?: string;
 }
 
-export function LlmObservabilityCard({ site = "us5.datadoghq.com" }: LlmObservabilityCardProps) {
+export function LlmObservabilityCard({
+  site = "us5.datadoghq.com",
+}: LlmObservabilityCardProps) {
   const llmObsUrl = `https://app.${site}/llm/apps/grokbot`;
 
   return (
@@ -72,7 +80,8 @@ export function LlmObservabilityCard({ site = "us5.datadoghq.com" }: LlmObservab
 
       <div className="p-2.5 rounded bg-surface border border-[var(--oh-border)] text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[var(--oh-muted)]">
         <span>
-          💡 Every agent turn, tool execution (bash/browser/files), and LLM generation is indexed in Datadog.
+          💡 Every agent turn, tool execution (bash/browser/files), and LLM
+          generation is indexed in Datadog.
         </span>
         <a
           href={llmObsUrl}

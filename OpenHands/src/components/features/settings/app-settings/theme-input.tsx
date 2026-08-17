@@ -20,8 +20,9 @@ import {
 export function ThemeInput() {
   const { t } = useTranslation("openhands");
 
-  const [selectedThemeKey, setSelectedThemeKey] =
-    React.useState<ColorThemeKey>(() => readPersistedColorTheme());
+  const [selectedThemeKey, setSelectedThemeKey] = React.useState<ColorThemeKey>(
+    () => readPersistedColorTheme(),
+  );
 
   const [colors, setColors] = React.useState<CustomThemeColors>(() =>
     getThemeColors(readPersistedColorTheme(), readPersistedCustomThemeColors()),
@@ -61,8 +62,14 @@ export function ThemeInput() {
 
   const handleReset = React.useCallback(() => {
     let resetColors: CustomThemeColors;
-    if (selectedThemeKey !== "custom" && selectedThemeKey in PRESET_DEFAULT_COLORS) {
-      resetColors = PRESET_DEFAULT_COLORS[selectedThemeKey as keyof typeof PRESET_DEFAULT_COLORS];
+    if (
+      selectedThemeKey !== "custom" &&
+      selectedThemeKey in PRESET_DEFAULT_COLORS
+    ) {
+      resetColors =
+        PRESET_DEFAULT_COLORS[
+          selectedThemeKey as keyof typeof PRESET_DEFAULT_COLORS
+        ];
     } else {
       resetColors = PRESET_DEFAULT_COLORS["openhands-neutral"];
     }
@@ -77,7 +84,10 @@ export function ThemeInput() {
   }, [selectedThemeKey]);
 
   return (
-    <div className="flex flex-col gap-2.5 w-full min-w-0" data-testid="theme-customizer">
+    <div
+      className="flex flex-col gap-2.5 w-full min-w-0"
+      data-testid="theme-customizer"
+    >
       <div className="rounded-xl border border-[var(--oh-border)] bg-[var(--oh-surface)] p-4 flex flex-col gap-3 shadow-sm">
         {/* Preset Row */}
         <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--oh-border-subtle)]">

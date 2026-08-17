@@ -34,8 +34,10 @@ export function LogsViewerCard({
       // Filter severity
       if (filterSeverity !== "all") {
         const s = (log.status || "").toLowerCase();
-        if (filterSeverity === "error" && s !== "error" && s !== "err") return false;
-        if (filterSeverity === "warn" && s !== "warn" && s !== "warning") return false;
+        if (filterSeverity === "error" && s !== "error" && s !== "err")
+          return false;
+        if (filterSeverity === "warn" && s !== "warn" && s !== "warning")
+          return false;
         if (filterSeverity === "info" && s !== "info") return false;
       }
       // Search query
@@ -210,7 +212,9 @@ export function LogsViewerCard({
                   {isExpanded && (
                     <div className="p-3 bg-surface-deep border-t border-[var(--oh-border-subtle)] text-[11px] space-y-2">
                       <div>
-                        <span className="text-[var(--oh-muted)]">Full Message:</span>
+                        <span className="text-[var(--oh-muted)]">
+                          Full Message:
+                        </span>
                         <pre className="mt-1 p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-foreground whitespace-pre-wrap break-all font-mono">
                           {log.message}
                         </pre>
@@ -232,14 +236,17 @@ export function LogsViewerCard({
                         </div>
                       )}
 
-                      {log.attributes && Object.keys(log.attributes).length > 0 && (
-                        <div>
-                          <span className="text-[var(--oh-muted)]">Attributes:</span>
-                          <pre className="mt-1 p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-[10px] text-foreground font-mono overflow-x-auto">
-                            {JSON.stringify(log.attributes, null, 2)}
-                          </pre>
-                        </div>
-                      )}
+                      {log.attributes &&
+                        Object.keys(log.attributes).length > 0 && (
+                          <div>
+                            <span className="text-[var(--oh-muted)]">
+                              Attributes:
+                            </span>
+                            <pre className="mt-1 p-2 rounded bg-surface border border-[var(--oh-border-subtle)] text-[10px] text-foreground font-mono overflow-x-auto">
+                              {JSON.stringify(log.attributes, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>

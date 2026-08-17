@@ -20,8 +20,12 @@ describe("ThemeInput component", () => {
 
     expect(screen.getByTestId("theme-customizer")).toBeInTheDocument();
     expect(screen.getByTestId("color-theme-preset-input")).toBeInTheDocument();
-    expect(screen.getByTestId("color-theme-background-picker")).toBeInTheDocument();
-    expect(screen.getByTestId("color-theme-foreground-picker")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("color-theme-background-picker"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("color-theme-foreground-picker"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("color-theme-accent-picker")).toBeInTheDocument();
   });
 

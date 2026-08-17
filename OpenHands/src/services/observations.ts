@@ -16,9 +16,7 @@ export function handleObservationMessage(message: ObservationMessage) {
     const pendingCall =
       activeMcpToolCalls.get(message.cause) ||
       activeMcpToolCalls.get(message.id);
-    const durationMs = pendingCall
-      ? Date.now() - pendingCall.startTime
-      : 150;
+    const durationMs = pendingCall ? Date.now() - pendingCall.startTime : 150;
 
     const toolName = pendingCall?.toolName || "mcp_tool";
     const serverName = pendingCall?.serverName || "mcp-server";

@@ -1,6 +1,10 @@
 import { GROKBOT_VERSION } from "#/constants/grokbot-version";
 
-export function GrokbotVersionBadge({ collapsed = false }: { collapsed?: boolean }) {
+export function GrokbotVersionBadge({
+  collapsed = false,
+}: {
+  collapsed?: boolean;
+}) {
   if (collapsed) return null;
   return (
     <span

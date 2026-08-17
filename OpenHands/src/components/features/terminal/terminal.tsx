@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Plus,
-  X,
-  Trash2,
-  CircleDot,
-  Bot,
-  SquareTerminal,
-} from "lucide-react";
+import { Plus, X, Trash2, CircleDot, Bot, SquareTerminal } from "lucide-react";
 import { useTerminal } from "#/hooks/use-terminal";
 import "@xterm/xterm/css/xterm.css";
 import { RUNTIME_INACTIVE_STATES } from "#/types/agent-state";
@@ -48,7 +41,10 @@ function Terminal() {
     !isRuntimeInactive && !!conversationUrl,
   );
 
-  const activeTerminalRef = React.useRef<{ clear: () => void; write: (data: string) => void } | null>(null);
+  const activeTerminalRef = React.useRef<{
+    clear: () => void;
+    write: (data: string) => void;
+  } | null>(null);
 
   const handleExecuteCommand = React.useCallback(
     async (command: string) => {
@@ -73,7 +69,16 @@ function Terminal() {
       try {
         const firstWord = trimmed.split(/\s+/)[0];
         const isCd = firstWord === "cd";
-        const ttyCommands = ["htop", "top", "vim", "vi", "nano", "less", "more", "man"];
+        const ttyCommands = [
+          "htop",
+          "top",
+          "vim",
+          "vi",
+          "nano",
+          "less",
+          "more",
+          "man",
+        ];
 
         let execCommand = isCd
           ? `export TERM=xterm-256color; ${trimmed} && pwd`
@@ -238,6 +243,3 @@ function Terminal() {
 }
 
 export default Terminal;
-
-
-

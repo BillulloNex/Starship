@@ -25,7 +25,9 @@ export function ObservabilityLangfuseCard() {
         <div className="flex items-center justify-between pb-1 border-b border-[var(--oh-border)]">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-sky-400" />
-            <span className="text-base font-semibold">Observability & Timing</span>
+            <span className="text-base font-semibold">
+              Observability & Timing
+            </span>
           </div>
           {enabled && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">

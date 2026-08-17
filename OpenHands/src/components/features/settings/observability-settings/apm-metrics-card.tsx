@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Activity,
-  AlertTriangle,
-  Clock,
-  Cpu,
-  Layers,
-} from "lucide-react";
+import { Activity, AlertTriangle, Clock, Cpu, Layers } from "lucide-react";
 import { DatadogSummaryResponse } from "#/api/observability-service/datadog.types";
 import { cn } from "#/utils/utils";
 
@@ -113,7 +107,11 @@ export function ApmMetricsCard({ summary, isLoading }: ApmMetricsCardProps) {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold text-foreground">
-                {isLoading ? "..." : latencyP95 > 0 ? `${latencyP95}ms` : "<10ms"}
+                {isLoading
+                  ? "..."
+                  : latencyP95 > 0
+                    ? `${latencyP95}ms`
+                    : "<10ms"}
               </span>
               <span className="text-[11px] text-[var(--oh-muted)] font-mono">
                 (p50: {latencyP50}ms)

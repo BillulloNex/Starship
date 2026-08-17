@@ -54,9 +54,17 @@ export function MonitorsAlertsCard({
     );
   };
 
-  const okCount = monitors.filter((m) => (m.state || "").toLowerCase() === "ok").length;
-  const alertCount = monitors.filter((m) => (m.state || "").toLowerCase() === "alert").length;
-  const warnCount = monitors.filter((m) => (m.state || "").toLowerCase() === "warn" || (m.state || "").toLowerCase() === "warning").length;
+  const okCount = monitors.filter(
+    (m) => (m.state || "").toLowerCase() === "ok",
+  ).length;
+  const alertCount = monitors.filter(
+    (m) => (m.state || "").toLowerCase() === "alert",
+  ).length;
+  const warnCount = monitors.filter(
+    (m) =>
+      (m.state || "").toLowerCase() === "warn" ||
+      (m.state || "").toLowerCase() === "warning",
+  ).length;
   const noDataCount = monitors.length - (okCount + alertCount + warnCount);
 
   return (

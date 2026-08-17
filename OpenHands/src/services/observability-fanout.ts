@@ -9,15 +9,6 @@
  * Adding a new backend = implement the interface + register it here.
  */
 
-import {
-  OPIK_API_KEY,
-  OPIK_BASE_URL,
-  OPIK_WORKSPACE,
-  LANGWATCH_API_KEY,
-  LANGWATCH_BASE_URL,
-  POSTHOG_AI_ENABLED,
-} from "./backends/observability-config";
-
 // ---------------------------------------------------------------------------
 // Shared data types — the canonical shapes for generation & tool events
 // ---------------------------------------------------------------------------
@@ -140,5 +131,7 @@ import "./backends/langwatch-backend";
 // at module evaluation time. This prevents tree-shaking.
 console.debug(
   `[observability] ${getBackends().length} backends registered:`,
-  getBackends().map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", ") || "none",
+  getBackends()
+    .map((b) => `${b.name}(${b.enabled ? "on" : "off"})`)
+    .join(", ") || "none",
 );

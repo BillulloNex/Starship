@@ -23,10 +23,7 @@ declare global {
 
 function getConfig(key: string, fallback = ""): string {
   // 1. Runtime injection (highest priority — always works)
-  if (
-    typeof window !== "undefined" &&
-    window.__OBSERVABILITY_CONFIG__?.[key]
-  ) {
+  if (typeof window !== "undefined" && window.__OBSERVABILITY_CONFIG__?.[key]) {
     return window.__OBSERVABILITY_CONFIG__[key];
   }
 
@@ -55,5 +52,4 @@ export const LANGWATCH_BASE_URL = getConfig(
 
 // ─── PostHog AI ───────────────────────────────────────────────────────────
 const posthogVal = getConfig("VITE_POSTHOG_AI_ENABLED");
-export const POSTHOG_AI_ENABLED =
-  posthogVal === "true" || posthogVal === "1";
+export const POSTHOG_AI_ENABLED = posthogVal === "true" || posthogVal === "1";

@@ -64,7 +64,12 @@ export function useTitleProcessor(
 
     // Write the cleaned title back to the server
     updateConversation({ conversationId: id, newTitle: processedTitle });
-  }, [conversation?.id, conversation?.title, conversation?.selected_repository, updateConversation]);
+  }, [
+    conversation?.id,
+    conversation?.title,
+    conversation?.selected_repository,
+    updateConversation,
+  ]);
 
   /**
    * Call this when the user manually renames a conversation to prevent

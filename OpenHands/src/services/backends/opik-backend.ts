@@ -4,7 +4,11 @@ import {
   ObservabilityBackend,
   registerBackend,
 } from "../observability-fanout";
-import { OPIK_API_KEY, OPIK_BASE_URL, OPIK_WORKSPACE } from "./observability-config";
+import {
+  OPIK_API_KEY,
+  OPIK_BASE_URL,
+  OPIK_WORKSPACE,
+} from "./observability-config";
 
 /**
  * Observability backend adapter for Comet Opik.

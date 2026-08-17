@@ -196,7 +196,9 @@ export function ConversationWebSocketProvider({
   const lastAssistantOutputRef = useRef<string | undefined>(undefined);
   // Store the latest generation stats by model name so we can enrich with text
   // regardless of whether the stats or assistant message arrives first.
-  const lastStatsMapRef = useRef<Record<string, import("#/services/observability-fanout").GenerationData>>({});
+  const lastStatsMapRef = useRef<
+    Record<string, import("#/services/observability-fanout").GenerationData>
+  >({});
 
   const isPlanFilePath = (path: string | null): boolean =>
     path?.toUpperCase().endsWith("PLAN.MD") ?? false;
@@ -384,10 +386,7 @@ export function ConversationWebSocketProvider({
           if (userText) {
             lastUserPromptRef.current = userText;
           }
-          consumeMatchingPendingMessage(
-            conversationId,
-            userText,
-          );
+          consumeMatchingPendingMessage(conversationId, userText);
         }
         if (isMessageEvent(event) && event.llm_message.role === "assistant") {
           const assistantText = extractMessageEventText(event);
@@ -644,10 +643,7 @@ export function ConversationWebSocketProvider({
             lastAssistantOutputRef.current = undefined;
 
             if (conversationId) {
-              consumeMatchingPendingMessage(
-                conversationId,
-                userText,
-              );
+              consumeMatchingPendingMessage(conversationId, userText);
               // Clear draft from localStorage - message was successfully delivered
               setConversationState(conversationId, { draftMessage: null });
             }

@@ -8,7 +8,6 @@ export type PresetThemeKey =
 
 export type ColorThemeKey = PresetThemeKey | "custom";
 
-
 export interface CustomThemeColors {
   background: string;
   foreground: string;
@@ -20,7 +19,6 @@ export const DEFAULT_CUSTOM_THEME_COLORS: CustomThemeColors = {
   foreground: "#DEDDF0",
   accent: "#A78BFA",
 };
-
 
 export interface ColorThemeDefinition {
   label: string;
@@ -366,41 +364,39 @@ export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
   },
 };
 
-export const PRESET_DEFAULT_COLORS: Record<
-  PresetThemeKey,
-  CustomThemeColors
-> = {
-  "openhands-neutral": {
-    background: "#181818",
-    foreground: "#ECECEC",
-    accent: "#ffffff",
-  },
-  "openhands-neo": {
-    background: "#181818",
-    foreground: "#ECECEC",
-    accent: "#ffffff",
-  },
-  "openhands-deepsea": {
-    background: "#0B0E14",
-    foreground: "#EEF2F7",
-    accent: "#007ACC",
-  },
-  "vscode-abyss": {
-    background: "#000C18",
-    foreground: "#B8C8E8",
-    accent: "#6688CC",
-  },
-  "catppuccin-frappe": {
-    background: "#292C3C",
-    foreground: "#B5BFE2",
-    accent: "#8CAAEE",
-  },
-  "catppuccin-macchiato": {
-    background: "#1E2030",
-    foreground: "#CAD3F5",
-    accent: "#8AADF4",
-  },
-};
+export const PRESET_DEFAULT_COLORS: Record<PresetThemeKey, CustomThemeColors> =
+  {
+    "openhands-neutral": {
+      background: "#181818",
+      foreground: "#ECECEC",
+      accent: "#ffffff",
+    },
+    "openhands-neo": {
+      background: "#181818",
+      foreground: "#ECECEC",
+      accent: "#ffffff",
+    },
+    "openhands-deepsea": {
+      background: "#0B0E14",
+      foreground: "#EEF2F7",
+      accent: "#007ACC",
+    },
+    "vscode-abyss": {
+      background: "#000C18",
+      foreground: "#B8C8E8",
+      accent: "#6688CC",
+    },
+    "catppuccin-frappe": {
+      background: "#292C3C",
+      foreground: "#B5BFE2",
+      accent: "#8CAAEE",
+    },
+    "catppuccin-macchiato": {
+      background: "#1E2030",
+      foreground: "#CAD3F5",
+      accent: "#8AADF4",
+    },
+  };
 
 function parseHex(hex: string): [number, number, number] {
   let cleaned = hex.trim().replace(/^#/, "");
@@ -429,14 +425,12 @@ function interpolateRgb(
   [r2, g2, b2]: [number, number, number],
   t: number,
 ): string {
-  return rgbToHex(
-    r1 + (r2 - r1) * t,
-    g1 + (g2 - g1) * t,
-    b1 + (b2 - b1) * t,
-  );
+  return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
 }
 
-export function generateCustomThemeScale(colors: CustomThemeColors): ThemeScale {
+export function generateCustomThemeScale(
+  colors: CustomThemeColors,
+): ThemeScale {
   const bg = parseHex(colors.background);
   const fg = parseHex(colors.foreground);
 
@@ -449,8 +443,8 @@ export function generateCustomThemeScale(colors: CustomThemeColors): ThemeScale 
   const stop300 = interpolateRgb(fg, bg, 0.28);
   const stop400 = interpolateRgb(fg, bg, 0.42);
   const stop500 = interpolateRgb(fg, bg, 0.58);
-  const stop600 = interpolateRgb(fg, bg, 0.70);
-  const stop700 = interpolateRgb(fg, bg, 0.80);
+  const stop600 = interpolateRgb(fg, bg, 0.7);
+  const stop700 = interpolateRgb(fg, bg, 0.8);
   const stop800 = interpolateRgb(fg, bg, 0.88);
   const stop900 = interpolateRgb(fg, bg, 0.94);
   const stop925 = interpolateRgb(fg, bg, 0.97);
@@ -574,7 +568,9 @@ export function getThemeDefinition(
       customColors ?? readPersistedCustomThemeColors(),
     );
   }
-  return COLOR_THEMES[key as PresetThemeKey] ?? COLOR_THEMES[DEFAULT_COLOR_THEME];
+  return (
+    COLOR_THEMES[key as PresetThemeKey] ?? COLOR_THEMES[DEFAULT_COLOR_THEME]
+  );
 }
 
 /** Resolve the effective 3 base colors (background, foreground, accent) for a given theme. */
@@ -652,4 +648,3 @@ function syncColorThemeTokensOnScopeRoots(
     }
   }
 }
-
