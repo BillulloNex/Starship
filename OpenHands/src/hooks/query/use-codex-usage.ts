@@ -12,10 +12,10 @@ export function useCodexUsage() {
   const { conversationId } = useOptionalConversationId();
   const { data: conversation } = useActiveConversation();
 
-  // Active when conversation is using ACP and configured with codex agent/server
+  // Active when conversation is using ACP or configured with codex agent/server
   const isAcp = conversation?.agent_kind === "acp";
   const acpServer = (conversation as { acp_server?: string } | undefined)?.acp_server;
-  const isCodex = isAcp && (!acpServer || acpServer === "codex" || acpServer.includes("codex"));
+  const isCodex = !conversation || isAcp || !acpServer || acpServer.includes("codex");
 
   return useQuery<CodexUsageQuota | null>({
     queryKey: ["codex-usage", conversationId],
