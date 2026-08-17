@@ -95,6 +95,50 @@ const BackendFormModal = React.lazy(() =>
   })),
 );
 
+const PRE_HYDRATION_ERROR_HANDLER = `(function(){
+  var K='grokbot_prehydrate_reload',T=10000;
+  function isChunkErr(t,e){
+    if(t&&(t.tagName==='SCRIPT'||t.tagName==='LINK')){
+      var s=t.src||t.href||'';
+      if(s.indexOf('/assets/')!==-1||s.endsWith('.js')||s.endsWith('.css'))return true;
+    }
+    var m=(e&&(e.message||e.name||String(e)))||'';
+    var l=m.toLowerCase();
+    return l.indexOf('failed to fetch dynamically imported module')!==-1||
+      l.indexOf('error loading dynamically imported module')!==-1||
+      l.indexOf('importing a module script failed')!==-1||
+      l.indexOf('loading chunk')!==-1||
+      l.indexOf('chunkloaderror')!==-1;
+  }
+  function recover(){
+    try{
+      var last=Number(sessionStorage.getItem(K)||0);
+      var now=Date.now();
+      if(!last||now-last>T){
+        sessionStorage.setItem(K,String(now));
+        var q=window.location.search||'';
+        var c=q.replace(/[?&]_rb=\\d+/,'');
+        var s=c?(c.indexOf('?')!==-1?'&':'?'):'?';
+        window.location.href=window.location.pathname+c+s+'_rb='+now+window.location.hash;
+        return;
+      }
+    }catch(e){}
+    function showFallback(){
+      if(document.getElementById('grokbot-recovery-banner'))return;
+      var d=document.createElement('div');
+      d.id='grokbot-recovery-banner';
+      d.style.cssText='position:fixed;inset:0;background:#090d16;color:#f0f6fc;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;z-index:999999;padding:24px;text-align:center;';
+      d.innerHTML='<div style="max-width:420px;padding:32px;background:#151b23;border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,0.6);"><h2 style="font-size:20px;font-weight:700;margin:0 0 12px 0;color:#fff;">Update Available</h2><p style="font-size:14px;color:#8b949e;line-height:1.5;margin:0 0 24px 0;">A new version of GrokBot was deployed. Refresh to update.</p><button onclick="try{sessionStorage.removeItem(\\x27'+K+'\\x27);}catch(e){}window.location.reload();" style="background:#238636;color:#fff;font-weight:600;font-size:14px;padding:10px 24px;border-radius:8px;border:none;cursor:pointer;">Reload Page</button></div>';
+      if(document.body){document.body.appendChild(d);}
+      else{document.addEventListener('DOMContentLoaded',function(){if(document.body)document.body.appendChild(d);});}
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',showFallback);}
+    else{showFallback();}
+  }
+  window.addEventListener('error',function(e){if(isChunkErr(e.target,e.error||e.message)){recover();}},true);
+  window.addEventListener('unhandledrejection',function(e){if(isChunkErr(null,e.reason)){recover();}});
+})();`;
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -103,6 +147,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <script
+          dangerouslySetInnerHTML={{ __html: PRE_HYDRATION_ERROR_HANDLER }}
+        />
       </head>
       <body data-agent-server-ui="" className="m-0">
         <AgentServerUIRoot contentClassName="min-h-screen">
@@ -116,6 +163,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </body>
     </html>
   );
+}
+
+export function HydrateFallback() {
+  return <AgentServerBootstrapLoading />;
 }
 
 function AgentServerBootstrapLoading() {

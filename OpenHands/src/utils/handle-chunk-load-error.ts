@@ -1,4 +1,5 @@
 const RELOAD_KEY = "grokbot_chunk_reload_timestamp";
+const RELOAD_THROTTLE_MS = 10000;
 
 /**
  * Determines whether a given error or event represents a failed script/chunk load
@@ -37,9 +38,8 @@ export function isChunkLoadError(error: unknown): boolean {
 
 /**
  * Triggers a page reload if a chunk load fails.
- * Uses the current manifest hash as a version key — only reloads once per
- * manifest version to prevent infinite loops, while still recovering when
- * a new deployment arrives.
+ * Uses the current manifest hash as a version key with a throttle window to prevent infinite
+ * loops while still recovering when a new deployment arrives.
  */
 export function reloadOnChunkError(): void {
   if (typeof window === "undefined") return;
@@ -50,19 +50,21 @@ export function reloadOnChunkError(): void {
     const versionEl =
       document.querySelector('link[href*="/assets/root-"]') ||
       document.querySelector('script[src*="/assets/entry.client-"]');
-    const href = versionEl?.getAttribute("href") || versionEl?.getAttribute("src") || "";
+    const href =
+      versionEl?.getAttribute("href") || versionEl?.getAttribute("src") || "";
     const buildHash = href.match(/-([a-zA-Z0-9_-]+)\.\w+$/)?.[1] || "unknown";
     const versionKey = `${RELOAD_KEY}_${buildHash}`;
 
-    const alreadyReloaded = sessionStorage.getItem(versionKey);
-    if (alreadyReloaded) {
+    const lastReload = Number(sessionStorage.getItem(versionKey) || 0);
+    const now = Date.now();
+    if (lastReload && now - lastReload < RELOAD_THROTTLE_MS) {
       console.warn(
-        `[Grokbot] Chunk load error detected for build ${buildHash}, but reload was already attempted. Skipping to prevent loop.`,
+        `[Grokbot] Chunk load error detected for build ${buildHash}, but reload was already attempted within ${RELOAD_THROTTLE_MS}ms. Skipping to prevent loop.`,
       );
       return;
     }
 
-    sessionStorage.setItem(versionKey, String(Date.now()));
+    sessionStorage.setItem(versionKey, String(now));
     console.warn(
       "[Grokbot] Deployment update or missing chunk detected. Reloading page...",
     );

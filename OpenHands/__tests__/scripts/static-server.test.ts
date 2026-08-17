@@ -477,7 +477,7 @@ describe("static-server.mjs", () => {
       expect(body).not.toContain("should-not-inject");
     });
 
-    it("sets Cache-Control: no-cache for injected index.html", async () => {
+    it("sets strict anti-caching headers for injected index.html", async () => {
       const buildDir = mkdtempSync(path.join(tmpdir(), "agent-canvas-build-"));
       tempDirs.push(buildDir);
       writeFileSync(
@@ -488,7 +488,11 @@ describe("static-server.mjs", () => {
       const origin = await startServerWithKey(buildDir, "cache-test-key");
       const response = await fetch(`${origin}/`);
 
-      expect(response.headers.get("cache-control")).toBe("no-cache");
+      expect(response.headers.get("cache-control")).toBe(
+        "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+      );
+      expect(response.headers.get("pragma")).toBe("no-cache");
+      expect(response.headers.get("expires")).toBe("0");
     });
 
     it("does not inject when sessionApiKey is null", async () => {

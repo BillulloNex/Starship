@@ -347,9 +347,7 @@ function makeConfigInjectionScript(
     if (process.env[key]) obsConfig[key] = process.env[key];
   }
   if (Object.keys(obsConfig).length > 0) {
-    parts.push(
-      `window.__OBSERVABILITY_CONFIG__=${JSON.stringify(obsConfig)};`,
-    );
+    parts.push(`window.__OBSERVABILITY_CONFIG__=${JSON.stringify(obsConfig)};`);
   }
 
   // Auto-grant telemetry consent for self-hosted instances.
@@ -411,7 +409,11 @@ async function serveInjectedIndexHtml(
   res.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Content-Length": buf.length,
-    "Cache-Control": "no-cache",
+    "Cache-Control":
+      "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
+    "Surrogate-Control": "no-store",
   });
   if (req.method === "HEAD") {
     res.end();
@@ -509,7 +511,13 @@ function setStaticHeaders(res, pathname) {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     return;
   }
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
 }
 
 function createStaticMiddleware(dirAbs) {
