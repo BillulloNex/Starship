@@ -69,11 +69,13 @@ check() {
 api() {
   local method="$1" path="$2"
   shift 2
-  curl -sf --max-time 30 \
+  curl -s -S \
+    --max-time 30 \
     -X "$method" \
     -H "X-Session-API-Key: $API_KEY" \
     -H "Content-Type: application/json" \
-    "$BASE_URL$path" "$@"
+    "$@" \
+    "$BASE_URL$path"
 }
 
 cleanup_conversation() {
@@ -144,7 +146,8 @@ CREATE_BODY=$(cat <<EOF
       "api_key": "$LLM_KEY",
       "base_url": "https://api.groq.com/openai/v1",
       "temperature": 0,
-      "max_output_tokens": 500
+      "max_output_tokens": 500,
+      "reasoning_effort": "none"
     },
     "condenser": {"enabled": false},
     "tools": [{"name": "terminal", "params": {}}]
@@ -195,8 +198,17 @@ sleep 2
 ELAPSED=2
 
 while [[ $ELAPSED -lt $TIMEOUT ]]; do
-  CONV_DETAIL=$(api GET "/api/conversations/$CONV_ID" 2>/dev/null) || CONV_DETAIL="{}"
-  AGENT_STATUS=$(echo "$CONV_DETAIL" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('execution_status', d.get('status', '')))" 2>/dev/null) || AGENT_STATUS=""
+  CONV_SEARCH=$(api GET "/api/conversations/search?limit=20" 2>/dev/null) || CONV_SEARCH="{}"
+  AGENT_STATUS=$(echo "$CONV_SEARCH" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+status = ''
+for c in data.get('items', []):
+    if c.get('id') == '$CONV_ID':
+        status = c.get('execution_status', c.get('status', ''))
+        break
+print(status)
+" 2>/dev/null) || AGENT_STATUS=""
 
   if [[ "$AGENT_STATUS" == "idle" || "$AGENT_STATUS" == "stopped" || "$AGENT_STATUS" == "finished" || \
         "$AGENT_STATUS" == "IDLE" || "$AGENT_STATUS" == "STOPPED" || "$AGENT_STATUS" == "FINISHED" ]]; then
@@ -219,8 +231,7 @@ check "Agent executed & finished" "$HAS_RESPONSE" "status=$AGENT_STATUS after ${
 
 # ── 6. Verify Events & LLM Response Content ──
 echo "📋 Step 6: Verifying agent events..."
-EVENTS=$(api GET "/api/conversations/$CONV_ID/events/search?limit=20" 2>/dev/null) || \
-  EVENTS=$(api GET "/api/conversations/$CONV_ID/events?limit=20" 2>/dev/null) || EVENTS="{}"
+EVENTS=$(api GET "/api/conversations/$CONV_ID/events/search?limit=20" 2>/dev/null) || EVENTS="{}"
 
 EVENT_COUNT=$(echo "$EVENTS" | python3 -c "
 import json, sys
