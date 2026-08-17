@@ -159,6 +159,11 @@ export function CodexQuotaCard() {
             windowData={quota.secondaryWindow}
           />
         )}
+        {!quota.primaryWindow && !quota.secondaryWindow && (
+          <div className="text-xs text-emerald-500 font-medium py-0.5">
+            Active • 100% available
+          </div>
+        )}
       </div>
     </div>
   );

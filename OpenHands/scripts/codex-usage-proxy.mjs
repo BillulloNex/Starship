@@ -115,6 +115,45 @@ function fetchWhamUsage(token) {
   });
 }
 
+function normalizeWindow(win) {
+  if (!win || typeof win !== "object") return null;
+
+  const limitSeconds = Number(
+    win.limit_window_seconds || win.window_seconds || win.window || win.seconds || win.limit_seconds,
+  ) || 0;
+
+  let rawUsed =
+    win.used_percent ?? win.usedPercent ?? win.percentage ?? win.used_percentage ?? win.consumed_percent ?? 0;
+  let usedPercent = Number(rawUsed) || 0;
+  // If given as a 0..1 decimal fraction (e.g. 0.24 instead of 24)
+  if (usedPercent > 0 && usedPercent <= 1.0) {
+    usedPercent = Math.round(usedPercent * 1000) / 10;
+  } else {
+    usedPercent = Math.max(0, Math.min(100, Math.round(usedPercent * 10) / 10));
+  }
+
+  const remainingPercent = Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10));
+
+  let resetAt = Number(win.reset_at || win.nextResetTime || win.resetAt || win.resets_at) || null;
+  // If relative reset duration is provided (e.g. resets_in_seconds / reset_after_seconds)
+  if (!resetAt) {
+    const relSeconds = Number(win.resets_in_seconds || win.reset_after_seconds || win.resets_in) || 0;
+    if (relSeconds > 0) {
+      resetAt = Math.floor(Date.now() / 1000) + relSeconds;
+    }
+  }
+
+  const limitReached = Boolean(win.limit_reached || win.limitReached || usedPercent >= 100);
+
+  return {
+    limitSeconds,
+    usedPercent,
+    remainingPercent,
+    resetAt,
+    limitReached,
+  };
+}
+
 /**
  * Normalize ChatGPT WHAM usage payload into structured quota data
  */
@@ -124,66 +163,60 @@ export function normalizeWhamUsage(data) {
   }
 
   const planType = typeof data.plan_type === "string" ? data.plan_type : (data.plan || "standard");
-  const rawLimits = Array.isArray(data.rate_limits)
-    ? [...data.rate_limits]
-    : Array.isArray(data.limits)
-      ? [...data.limits]
-      : Array.isArray(data.windows)
-        ? [...data.windows]
-        : [];
-
-  // If rate_limits is an object with named keys (e.g. { session: {...}, weekly: {...} })
-  if (!Array.isArray(data.rate_limits) && typeof data.rate_limits === "object" && data.rate_limits !== null) {
-    for (const key of Object.keys(data.rate_limits)) {
-      rawLimits.push(data.rate_limits[key]);
-    }
-  }
-
-  // Also check top-level objects
-  if (data.session_limit && typeof data.session_limit === "object") rawLimits.push(data.session_limit);
-  if (data.weekly_limit && typeof data.weekly_limit === "object") rawLimits.push(data.weekly_limit);
-  if (data.primary_window && typeof data.primary_window === "object") rawLimits.push(data.primary_window);
-  if (data.secondary_window && typeof data.secondary_window === "object") rawLimits.push(data.secondary_window);
 
   let primaryWindow = null;
   let secondaryWindow = null;
 
-  for (const limit of rawLimits) {
-    if (!limit || typeof limit !== "object") continue;
-
-    const limitSeconds = Number(limit.limit_window_seconds || limit.window_seconds || limit.window || limit.seconds) || 0;
-    const usedPercent = typeof limit.used_percent === "number"
-      ? Math.max(0, Math.min(100, Math.round(limit.used_percent * 10) / 10))
-      : typeof limit.usedPercent === "number"
-        ? Math.max(0, Math.min(100, Math.round(limit.usedPercent * 10) / 10))
-        : typeof limit.percentage === "number"
-          ? Math.max(0, Math.min(100, Math.round(limit.percentage * 10) / 10))
-          : 0;
-    const remainingPercent = Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10));
-    const resetAt = Number(limit.reset_at || limit.nextResetTime || limit.resetAt || limit.resets_at) || null;
-    const limitReached = Boolean(limit.limit_reached || limit.limitReached || usedPercent >= 100);
-
-    const windowData = {
-      limitSeconds,
-      usedPercent,
-      remainingPercent,
-      resetAt,
-      limitReached,
-    };
-
-    // Primary window is typically <= 10h (36000s) session limit
-    if (limitSeconds > 0 && limitSeconds <= 36000 && !primaryWindow) {
-      primaryWindow = windowData;
-    } else if (limitSeconds > 36000 && !secondaryWindow) {
-      secondaryWindow = windowData;
-    } else if (!primaryWindow) {
-      primaryWindow = windowData;
-    } else if (!secondaryWindow) {
-      secondaryWindow = windowData;
+  // 1. Check data.rate_limit.primary_window and data.rate_limit.secondary_window
+  if (data.rate_limit && typeof data.rate_limit === "object") {
+    if (data.rate_limit.primary_window) {
+      primaryWindow = normalizeWindow(data.rate_limit.primary_window);
+    }
+    if (data.rate_limit.secondary_window) {
+      secondaryWindow = normalizeWindow(data.rate_limit.secondary_window);
+    }
+    // If rate_limit itself is a single window object
+    if (
+      !primaryWindow &&
+      (data.rate_limit.used_percent !== undefined || data.rate_limit.limit_window_seconds !== undefined)
+    ) {
+      primaryWindow = normalizeWindow(data.rate_limit);
     }
   }
 
-  // If only one window was present and not assigned to primary
+  // 2. Check top-level primary_window / secondary_window / session_limit / weekly_limit
+  if (!primaryWindow && data.primary_window) primaryWindow = normalizeWindow(data.primary_window);
+  if (!secondaryWindow && data.secondary_window) secondaryWindow = normalizeWindow(data.secondary_window);
+  if (!primaryWindow && data.session_limit) primaryWindow = normalizeWindow(data.session_limit);
+  if (!secondaryWindow && data.weekly_limit) secondaryWindow = normalizeWindow(data.weekly_limit);
+
+  // 3. Check rate_limits or limits arrays / objects
+  if (!primaryWindow || !secondaryWindow) {
+    const rawLimits = [];
+    if (Array.isArray(data.rate_limits)) rawLimits.push(...data.rate_limits);
+    else if (data.rate_limits && typeof data.rate_limits === "object") {
+      Object.values(data.rate_limits).forEach((v) => rawLimits.push(v));
+    }
+    if (Array.isArray(data.limits)) rawLimits.push(...data.limits);
+    if (Array.isArray(data.windows)) rawLimits.push(...data.windows);
+
+    for (const limit of rawLimits) {
+      const parsed = normalizeWindow(limit);
+      if (!parsed) continue;
+
+      if (parsed.limitSeconds > 0 && parsed.limitSeconds <= 36000 && !primaryWindow) {
+        primaryWindow = parsed;
+      } else if (parsed.limitSeconds > 36000 && !secondaryWindow) {
+        secondaryWindow = parsed;
+      } else if (!primaryWindow) {
+        primaryWindow = parsed;
+      } else if (!secondaryWindow) {
+        secondaryWindow = parsed;
+      }
+    }
+  }
+
+  // If only one window was found and placed in secondary, promote to primary
   if (!primaryWindow && secondaryWindow) {
     primaryWindow = secondaryWindow;
     secondaryWindow = null;
