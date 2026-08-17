@@ -160,14 +160,30 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   ) {
     default_command.push("--dangerously-skip-permissions");
   }
+  const available_models =
+    info?.available_models?.map((model) => ({
+      id: model.id,
+      label: model.label,
+    })) ?? [];
+
+  if (key === "claude-code") {
+    const hasOpus5 = available_models.some(
+      (m) => m.id === "claude-5-opus" || m.id === "claude-opus-5",
+    );
+    if (!hasOpus5) {
+      // Add Claude 5 Opus to the suggested list
+      available_models.splice(1, 0, {
+        id: "claude-5-opus",
+        label: "Claude 5 Opus",
+      });
+    }
+  }
+
   return {
     key,
     display_name: info?.display_name ?? key,
     default_command,
-    available_models: info?.available_models?.map((model) => ({
-      id: model.id,
-      label: model.label,
-    })),
+    available_models,
     default_model: info?.default_model ?? undefined,
     description_key: ui.description_key,
     icon: ui.icon,
