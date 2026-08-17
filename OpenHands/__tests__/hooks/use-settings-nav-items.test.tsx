@@ -140,8 +140,9 @@ describe("useSettingsNavItems", () => {
 
     expect(paths).not.toContain("/settings/agent-server");
     expect(paths).not.toContain("/settings/integrations");
-    expect(paths).not.toContain("/settings/skills");
-    expect(paths).not.toContain("/settings/mcp");
+    expect(paths).toContain("/settings/skills");
+    expect(paths).toContain("/settings/mcp");
+    expect(paths).toContain("/settings/plugins");
   });
 
   it("keeps every settings library enabled while an ACP profile is active", () => {

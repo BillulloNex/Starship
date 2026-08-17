@@ -177,18 +177,11 @@ export function Sidebar() {
   const showCollapsedExpandButton =
     collapsed && collapsedRailHovered && !suppressCollapsedExpandRef.current;
 
-  const isExtensionsActive =
-    currentPath === "/customize" ||
-    currentPath.startsWith("/skills") ||
-    currentPath === "/plugins" ||
-    currentPath === "/mcp";
-
   const railBodyProps = {
     collapseToggleLabel,
     onCollapse: handleCollapse,
     onExpand: () => setCollapsed(false),
     showCollapsedExpandButton,
-    isExtensionsActive,
     currentPath,
     activeBackendHealth,
     collapsedBackendPopoverOpen,

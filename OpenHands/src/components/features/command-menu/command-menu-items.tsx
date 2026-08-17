@@ -23,9 +23,8 @@ const ICON_SIZE = 18;
 
 export const COMMAND_MENU_ROUTE = {
   conversations: "/conversations",
-  customize: "/customize",
   automations: automationListPath(),
-  mcp: "/mcp",
+  mcp: "/settings/mcp",
   settings: "/settings",
   agentSettings: "/settings/agents",
   llmSettings: "/settings/llm",
@@ -38,7 +37,6 @@ export const COMMAND_MENU_ROUTE = {
 export type CommandMenuGroupId = "navigation" | "settings" | "actions";
 export type CommandMenuItemId =
   | "new-chat"
-  | "customize"
   | "automations"
   | "mcp"
   | "settings"
@@ -92,15 +90,6 @@ export const createCommandMenuItems = ({
     to: COMMAND_MENU_ROUTE.conversations,
   },
   {
-    id: "customize",
-    group: "navigation",
-    titleKey: I18nKey.COMMAND_MENU$CUSTOMIZE_TITLE,
-    descriptionKey: I18nKey.COMMAND_MENU$CUSTOMIZE_DESCRIPTION,
-    keywordsKey: I18nKey.COMMAND_MENU$CUSTOMIZE_KEYWORDS,
-    icon: <Sparkles size={ICON_SIZE} />,
-    to: COMMAND_MENU_ROUTE.customize,
-  },
-  {
     id: "automations",
     group: "navigation",
     titleKey: I18nKey.COMMAND_MENU$AUTOMATIONS_TITLE,
@@ -113,15 +102,6 @@ export const createCommandMenuItems = ({
     to: COMMAND_MENU_ROUTE.automations,
   },
   {
-    id: "mcp",
-    group: "navigation",
-    titleKey: I18nKey.COMMAND_MENU$MCP_TITLE,
-    descriptionKey: I18nKey.COMMAND_MENU$MCP_DESCRIPTION,
-    keywordsKey: I18nKey.COMMAND_MENU$MCP_KEYWORDS,
-    icon: <Wrench size={ICON_SIZE} />,
-    to: COMMAND_MENU_ROUTE.mcp,
-  },
-  {
     id: "settings",
     group: "settings",
     titleKey: I18nKey.COMMAND_MENU$SETTINGS_TITLE,
@@ -129,6 +109,15 @@ export const createCommandMenuItems = ({
     keywordsKey: I18nKey.COMMAND_MENU$SETTINGS_KEYWORDS,
     icon: <Settings size={ICON_SIZE} />,
     to: COMMAND_MENU_ROUTE.settings,
+  },
+  {
+    id: "mcp",
+    group: "settings",
+    titleKey: I18nKey.COMMAND_MENU$MCP_TITLE,
+    descriptionKey: I18nKey.COMMAND_MENU$MCP_DESCRIPTION,
+    keywordsKey: I18nKey.COMMAND_MENU$MCP_KEYWORDS,
+    icon: <Wrench size={ICON_SIZE} />,
+    to: COMMAND_MENU_ROUTE.mcp,
   },
   {
     id: "agent-settings",

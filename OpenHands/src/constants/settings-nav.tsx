@@ -1,8 +1,10 @@
-import { Activity, AppWindow, Brain, Shield } from "lucide-react";
+import { AppWindow, Brain, Shield } from "lucide-react";
 import KeyIcon from "#/icons/key.svg?react";
 import MemoryIcon from "#/icons/memory_icon.svg?react";
 import CircuitIcon from "#/icons/u-circuit.svg?react";
 import RobotIcon from "#/icons/u-robot.svg?react";
+import ServerProcessIcon from "#/icons/server-process.svg?react";
+import SkillsIcon from "#/icons/skills.svg?react";
 
 export interface SettingsNavItem {
   icon: React.ReactElement;
@@ -48,6 +50,47 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     subtitle: "SETTINGS$PAGE_AGENT_CONTEXT_SUBLINE",
   },
   {
+    icon: <KeyIcon width={16} height={16} />,
+    to: "/settings/secrets",
+    text: "SETTINGS$NAV_SECRETS",
+    subtitle: "SETTINGS$PAGE_SECRETS_SUBLINE",
+  },
+  {
+    icon: <ServerProcessIcon width={16} height={16} />,
+    to: "/settings/mcp",
+    text: "SETTINGS$NAV_MCP",
+    subtitle: "SETTINGS$MCP_DESCRIPTION",
+  },
+  {
+    icon: <SkillsIcon width={16} height={16} aria-hidden="true" />,
+    to: "/settings/skills",
+    text: "SETTINGS$NAV_SKILLS",
+    subtitle: "SETTINGS$SKILLS_PAGE_DESCRIPTION",
+  },
+  {
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        width={16}
+        height={16}
+        aria-hidden="true"
+      >
+        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+        <path d="m3.3 7 8.7 5 8.7-5" />
+        <path d="M12 22V12" />
+      </svg>
+    ),
+    to: "/settings/plugins",
+    text: "SETTINGS$NAV_PLUGINS",
+    subtitle: "SETTINGS$PLUGINS_DESCRIPTION",
+  },
+  {
     icon: <Shield className="size-4" strokeWidth={2} aria-hidden />,
     to: "/settings/verification",
     text: "SETTINGS$NAV_VERIFICATION",
@@ -58,11 +101,5 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/app",
     text: "SETTINGS$NAV_APPLICATION",
     subtitle: "SETTINGS$PAGE_APPLICATION_SUBLINE",
-  },
-  {
-    icon: <KeyIcon width={16} height={16} />,
-    to: "/settings/secrets",
-    text: "SETTINGS$NAV_SECRETS",
-    subtitle: "SETTINGS$PAGE_SECRETS_SUBLINE",
   },
 ];

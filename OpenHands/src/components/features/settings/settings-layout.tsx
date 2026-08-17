@@ -21,7 +21,9 @@ export function SettingsLayout({
       <div className="flex min-h-0 flex-1 gap-10 md:items-start">
         <SettingsDesktopSidebar navigationItems={navigationItems} />
         <main className={settingsLayoutMainScrollClassName}>
-          <div className="mx-auto w-full min-w-0 max-w-[800px]">{children}</div>
+          <div className="mx-auto w-full min-w-0 max-w-[1100px]">
+            {children}
+          </div>
         </main>
       </div>
     </div>

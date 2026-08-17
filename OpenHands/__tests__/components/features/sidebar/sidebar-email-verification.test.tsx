@@ -147,12 +147,12 @@ describe("Sidebar email verification", () => {
     renderSidebar();
     await screen.findByTestId("settings-loaded");
 
-    // Assert: New Chat, Customize/Extensions, and Automations stay actionable
+    // Assert: New Chat, Automations, and Observability stay actionable
     // (a disabled link would carry aria-disabled="true").
     for (const testId of [
       "sidebar-conversations-link",
-      "sidebar-skills-link",
       "sidebar-automations-link",
+      "sidebar-observability-link",
     ]) {
       expect(screen.getByTestId(testId)).not.toHaveAttribute("aria-disabled");
     }

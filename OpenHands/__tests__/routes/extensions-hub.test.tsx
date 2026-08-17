@@ -27,9 +27,12 @@ describe("ExtensionsHub", () => {
     mockUseBreakpoint.mockReturnValue(false);
   });
 
-  it("redirects desktop Customize navigation to MCP Servers", () => {
+  it("redirects Customize navigation to Settings MCP Servers", () => {
     render(<ExtensionsHub />);
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: "/mcp", replace: true });
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/settings/mcp",
+      replace: true,
+    });
   });
 });
