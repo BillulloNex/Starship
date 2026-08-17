@@ -7,6 +7,27 @@ import {
   applyColorTheme,
 } from "#/themes/color-themes";
 
+const NEW_THEMES = [
+  {
+    key: "vscode-abyss",
+    label: "Abyss",
+    background: "#000C18",
+    primary: "#6688CC",
+  },
+  {
+    key: "catppuccin-frappe",
+    label: "Catppuccin Frappé",
+    background: "#292C3C",
+    primary: "#8CAAEE",
+  },
+  {
+    key: "catppuccin-macchiato",
+    label: "Catppuccin Macchiato",
+    background: "#1E2030",
+    primary: "#8AADF4",
+  },
+] as const;
+
 describe("color themes", () => {
   it("includes OpenHands-Neo as a neutral-based theme with white button tokens", () => {
     const neo = COLOR_THEMES["openhands-neo"];
@@ -27,6 +48,37 @@ describe("color themes", () => {
         ?.label,
     ).toBe("OpenHands-Neo");
   });
+
+  it("exposes the new themes in the settings theme picker", () => {
+    expect(AVAILABLE_COLOR_THEMES).toEqual(
+      expect.arrayContaining(
+        NEW_THEMES.map(({ key, label }) =>
+          expect.objectContaining({ key, label }),
+        ),
+      ),
+    );
+  });
+
+  it.each(NEW_THEMES)(
+    "defines and applies the $label palette",
+    ({ key, background, primary }) => {
+      document.body.setAttribute("data-agent-server-ui", "");
+
+      applyColorTheme(key);
+
+      const theme = COLOR_THEMES[key];
+      const styleEl = document.getElementById("oh-color-theme-override");
+      expect(theme.scale["--cool-grey-950"]).toBe(background);
+      expect(theme.tokens?.["--oh-color-primary"]).toBe(primary);
+      expect(styleEl?.textContent).toContain(`--cool-grey-950: ${background};`);
+      expect(document.body.style.getPropertyValue("--oh-color-primary")).toBe(
+        primary,
+      );
+
+      applyColorTheme("openhands-neutral");
+      document.body.removeAttribute("data-agent-server-ui");
+    },
+  );
 
   it("injects white primary tokens when applying OpenHands-Neo", () => {
     document.body.setAttribute("data-agent-server-ui", "");
@@ -55,7 +107,9 @@ describe("color themes", () => {
     expect(styleEl?.textContent).toContain(
       "[data-agent-server-ui][data-agent-server-ui] {",
     );
-    expect(styleEl?.textContent).toContain("[data-theme=dark][data-theme=dark] {");
+    expect(styleEl?.textContent).toContain(
+      "[data-theme=dark][data-theme=dark] {",
+    );
 
     styleEl?.remove();
   });
@@ -88,9 +142,9 @@ describe("color themes", () => {
 
     applyColorTheme("openhands-neo");
 
-    const scopeRoot = screen.getByTestId("primary-button").closest(
-      "[data-agent-server-ui]",
-    ) as HTMLElement;
+    const scopeRoot = screen
+      .getByTestId("primary-button")
+      .closest("[data-agent-server-ui]") as HTMLElement;
 
     expect(scopeRoot.style.getPropertyValue("--oh-color-primary")).toBe(
       "#ffffff",
