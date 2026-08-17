@@ -16,8 +16,8 @@ export function ClaudeUsageCard() {
       conversation?.tags?.acpserver === "claude-code");
 
   const isClaudeModel =
-    typeof conversation?.model === "string" &&
-    conversation.model.toLowerCase().includes("claude");
+    typeof conversation?.llm_model === "string" &&
+    conversation.llm_model.toLowerCase().includes("claude");
 
   // Only render when the conversation is Claude-powered
   if (!isAcpClaude && !isClaudeModel) {

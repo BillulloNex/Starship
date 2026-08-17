@@ -73,11 +73,18 @@ export interface ObservabilityBackend {
 // Registry
 // ---------------------------------------------------------------------------
 
-let backends: ObservabilityBackend[] | undefined;
+function getBackends(): ObservabilityBackend[] {
+  const g = globalThis as unknown as {
+    __OH_OBSERVABILITY_BACKENDS__?: ObservabilityBackend[];
+  };
+  if (!g.__OH_OBSERVABILITY_BACKENDS__) {
+    g.__OH_OBSERVABILITY_BACKENDS__ = [];
+  }
+  return g.__OH_OBSERVABILITY_BACKENDS__;
+}
 
 export function registerBackend(backend: ObservabilityBackend): void {
-  if (!backends) backends = [];
-  backends.push(backend);
+  getBackends().push(backend);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,8 +92,8 @@ export function registerBackend(backend: ObservabilityBackend): void {
 // ---------------------------------------------------------------------------
 
 export function fanoutGeneration(data: GenerationData): void {
-  if (!backends) return;
-  for (const backend of backends) {
+  const list = getBackends();
+  for (const backend of list) {
     if (!backend.enabled) continue;
     try {
       backend.recordGeneration(data);
@@ -100,8 +107,8 @@ export function fanoutGeneration(data: GenerationData): void {
 }
 
 export function fanoutToolCall(data: ToolCallData): void {
-  if (!backends) return;
-  for (const backend of backends) {
+  const list = getBackends();
+  for (const backend of list) {
     if (!backend.enabled) continue;
     try {
       backend.recordToolCall(data);
@@ -132,6 +139,6 @@ import "./backends/langwatch-backend";
 // Force Vite to treat this module as having side effects by logging
 // at module evaluation time. This prevents tree-shaking.
 console.debug(
-  `[observability] ${backends?.length ?? 0} backends registered:`,
-  backends?.map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", ") ?? "none",
+  `[observability] ${getBackends().length} backends registered:`,
+  getBackends().map((b) => `${b.name}(${b.enabled ? "on" : "off"})`).join(", ") || "none",
 );

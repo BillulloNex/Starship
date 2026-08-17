@@ -54,7 +54,7 @@ describe("mock conversation handlers", () => {
       ]);
 
     expect(conversation?.id).toBe(TABLE_DEMO_CONVERSATION_ID);
-    expect(conversation?.title).toBe("Wide table demo");
+    expect(conversation?.title).toBe("Wide Table Demo");
   });
 
   it("returns table demo events sorted for conversation history", async () => {
@@ -82,7 +82,7 @@ describe("mock conversation handlers", () => {
       { limit: 50, sortOrder: "TIMESTAMP_DESC" },
     );
 
-    expect(conversation?.title).toBe("Generated canvas demo");
+    expect(conversation?.title).toBe("Generated Canvas Demo");
     expect(page.items).toHaveLength(4);
     expect(page.items).toEqual(
       expect.arrayContaining([

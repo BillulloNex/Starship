@@ -1,10 +1,26 @@
-export type ColorThemeKey =
+export type PresetThemeKey =
   | "openhands-deepsea"
   | "openhands-neutral"
   | "openhands-neo"
   | "vscode-abyss"
   | "catppuccin-frappe"
   | "catppuccin-macchiato";
+
+export type ColorThemeKey = PresetThemeKey | "custom";
+
+
+export interface CustomThemeColors {
+  background: string;
+  foreground: string;
+  accent: string;
+}
+
+export const DEFAULT_CUSTOM_THEME_COLORS: CustomThemeColors = {
+  background: "#171525",
+  foreground: "#DEDDF0",
+  accent: "#A78BFA",
+};
+
 
 export interface ColorThemeDefinition {
   label: string;
@@ -240,7 +256,7 @@ const CATPPUCCIN_MACCHIATO_SCALE: ThemeScale = {
   975: "#181926",
 };
 
-export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
+export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
   "openhands-deepsea": {
     label: "OpenHands-DeepSea",
     // Matches the values already set by index.css; included so switching back
@@ -350,19 +366,151 @@ export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
   },
 };
 
-export const DEFAULT_COLOR_THEME: ColorThemeKey = "openhands-neutral";
+export const PRESET_DEFAULT_COLORS: Record<
+  PresetThemeKey,
+  CustomThemeColors
+> = {
+  "openhands-neutral": {
+    background: "#181818",
+    foreground: "#ECECEC",
+    accent: "#ffffff",
+  },
+  "openhands-neo": {
+    background: "#181818",
+    foreground: "#ECECEC",
+    accent: "#ffffff",
+  },
+  "openhands-deepsea": {
+    background: "#0B0E14",
+    foreground: "#EEF2F7",
+    accent: "#007ACC",
+  },
+  "vscode-abyss": {
+    background: "#000C18",
+    foreground: "#B8C8E8",
+    accent: "#6688CC",
+  },
+  "catppuccin-frappe": {
+    background: "#292C3C",
+    foreground: "#B5BFE2",
+    accent: "#8CAAEE",
+  },
+  "catppuccin-macchiato": {
+    background: "#1E2030",
+    foreground: "#CAD3F5",
+    accent: "#8AADF4",
+  },
+};
 
-export const AVAILABLE_COLOR_THEMES = Object.entries(COLOR_THEMES).map(
-  ([key, def]) => ({ key: key as ColorThemeKey, label: def.label }),
-);
+function parseHex(hex: string): [number, number, number] {
+  let cleaned = hex.trim().replace(/^#/, "");
+  if (cleaned.length === 3) {
+    cleaned = cleaned
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  if (cleaned.length !== 6) {
+    return [0, 0, 0];
+  }
+  const val = Number.parseInt(cleaned, 16);
+  if (Number.isNaN(val)) return [0, 0, 0];
+  return [(val >> 16) & 255, (val >> 8) & 255, val & 255];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const toHex = (v: number) => clamp(v).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function interpolateRgb(
+  [r1, g1, b1]: [number, number, number],
+  [r2, g2, b2]: [number, number, number],
+  t: number,
+): string {
+  return rgbToHex(
+    r1 + (r2 - r1) * t,
+    g1 + (g2 - g1) * t,
+    b1 + (b2 - b1) * t,
+  );
+}
+
+export function generateCustomThemeScale(colors: CustomThemeColors): ThemeScale {
+  const bg = parseHex(colors.background);
+  const fg = parseHex(colors.foreground);
+
+  // Stop 50: Slightly brighter than foreground (blend 15% towards white)
+  const stop50 = interpolateRgb(fg, [255, 255, 255], 0.15);
+  // Stop 100: Foreground
+  const stop100 = rgbToHex(fg[0], fg[1], fg[2]);
+  // Intermediate stops: smoothly blend between fg and bg
+  const stop200 = interpolateRgb(fg, bg, 0.15);
+  const stop300 = interpolateRgb(fg, bg, 0.28);
+  const stop400 = interpolateRgb(fg, bg, 0.42);
+  const stop500 = interpolateRgb(fg, bg, 0.58);
+  const stop600 = interpolateRgb(fg, bg, 0.70);
+  const stop700 = interpolateRgb(fg, bg, 0.80);
+  const stop800 = interpolateRgb(fg, bg, 0.88);
+  const stop900 = interpolateRgb(fg, bg, 0.94);
+  const stop925 = interpolateRgb(fg, bg, 0.97);
+  // Stop 950: Background
+  const stop950 = rgbToHex(bg[0], bg[1], bg[2]);
+  // Stop 975: Darker than background (blend 35% towards black)
+  const stop975 = interpolateRgb(bg, [0, 0, 0], 0.35);
+
+  return {
+    50: stop50,
+    100: stop100,
+    200: stop200,
+    300: stop300,
+    400: stop400,
+    500: stop500,
+    600: stop600,
+    700: stop700,
+    800: stop800,
+    900: stop900,
+    925: stop925,
+    950: stop950,
+    975: stop975,
+  };
+}
+
+export function generateCustomTheme(
+  colors: CustomThemeColors,
+): ColorThemeDefinition {
+  const scale = generateCustomThemeScale(colors);
+  return {
+    label: "Custom",
+    scale: createThemeScale(scale),
+    heroui: createHeroUITheme(scale),
+    tokens: {
+      "--oh-color-primary": colors.accent,
+      "--oh-accent": colors.accent,
+      "--oh-warning": colors.accent,
+    },
+  };
+}
+
+export const DEFAULT_COLOR_THEME: PresetThemeKey = "openhands-neutral";
+
+export const AVAILABLE_COLOR_THEMES: { key: ColorThemeKey; label: string }[] = [
+  ...Object.entries(COLOR_THEMES).map(([key, def]) => ({
+    key: key as ColorThemeKey,
+    label: def.label,
+  })),
+  { key: "custom", label: "Custom" },
+];
 
 const STORAGE_KEY = "openhands-color-theme";
+const CUSTOM_THEME_STORAGE_KEY = "openhands-custom-theme-colors";
 
 /** Read the persisted theme key from localStorage, falling back to the default. */
 export function readPersistedColorTheme(): ColorThemeKey {
   if (typeof window === "undefined") return DEFAULT_COLOR_THEME;
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "custom") return "custom";
     if (stored && stored in COLOR_THEMES) return stored as ColorThemeKey;
   } catch {
     // ignore quota / privacy-mode failures
@@ -379,35 +527,83 @@ export function persistColorTheme(key: ColorThemeKey): void {
   }
 }
 
+/** Read persisted custom theme colors from localStorage. */
+export function readPersistedCustomThemeColors(): CustomThemeColors {
+  if (typeof window === "undefined") return DEFAULT_CUSTOM_THEME_COLORS;
+  try {
+    const stored = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (
+        typeof parsed?.background === "string" &&
+        typeof parsed?.foreground === "string" &&
+        typeof parsed?.accent === "string"
+      ) {
+        return {
+          background: parsed.background,
+          foreground: parsed.foreground,
+          accent: parsed.accent,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_CUSTOM_THEME_COLORS;
+}
+
+/** Persist custom theme colors to localStorage. */
+export function persistCustomThemeColors(colors: CustomThemeColors): void {
+  try {
+    window.localStorage.setItem(
+      CUSTOM_THEME_STORAGE_KEY,
+      JSON.stringify(colors),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+/** Resolve the effective ColorThemeDefinition for a given theme key. */
+export function getThemeDefinition(
+  key: ColorThemeKey,
+  customColors?: CustomThemeColors,
+): ColorThemeDefinition {
+  if (key === "custom") {
+    return generateCustomTheme(
+      customColors ?? readPersistedCustomThemeColors(),
+    );
+  }
+  return COLOR_THEMES[key as PresetThemeKey] ?? COLOR_THEMES[DEFAULT_COLOR_THEME];
+}
+
+/** Resolve the effective 3 base colors (background, foreground, accent) for a given theme. */
+export function getThemeColors(
+  key: ColorThemeKey,
+  customColors?: CustomThemeColors,
+): CustomThemeColors {
+  if (key === "custom") {
+    return customColors ?? readPersistedCustomThemeColors();
+  }
+  return (
+    PRESET_DEFAULT_COLORS[key as PresetThemeKey] ??
+    PRESET_DEFAULT_COLORS[DEFAULT_COLOR_THEME]
+  );
+}
+
 const THEME_STYLE_TAG_ID = "oh-color-theme-override";
 
 /**
  * Apply a theme by injecting (or replacing) a <style> tag that overrides
  * both our custom --cool-grey-* primitives and HeroUI's --heroui-* tokens.
- *
- * Why a <style> tag:
- *   PostCSS transforms :root / body to [data-agent-server-ui], so --cool-grey-*
- *   is set on EVERY element carrying that attribute. A body inline-style only
- *   overrides body itself — inner matching elements keep the stylesheet value.
- *
- * Why heroui variables:
- *   HeroUI stores colors as HSL channels in --heroui-* vars on [data-theme=dark].
- *   They reference their own token system and are unaffected by --cool-grey-*
- *   changes, so we override them from the same injected sheet.
- *
- * Why doubled selectors + re-append on every call:
- *   "Later sheet wins the tie" cannot be relied on: in the built SPA
- *   (ssr:false, prerendered shell) React 19 re-creates the <head> elements it
- *   manages (<Meta/>/<Links/>) whenever the tree above the router remounts.
- *   That can re-insert the base stylesheet <link> AFTER this tag, allowing its
- *   unlayered [data-agent-server-ui] variable rules (0,1,0) to win every tie.
- *   Doubling the attribute selectors ([x][x], 0,2,0) beats them from any
- *   position in <head>; re-appending on each apply keeps document order
- *   favorable as well.
  */
-export function applyColorTheme(key: ColorThemeKey): void {
+export function applyColorTheme(
+  key: ColorThemeKey,
+  customColors?: CustomThemeColors,
+): void {
   if (typeof document === "undefined") return;
-  const { scale, heroui, tokens = {} } = COLOR_THEMES[key];
+  const definition = getThemeDefinition(key, customColors);
+  const { scale, heroui, tokens = {} } = definition;
 
   const scaleDecls = Object.entries(scale)
     .map(([p, v]) => `  ${p}: ${v};`)
@@ -421,13 +617,6 @@ export function applyColorTheme(key: ColorThemeKey): void {
     .map(([p, v]) => `  ${p}: ${v};`)
     .join("\n");
 
-  // Target both selectors for heroui vars:
-  //   [data-agent-server-ui] — covers document.body (portal destination) so
-  //     portalled popover/listbox content inherits the overridden values.
-  //   [data-theme=dark]      — covers the inner AgentServerUIRoot wrapper so
-  //     components scoped inside the dark theme wrapper also pick them up.
-  // Both are doubled to out-specify the base sheet regardless of stylesheet
-  // order (see the doc comment above).
   const css = [
     `[data-agent-server-ui][data-agent-server-ui] {\n${scaleDecls}\n${herouiDecls}\n${tokenDecls}\n}`,
     `[data-theme=dark][data-theme=dark] {\n${herouiDecls}\n}`,
@@ -441,8 +630,6 @@ export function applyColorTheme(key: ColorThemeKey): void {
     styleEl.id = THEME_STYLE_TAG_ID;
   }
   styleEl.textContent = css;
-  // Re-append even when the tag already exists (appendChild relocates a
-  // connected node) so the override also stays after any re-inserted <link>.
   document.head.appendChild(styleEl);
 
   syncColorThemeTokensOnScopeRoots(tokens);
@@ -465,3 +652,4 @@ function syncColorThemeTokensOnScopeRoots(
     }
   }
 }
+

@@ -43,6 +43,7 @@ import {
   LAUNCH_CHILD_CONVERSATION_TOOL_NAME,
 } from "./launch-child-conversation-client-tool";
 import { generateRandomConversationName } from "#/utils/random-conversation-names";
+import { processConversationTitle } from "#/utils/process-conversation-title";
 
 export interface DirectConversationInfo {
   id: string;
@@ -341,7 +342,11 @@ export function toAppConversation(
     selected_workspace: metadata?.selected_workspace ?? null,
     active_profile: metadata?.active_profile ?? null,
     title: info.title?.trim()
-      ? info.title
+      ? processConversationTitle(
+          info.title,
+          info.id,
+          metadata?.selected_repository,
+        ).title
       : getDefaultConversationTitle(info.id),
     trigger: null,
     pr_number: [],

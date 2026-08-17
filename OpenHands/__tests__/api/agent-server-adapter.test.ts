@@ -902,15 +902,15 @@ describe("buildStartConversationRequest", () => {
 });
 
 describe("getDefaultConversationTitle", () => {
-  it("generates a random adjective-noun placeholder name", () => {
+  it("generates a clean placeholder name", () => {
     const title = getDefaultConversationTitle("372eb-1234-5678-9abc");
-    expect(title).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(title).toBe("New Conversation");
   });
 
   it("is deterministic — same ID produces the same name", () => {
-    const title1 = getDefaultConversationTitle("372eb-1234-5678-9abc");
-    const title2 = getDefaultConversationTitle("372eb-1234-5678-9abc");
-    expect(title1).toBe(title2);
+    const t1 = getDefaultConversationTitle("372eb-1234-5678-9abc");
+    const t2 = getDefaultConversationTitle("372eb-1234-5678-9abc");
+    expect(t1).toBe(t2);
   });
 });
 
@@ -921,32 +921,32 @@ describe("toAppConversation", () => {
     updated_at: "2026-01-01T00:00:00Z",
   };
 
-  it("falls back to a random placeholder when the backend returns null", () => {
+  it("falls back to default placeholder when the backend returns null", () => {
     const result = toAppConversation({ ...baseInfo, title: null });
-    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(result.title).toBe("New Conversation");
   });
 
-  it("falls back to a random placeholder when the backend returns undefined", () => {
+  it("falls back to default placeholder when the backend returns undefined", () => {
     const result = toAppConversation({ ...baseInfo });
-    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(result.title).toBe("New Conversation");
   });
 
-  it("falls back to a random placeholder when the backend returns an empty string", () => {
+  it("falls back to default placeholder when the backend returns an empty string", () => {
     const result = toAppConversation({ ...baseInfo, title: "" });
-    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(result.title).toBe("New Conversation");
   });
 
-  it("falls back to a random placeholder when the backend returns whitespace only", () => {
+  it("falls back to default placeholder when the backend returns whitespace only", () => {
     const result = toAppConversation({ ...baseInfo, title: "   " });
-    expect(result.title).toMatch(/^[a-z]+-[a-z]+$/);
+    expect(result.title).toBe("New Conversation");
   });
 
-  it("preserves a backend-provided title when one is set", () => {
+  it("preserves and formats a backend-provided title when one is set", () => {
     const result = toAppConversation({
       ...baseInfo,
-      title: "My real title",
+      title: "My Real Title",
     });
-    expect(result.title).toBe("My real title");
+    expect(result.title).toBe("My Real Title");
   });
 
   it("hydrates selected_workspace from stored metadata so the sidebar can group by it", () => {
