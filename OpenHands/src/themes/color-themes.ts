@@ -1,7 +1,10 @@
 export type ColorThemeKey =
   | "openhands-deepsea"
   | "openhands-neutral"
-  | "openhands-neo";
+  | "openhands-neo"
+  | "vscode-abyss"
+  | "catppuccin-frappe"
+  | "catppuccin-macchiato";
 
 export interface ColorThemeDefinition {
   label: string;
@@ -105,6 +108,138 @@ const NEO_WHITE_BUTTON_TOKENS: Record<
   "--oh-warning": "#ffffff",
 };
 
+type ThemeScale = Record<
+  50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 925 | 950 | 975,
+  string
+>;
+
+function hexToHslChannels(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const red = ((value >> 16) & 255) / 255;
+  const green = ((value >> 8) & 255) / 255;
+  const blue = (value & 255) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  if (delta === 0) return `0 0% ${(lightness * 100).toFixed(2)}%`;
+
+  const saturation = delta / (lightness > 0.5 ? 2 - max - min : max + min);
+  let hue: number;
+  if (max === red) {
+    hue = (green - blue) / delta + (green < blue ? 6 : 0);
+  } else if (max === green) {
+    hue = (blue - red) / delta + 2;
+  } else {
+    hue = (red - green) / delta + 4;
+  }
+
+  return `${((hue / 6) * 360).toFixed(2)} ${(saturation * 100).toFixed(2)}% ${(lightness * 100).toFixed(2)}%`;
+}
+
+function createThemeScale(scale: ThemeScale): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(scale).map(([stop, color]) => [
+      `--cool-grey-${stop}`,
+      color,
+    ]),
+  );
+}
+
+function createHeroUITheme(scale: ThemeScale): Record<string, string> {
+  const hsl = Object.fromEntries(
+    Object.entries(scale).map(([stop, color]) => [
+      stop,
+      hexToHslChannels(color),
+    ]),
+  ) as Record<keyof ThemeScale, string>;
+
+  return {
+    "--heroui-background": hsl[950],
+    "--heroui-background-foreground": hsl[50],
+    "--heroui-foreground-50": hsl[975],
+    "--heroui-foreground-100": hsl[950],
+    "--heroui-foreground-200": hsl[925],
+    "--heroui-foreground-300": hsl[900],
+    "--heroui-foreground-400": hsl[800],
+    "--heroui-foreground-500": hsl[700],
+    "--heroui-foreground-600": hsl[600],
+    "--heroui-foreground-700": hsl[500],
+    "--heroui-foreground-800": hsl[400],
+    "--heroui-foreground-900": hsl[300],
+    "--heroui-foreground": hsl[300],
+    "--heroui-content1": hsl[925],
+    "--heroui-content1-foreground": hsl[100],
+    "--heroui-content2": hsl[900],
+    "--heroui-content2-foreground": hsl[200],
+    "--heroui-content3": hsl[800],
+    "--heroui-content3-foreground": hsl[300],
+    "--heroui-content4": hsl[700],
+    "--heroui-content4-foreground": hsl[400],
+    "--heroui-default-50": hsl[975],
+    "--heroui-default-100": hsl[950],
+    "--heroui-default-200": hsl[925],
+    "--heroui-default-300": hsl[900],
+    "--heroui-default-400": hsl[800],
+    "--heroui-default-500": hsl[700],
+    "--heroui-default-600": hsl[600],
+    "--heroui-default-700": hsl[500],
+    "--heroui-default-800": hsl[400],
+    "--heroui-default-900": hsl[300],
+    "--heroui-default-foreground": hsl[50],
+    "--heroui-default": hsl[800],
+  };
+}
+
+const ABYSS_SCALE: ThemeScale = {
+  50: "#DCE8FF",
+  100: "#B8C8E8",
+  200: "#91A7D0",
+  300: "#6688CC",
+  400: "#596F99",
+  500: "#406385",
+  600: "#2B3C5D",
+  700: "#1D3152",
+  800: "#181F2F",
+  900: "#10192C",
+  925: "#061940",
+  950: "#000C18",
+  975: "#000610",
+};
+
+const CATPPUCCIN_FRAPPE_SCALE: ThemeScale = {
+  50: "#C6D0F5",
+  100: "#B5BFE2",
+  200: "#A5ADCE",
+  300: "#949CBB",
+  400: "#838BA7",
+  500: "#737994",
+  600: "#626880",
+  700: "#596075",
+  800: "#51576D",
+  900: "#414559",
+  925: "#303446",
+  950: "#292C3C",
+  975: "#232634",
+};
+
+const CATPPUCCIN_MACCHIATO_SCALE: ThemeScale = {
+  50: "#CAD3F5",
+  100: "#B8C0E0",
+  200: "#A5ADCB",
+  300: "#939AB7",
+  400: "#8087A2",
+  500: "#6E738D",
+  600: "#5B6078",
+  700: "#52566C",
+  800: "#494D64",
+  900: "#363A4F",
+  925: "#24273A",
+  950: "#1E2030",
+  975: "#181926",
+};
+
 export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
   "openhands-deepsea": {
     label: "OpenHands-DeepSea",
@@ -179,6 +314,39 @@ export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
     scale: NEUTRAL_SCALE,
     heroui: NEUTRAL_HEROUI,
     tokens: NEO_WHITE_BUTTON_TOKENS,
+  },
+
+  "vscode-abyss": {
+    label: "Abyss",
+    scale: createThemeScale(ABYSS_SCALE),
+    heroui: createHeroUITheme(ABYSS_SCALE),
+    tokens: {
+      "--oh-color-primary": "#6688CC",
+      "--oh-accent": "#0063A5",
+      "--oh-warning": "#FFEEAD",
+    },
+  },
+
+  "catppuccin-frappe": {
+    label: "Catppuccin Frappé",
+    scale: createThemeScale(CATPPUCCIN_FRAPPE_SCALE),
+    heroui: createHeroUITheme(CATPPUCCIN_FRAPPE_SCALE),
+    tokens: {
+      "--oh-color-primary": "#8CAAEE",
+      "--oh-accent": "#CA9EE6",
+      "--oh-warning": "#E5C890",
+    },
+  },
+
+  "catppuccin-macchiato": {
+    label: "Catppuccin Macchiato",
+    scale: createThemeScale(CATPPUCCIN_MACCHIATO_SCALE),
+    heroui: createHeroUITheme(CATPPUCCIN_MACCHIATO_SCALE),
+    tokens: {
+      "--oh-color-primary": "#8AADF4",
+      "--oh-accent": "#C6A0F6",
+      "--oh-warning": "#EED49F",
+    },
   },
 };
 
