@@ -213,6 +213,36 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      {
+        name: "serve-codex-observability",
+        apply: "serve",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const parsedUrl = new URL(req.url ?? "", "http://localhost");
+            if (parsedUrl.pathname.startsWith("/api/observability/codex")) {
+              const { handleCodexUsageProxy } = await import(
+                "./scripts/codex-usage-proxy.mjs"
+              );
+              const query = Object.fromEntries(
+                parsedUrl.searchParams.entries(),
+              );
+              handleCodexUsageProxy(req, res, parsedUrl.pathname, query).catch(
+                (err) => {
+                  console.error("Codex proxy error:", err);
+                  if (!res.headersSent) {
+                    res.writeHead(500, {
+                      "Content-Type": "application/json; charset=utf-8",
+                    });
+                    res.end(JSON.stringify({ error: err.message }));
+                  }
+                },
+              );
+              return;
+            }
+            next();
+          });
+        },
+      },
       !process.env.VITEST && !isLibraryBuild && reactRouter(),
       svgr(),
       tailwindcss(),

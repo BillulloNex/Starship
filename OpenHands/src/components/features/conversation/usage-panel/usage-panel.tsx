@@ -9,6 +9,7 @@ import { UsageSection } from "../metrics-modal/usage-section";
 import { CompactContextButton } from "./compact-context-button";
 import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
+import { CodexQuotaCard } from "./codex-quota-card";
 import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
 import { McpPerformanceSection } from "./mcp-performance-section";
 import { getContextWindowUsagePercentage } from "#/utils/format-token-count";
@@ -81,6 +82,8 @@ export function UsagePanel() {
       </div>
 
       <McpPerformanceSection />
+
+      <CodexQuotaCard />
 
       <ProviderBalanceCard />
     </main>

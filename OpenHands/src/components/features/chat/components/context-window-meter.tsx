@@ -5,6 +5,7 @@ import { useContextWindowUsage } from "#/hooks/use-context-window-usage";
 import { useSelectConversationTab } from "#/hooks/use-select-conversation-tab";
 import { useClickOutsideElement } from "#/hooks/use-click-outside-element";
 import { useCompactContextAction } from "#/hooks/use-compact-context-action";
+import { useCodexUsage } from "#/hooks/query/use-codex-usage";
 import { ContextMenuListItem } from "#/components/features/context-menu/context-menu-list-item";
 import { ConversationNameContextMenuIconText } from "#/components/features/conversation/conversation-name-context-menu-icon-text";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
@@ -47,6 +48,7 @@ export function ContextWindowMeter() {
   const { handleCompact, isCompacting, isDisabled } = useCompactContextAction(
     usage?.perTurnToken ?? 0,
   );
+  const { data: codexQuota } = useCodexUsage();
 
   if (!usage) {
     return null;
@@ -160,6 +162,24 @@ export function ContextWindowMeter() {
                 {usageTokenSummary}
               </span>
             </div>
+
+            {codexQuota?.primaryWindow && (
+              <div className="flex items-center justify-between text-xs px-2 py-1 rounded bg-surface-base border border-[var(--oh-border-subtle)]">
+                <span className="text-[var(--oh-muted)]">Codex session</span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    codexQuota.primaryWindow.remainingPercent < 15
+                      ? "text-red-500"
+                      : codexQuota.primaryWindow.remainingPercent <= 40
+                        ? "text-amber-500"
+                        : "text-emerald-500",
+                  )}
+                >
+                  {codexQuota.primaryWindow.remainingPercent}% left
+                </span>
+              </div>
+            )}
           </div>
 
           <Divider inset="menu" />
