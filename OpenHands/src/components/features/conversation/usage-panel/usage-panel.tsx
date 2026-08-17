@@ -4,6 +4,7 @@ import { I18nKey } from "#/i18n/declaration";
 import { ConversationTabEmptyState } from "#/components/features/conversation/conversation-tab-empty-state";
 import { useLiveConversationMetrics } from "#/hooks/use-live-conversation-metrics";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { useCodexUsage } from "#/hooks/query/use-codex-usage";
 import { CostSection } from "../metrics-modal/cost-section";
 import { UsageSection } from "../metrics-modal/usage-section";
 import { CompactContextButton } from "./compact-context-button";
