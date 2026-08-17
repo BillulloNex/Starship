@@ -12,6 +12,23 @@ const mockTerminalInstance = {
   writeln: vi.fn(),
   dispose: vi.fn(),
   loadAddon: vi.fn(),
+  onData: vi.fn(() => ({ dispose: vi.fn() })),
+  onBinary: vi.fn(() => ({ dispose: vi.fn() })),
+  onTitleChange: vi.fn(() => ({ dispose: vi.fn() })),
+  onKey: vi.fn(() => ({ dispose: vi.fn() })),
+  onRender: vi.fn(() => ({ dispose: vi.fn() })),
+  onResize: vi.fn(() => ({ dispose: vi.fn() })),
+  clear: vi.fn(),
+  reset: vi.fn(),
+  focus: vi.fn(),
+  blur: vi.fn(),
+  element: null,
+  textarea: null,
+  rows: 24,
+  cols: 80,
+  unicode: { activeVersion: "11" },
+  parser: { registerOscHandler: vi.fn() },
+  options: {},
 };
 
 vi.mock("@xterm/xterm", async (importOriginal) => ({
@@ -44,30 +61,31 @@ describe("Terminal empty state", () => {
     }) as unknown as typeof ResizeObserver;
   });
 
-  it("shows the empty state when runtime is active and there is no output", () => {
+  it("shows the terminal view when runtime is active", () => {
     renderWithProviders(<Terminal />);
 
-    expect(screen.getByText("TERMINAL$NO_OUTPUT")).toBeInTheDocument();
+    expect(screen.getByText("User Shell 1")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
   });
 
-  it("hides the empty state when terminal commands exist", () => {
+  it("renders active session when terminal commands exist", () => {
     useCommandStore.setState({
       commands: [{ type: "output", content: "hello" }],
     });
 
     renderWithProviders(<Terminal />);
 
-    expect(screen.queryByText("TERMINAL$NO_OUTPUT")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("runtime-waiting")).not.toBeInTheDocument();
   });
 
-  it("shows the runtime waiting state instead of the empty state when inactive", () => {
+  it("shows the runtime waiting state when inactive", () => {
     vi.mocked(useAgentState).mockReturnValue({
       curAgentState: AgentState.LOADING,
     });
 
     renderWithProviders(<Terminal />);
 
-    expect(screen.queryByText("TERMINAL$NO_OUTPUT")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ready")).not.toBeInTheDocument();
     expect(screen.getByTestId("runtime-waiting")).toBeInTheDocument();
   });
 });

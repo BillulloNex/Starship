@@ -96,6 +96,22 @@ echo "📋 Step 1: Health check..."
 HEALTH=$(curl -sf --max-time 10 "$BASE_URL/health" 2>/dev/null) || HEALTH=""
 check "Health endpoint" "$([[ -n "$HEALTH" ]] && echo true || echo false)" "$HEALTH"
 
+# ── 1a. Frontend HTML Check ──
+echo "📋 Step 1a: Frontend HTML check..."
+HTML_CONTENT=$(curl -s --max-time 10 "$BASE_URL/" 2>/dev/null) || HTML_CONTENT=""
+HAS_UI_TAG=$(echo "$HTML_CONTENT" | grep -q 'data-agent-server-ui' && echo "true" || echo "false")
+check "Frontend HTML serves data-agent-server-ui" "$HAS_UI_TAG"
+
+# ── 1b. Static Asset Check ──
+echo "📋 Step 1b: Static asset check..."
+ASSET_PATH=$(echo "$HTML_CONTENT" | grep -o 'src="/assets/[^"]*"' | head -n 1 | sed 's/src="//; s/"//')
+if [[ -n "$ASSET_PATH" ]]; then
+  ASSET_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL$ASSET_PATH" 2>/dev/null) || ASSET_CODE="000"
+  check "Static asset loads ($ASSET_PATH)" "$([[ "$ASSET_CODE" == "200" ]] && echo true || echo false)" "HTTP $ASSET_CODE"
+else
+  check "Static asset loads" "false" "No /assets/ script found in HTML"
+fi
+
 # ── 2. Datadog Status ──
 echo "📋 Step 2: Datadog status..."
 DD_STATUS=$(curl -sf --max-time 10 "$BASE_URL/api/observability/datadog/status" 2>/dev/null) || DD_STATUS="{}"
@@ -195,6 +211,16 @@ print(len(events))
 else
   check "Agent events received" "false" "skipped (no response)"
 fi
+
+# ── 6a. LLM Profile Round-Trip ──
+echo "📋 Step 6a: LLM Profile round-trip..."
+PROFILE_ID="smoke-test-profile"
+api POST "/api/profiles/$PROFILE_ID" -d '{"name":"Smoke Test Profile"}' >/dev/null 2>&1 || true
+api POST "/api/profiles/$PROFILE_ID/activate" >/dev/null 2>&1 || true
+ACTIVE_PROF_ID=$(api GET "/api/profiles/active" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || ACTIVE_PROF_ID=""
+api DELETE "/api/profiles/$PROFILE_ID" >/dev/null 2>&1 || true
+
+check "Profile round-trip (create->activate->verify->delete)" "$([[ "$ACTIVE_PROF_ID" == "$PROFILE_ID" ]] && echo true || echo false)" "Active profile: $ACTIVE_PROF_ID"
 
 # ── 7. Summary ──
 echo ""

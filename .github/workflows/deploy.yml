@@ -69,3 +69,56 @@ jobs:
                 "tags": ["env:production", "service:grokbot", "version:'${{ github.sha }}'"]
               }' || true
           fi
+
+  post-deploy-verify:
+    name: Post-Deploy Verification
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for Coolify to finish deploying..."
+          for i in $(seq 1 30); do
+            HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://grok.beenex.org/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ App is live (HTTP $HTTP_CODE)"
+              break
+            fi
+            echo "⏳ Attempt $i/30 — HTTP $HTTP_CODE"
+            sleep 10
+          done
+      
+      - name: Run smoke test
+        env:
+          GROKBOT_URL: https://grok.beenex.org
+          SESSION_API_KEY: ${{ secrets.GROKBOT_SESSION_API_KEY }}
+          LLM_API_KEY: ${{ secrets.GROKBOT_LLM_API_KEY }}
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh \
+            --url "$GROKBOT_URL" \
+            --api-key "$SESSION_API_KEY" \
+            --llm-key "$LLM_API_KEY" \
+            --model "groq/allam-2-7b" \
+            --timeout 120
+
+      - name: Report commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state,
+              context: 'post-deploy/smoke-test',
+              description: state === 'success' ? 'Smoke test passed' : 'Smoke test failed',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
