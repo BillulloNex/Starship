@@ -9,7 +9,7 @@ export function anchor({
   ExtraProps) {
   return (
     <a
-      className="text-blue-500 hover:underline"
+      className="text-[var(--oh-color-primary)] hover:underline font-medium inline-flex items-center gap-0.5 transition-colors"
       href={href}
       target="_blank"
       rel="noopener noreferrer"

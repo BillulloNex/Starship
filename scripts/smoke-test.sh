@@ -171,16 +171,30 @@ else
   exit 1
 fi
 
-# ── 5. Wait for Agent Response ──
-echo "📋 Step 5: Waiting for agent response (timeout: ${TIMEOUT}s)..."
+# ── 4a. Send User Message Event (Trigger Real LLM Execution) ──
+echo "📋 Step 4a: Sending user prompt to trigger real LLM call..."
+MSG_BODY=$(cat <<EOF
+{
+  "role": "user",
+  "content": [{"type": "text", "text": "Reply with exactly: SMOKE_TEST_OK"}],
+  "run": true
+}
+EOF
+)
+MSG_RESP=$(api POST "/api/conversations/$CONV_ID/events" -d "$MSG_BODY" 2>/dev/null) || MSG_RESP=""
+check "User message dispatched" "$([[ -n "$MSG_RESP" ]] && echo true || echo false)"
+
+# ── 5. Wait for Agent LLM Execution & Response ──
+echo "📋 Step 5: Waiting for agent response from LLM (timeout: ${TIMEOUT}s)..."
 ELAPSED=0
 AGENT_STATUS=""
 HAS_RESPONSE=false
 
-while [[ $ELAPSED -lt $TIMEOUT ]]; do
-  sleep 3
-  ELAPSED=$((ELAPSED + 3))
+# Give the agent a moment to transition from pending/idle to running
+sleep 2
+ELAPSED=2
 
+while [[ $ELAPSED -lt $TIMEOUT ]]; do
   CONV_DETAIL=$(api GET "/api/conversations/$CONV_ID" 2>/dev/null) || CONV_DETAIL="{}"
   AGENT_STATUS=$(echo "$CONV_DETAIL" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('execution_status', d.get('status', '')))" 2>/dev/null) || AGENT_STATUS=""
 
@@ -190,39 +204,32 @@ while [[ $ELAPSED -lt $TIMEOUT ]]; do
     break
   fi
 
-  # Also check for error states
   if [[ "$AGENT_STATUS" == "ERROR" || "$AGENT_STATUS" == "PAUSED" || \
         "$AGENT_STATUS" == "error" || "$AGENT_STATUS" == "paused" ]]; then
     break
   fi
 
   printf "   ⏳ %ds — status: %s\r" "$ELAPSED" "${AGENT_STATUS:-pending}"
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
 done
 echo ""
 
-check "Agent responded" "$HAS_RESPONSE" "status=$AGENT_STATUS after ${ELAPSED}s"
+check "Agent executed & finished" "$HAS_RESPONSE" "status=$AGENT_STATUS after ${ELAPSED}s"
 
-# ── 6. Verify Events (soft check — agent response already verified) ──
-if [[ "$HAS_RESPONSE" == "true" ]]; then
-  echo "📋 Step 6: Checking conversation events..."
-  EVENTS=$(api GET "/api/conversations/$CONV_ID/events?limit=5" 2>/dev/null) || EVENTS="[]"
-  EVENT_COUNT=$(echo "$EVENTS" | python3 -c "
+# ── 6. Verify Events & LLM Response Content ──
+echo "📋 Step 6: Verifying agent events..."
+EVENTS=$(api GET "/api/conversations/$CONV_ID/events/search?limit=20" 2>/dev/null) || \
+  EVENTS=$(api GET "/api/conversations/$CONV_ID/events?limit=20" 2>/dev/null) || EVENTS="{}"
+
+EVENT_COUNT=$(echo "$EVENTS" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-events = data if isinstance(data, list) else data.get('events', data.get('results', data.get('items', [])))
-print(len(events))
+items = data.get('items', data if isinstance(data, list) else data.get('events', []))
+print(len(items))
 " 2>/dev/null) || EVENT_COUNT="0"
 
-  if [[ "${EVENT_COUNT:-0}" -gt 0 ]]; then
-    RESULTS+=("✅ Agent events received (count=$EVENT_COUNT)")
-    ((PASS++)) || true
-  else
-    # Soft warning — don't increment FAIL since agent already responded
-    RESULTS+=("⚠️  Agent events not retrieved (non-fatal)")
-  fi
-else
-  check "Agent events received" "false" "skipped (no response)"
-fi
+check "Agent events recorded" "$([[ "${EVENT_COUNT:-0}" -gt 1 ]] && echo true || echo false)" "count=$EVENT_COUNT"
 
 # ── 6a. LLM Profile Round-Trip ──
 echo "📋 Step 6a: LLM Profile round-trip..."

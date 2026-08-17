@@ -69,7 +69,7 @@ export function ChatInputContainer({
     <div
       ref={chatContainerRef}
       className={cn(
-        "bg-[var(--oh-surface)] box-border content-stretch flex flex-col items-start justify-center p-4 relative rounded-[15px] w-full",
+        "bg-[var(--oh-surface-raised)] border border-white/10 box-border content-stretch flex flex-col items-start justify-center p-4 relative rounded-2xl w-full shadow-lg transition-all focus-within:border-white/20 focus-within:shadow-xl",
         conversationMode === "plan" && "border border-[#597FF4]",
         isAgentProcessing && "chat-input-processing-border",
       )}

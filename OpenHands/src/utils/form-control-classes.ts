@@ -47,17 +47,16 @@ export const formControlMutedHoverClassName =
 
 /** Text/icon pill triggers in the chat input actions row. */
 export const chatInputPillButtonClassName = cn(
-  "inline-flex items-center gap-1 rounded-[100px] border border-transparent px-1.5",
-  "text-sm font-normal leading-5 text-[var(--oh-muted)] whitespace-nowrap min-w-0 cursor-pointer",
+  "inline-flex items-center gap-1.5 rounded-lg border border-white/5 bg-[var(--oh-surface)] px-2.5 py-1",
+  "text-xs font-medium leading-5 text-[var(--oh-foreground)] whitespace-nowrap min-w-0 cursor-pointer shadow-sm",
   formControlTransitionClassName,
-  formControlMutedHoverClassName,
+  "hover:bg-[var(--oh-interactive-hover)] hover:text-white hover:border-white/10",
 );
 
-/** Circular icon triggers in the chat input actions row. */
+/** Circular/rounded icon triggers in the chat input actions row. */
 export const chatInputIconButtonClassName = cn(
-  "flex items-center justify-center rounded-full text-[var(--oh-muted)] cursor-pointer",
+  "flex items-center justify-center rounded-lg text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-interactive-hover)] cursor-pointer p-1 transition-all",
   formControlTransitionClassName,
-  formControlMutedHoverClassName,
 );
 
 export const formControlFocusClassName =

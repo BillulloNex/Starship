@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Outfit:wght@100..900&display=swap");
 
@@ -45,27 +46,27 @@ body {
   margin: 0;
   background-color: var(--oh-color-base);
   font-family:
-    -apple-system, "SF Pro", BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Roboto",
     sans-serif;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
   font-family:
-    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+    "IBM Plex Mono", source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 .markdown-body code {
-  padding: 0.2em 0.4em;
+  padding: 0.15em 0.45em;
   margin: 0;
   font-size: 85%;
   white-space: break-spaces;
-  background-color: var(--cool-grey-900);
-  border-radius: 4px;
-  color: var(--cool-grey-100);
-  border: 1px solid var(--cool-grey-900);
+  background-color: color-mix(in srgb, var(--oh-foreground) 8%, var(--oh-surface-raised));
+  border-radius: 6px;
+  color: var(--oh-foreground);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   letter-spacing: -0.2px;
 }
 

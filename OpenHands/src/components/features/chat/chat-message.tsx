@@ -145,13 +145,14 @@ export function ChatMessage({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       className={cn(
-        "rounded-xl relative w-fit max-w-full flex flex-col",
+        "rounded-2xl relative w-fit max-w-full flex flex-col transition-all",
         hasBubbleChildren && "gap-2",
-        type === "user" && "mt-6 bg-tertiary self-end px-4 py-2.5",
-        type === "agent" && "mt-6 w-full max-w-full bg-transparent",
+        type === "user" &&
+          "mt-6 bg-[var(--oh-surface-raised)] border border-white/10 text-[var(--oh-foreground)] self-end px-4 py-3 rounded-2xl shadow-sm leading-relaxed max-w-[88%]",
+        type === "agent" && "mt-6 w-full max-w-full bg-transparent leading-relaxed",
         isFromPlanningAgent &&
           type === "agent" &&
-          "border border-[#597ff4] bg-tertiary p-4 mt-2",
+          "border border-[#597ff4] bg-[var(--oh-surface-raised)] p-4 mt-2 rounded-2xl shadow-sm",
         pendingStatus === "error" &&
           "border border-[var(--oh-status-error)]/40",
         !isPendingUserMessage && "last:mb-4",

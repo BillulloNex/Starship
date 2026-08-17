@@ -27,7 +27,7 @@ export function code({
         <code
           className={cn(
             className,
-            "bg-surface-raised text-foreground border border-surface-raised rounded px-[0.4em] py-[0.2em]",
+            "bg-[var(--oh-surface-raised)] text-[var(--oh-foreground)] border border-white/10 rounded-md px-1.5 py-0.5 font-mono text-[13px] shadow-sm tracking-tight",
           )}
         >
           {children}
@@ -37,7 +37,7 @@ export function code({
 
     return (
       <CopyableContentWrapper text={codeString}>
-        <pre className="bg-surface-raised text-foreground border border-surface-raised rounded p-[1em] overflow-auto">
+        <pre className="bg-[var(--oh-surface-deep)] text-[var(--oh-foreground)] border border-white/10 rounded-xl p-3.5 overflow-auto shadow-sm">
           <code className={className}>{codeString}</code>
         </pre>
       </CopyableContentWrapper>
@@ -47,7 +47,7 @@ export function code({
   return (
     <CopyableContentWrapper text={codeString}>
       <SyntaxHighlighter
-        className="rounded-lg"
+        className="rounded-xl border border-white/10 shadow-sm"
         style={vscDarkPlus}
         language={match?.[1]}
         PreTag="div"
