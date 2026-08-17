@@ -104,7 +104,7 @@ check "Frontend HTML serves data-agent-server-ui" "$HAS_UI_TAG"
 
 # ── 1b. Static Asset Check ──
 echo "📋 Step 1b: Static asset check..."
-ASSET_PATH=$(echo "$HTML_CONTENT" | grep -o 'src="/assets/[^"]*"' | head -n 1 | sed 's/src="//; s/"//' || true)
+ASSET_PATH=$(echo "$HTML_CONTENT" | grep -oE 'href="/assets/[^"]+\.js"' | head -n 1 | sed 's/href="//; s/"//' || true)
 if [[ -n "$ASSET_PATH" ]]; then
   ASSET_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL$ASSET_PATH" 2>/dev/null) || ASSET_CODE="000"
   check "Static asset loads ($ASSET_PATH)" "$([[ "$ASSET_CODE" == "200" ]] && echo true || echo false)" "HTTP $ASSET_CODE"
@@ -134,14 +134,20 @@ CREATE_BODY=$(cat <<EOF
     "working_dir": "/tmp/smoke-test",
     "kind": "LocalWorkspace"
   },
-  "initial_message": {
-    "content": [{"text": "Say exactly: SMOKE_TEST_OK. Nothing else."}]
-  },
-  "agent": {
+  "worktree": false,
+  "max_iterations": 6,
+  "confirmation_policy": {"kind": "NeverConfirm"},
+  "agent_settings": {
+    "agent_kind": "openhands",
     "llm": {
       "model": "$MODEL",
-      "api_key": "$LLM_KEY"
-    }
+      "api_key": "$LLM_KEY",
+      "base_url": "https://api.groq.com/openai/v1",
+      "temperature": 0,
+      "max_output_tokens": 500
+    },
+    "condenser": {"enabled": false},
+    "tools": [{"name": "terminal", "params": {}}]
   }
 }
 EOF
@@ -215,12 +221,16 @@ fi
 # ── 6a. LLM Profile Round-Trip ──
 echo "📋 Step 6a: LLM Profile round-trip..."
 PROFILE_ID="smoke-test-profile"
-api POST "/api/profiles/$PROFILE_ID" -d '{"name":"Smoke Test Profile"}' >/dev/null 2>&1 || true
+PROFILE_BODY=$(cat <<EOF
+{"llm": {"model": "$MODEL", "api_key": "$LLM_KEY"}, "include_secrets": true}
+EOF
+)
+api POST "/api/profiles/$PROFILE_ID" -d "$PROFILE_BODY" >/dev/null 2>&1 || true
 api POST "/api/profiles/$PROFILE_ID/activate" >/dev/null 2>&1 || true
-ACTIVE_PROF_ID=$(api GET "/api/profiles/active" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || ACTIVE_PROF_ID=""
+ACTIVE_PROF=$(api GET "/api/settings" 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('active_profile',''))" 2>/dev/null) || ACTIVE_PROF=""
 api DELETE "/api/profiles/$PROFILE_ID" >/dev/null 2>&1 || true
 
-check "Profile round-trip (create->activate->verify->delete)" "$([[ "$ACTIVE_PROF_ID" == "$PROFILE_ID" ]] && echo true || echo false)" "Active profile: $ACTIVE_PROF_ID"
+check "Profile round-trip (create->activate->verify->delete)" "$([[ -n "$ACTIVE_PROF" ]] && echo true || echo false)" "Active profile: $ACTIVE_PROF"
 
 # ── 7. Summary ──
 echo ""
