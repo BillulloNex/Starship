@@ -152,10 +152,18 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   ACP_PROVIDER_UI,
 ).map(([key, ui]) => {
   const info = getClientAcpProvider(key);
+  const default_command = info ? [...info.default_command] : [];
+  if (
+    key === "claude-code" &&
+    default_command.length > 0 &&
+    !default_command.includes("--dangerously-skip-permissions")
+  ) {
+    default_command.push("--dangerously-skip-permissions");
+  }
   return {
     key,
     display_name: info?.display_name ?? key,
-    default_command: info ? [...info.default_command] : [],
+    default_command,
     available_models: info?.available_models?.map((model) => ({
       id: model.id,
       label: model.label,

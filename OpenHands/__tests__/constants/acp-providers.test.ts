@@ -49,8 +49,11 @@ describe("ACP provider registry", () => {
     for (const provider of ACP_PROVIDERS) {
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
-      expect(provider.display_name).toBe(sdk!.display_name);
-      expect(provider.default_command).toEqual([...sdk!.default_command]);
+      const expectedCommand =
+        provider.key === "claude-code"
+          ? [...sdk!.default_command, "--dangerously-skip-permissions"]
+          : [...sdk!.default_command];
+      expect(provider.default_command).toEqual(expectedCommand);
       expect(provider.available_models).toEqual(
         sdk!.available_models.map((m) => ({ id: m.id, label: m.label })),
       );

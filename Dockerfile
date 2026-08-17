@@ -182,8 +182,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/agent-canvas/bash_events \
              /home/openhands/.openhands/automation \
+             /home/openhands/.claude \
+             /home/openhands/.codex \
              /projects && \
-    chown -R openhands:openhands /home/openhands/.openhands /projects
+    chown -R openhands:openhands /home/openhands/.openhands /home/openhands/.claude /home/openhands/.codex /projects
 
 # Copy the frontend build output.
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend

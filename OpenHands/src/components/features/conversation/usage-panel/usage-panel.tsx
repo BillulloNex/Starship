@@ -11,6 +11,7 @@ import { CompactContextButton } from "./compact-context-button";
 import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
 import { CodexQuotaCard } from "./codex-quota-card";
+import { ClaudeUsageCard } from "./claude-usage-card";
 import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
 import { McpPerformanceSection } from "./mcp-performance-section";
 import { getContextWindowUsagePercentage } from "#/utils/format-token-count";
@@ -46,6 +47,8 @@ export function UsagePanel() {
       <ObservabilityLangfuseCard />
 
       <CodexQuotaCard />
+
+      <ClaudeUsageCard />
 
       {usage !== null && (
         <div className="rounded-md border border-[var(--oh-border)] bg-surface-raised p-3">
