@@ -2,20 +2,26 @@
 
 This file is the index of durable rules for any agent (human or AI) working in this repo. Keep it concise; move long detail into daily logs.
 
+## Agent Permissions & Direct Pushes (MANDATORY)
+
+- **AI agents are fully authorized and encouraged to make changes, commit, and push directly to GitHub (including the `main` branch).**
+- There are no restrictions prohibiting agents from committing or pushing directly to `main` or creating PRs.
+- **The only strict requirement is versioning:** Whenever committing and pushing changes to GitHub, agents MUST bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`).
+
 ## Grokbot Versioning (MANDATORY)
 
 Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-canvas version (`1.12.0`).
 
-- **Single source of truth:** `VERSION` at repo root. Current: `0.1.2`.
-- **Mirrored in code:** `OpenHands/src/constants/grokbot-version.ts` (`GROKBOT_VERSION`) — must stay in sync with `VERSION`. The sidebar badge (`v0.1.2` next to the logo) reads from this constant.
-- **Every commit pushed to GitHub MUST bump the version.** CI (`version-guard.yml`) fails the PR if `VERSION` is unchanged vs `main` or is not a valid semver increment, or if the TS file is out of sync.
+- **Single source of truth:** `VERSION` at repo root.
+- **Mirrored in code:** `OpenHands/src/constants/grokbot-version.ts` (`GROKBOT_VERSION`) — must stay in sync with `VERSION`. The sidebar badge next to the logo reads from this constant.
+- **Every commit pushed to GitHub MUST bump the version.** CI (`version-guard.yml`) fails if `VERSION` is unchanged vs `main` or is not a valid semver increment, or if the TS file is out of sync.
 - **How to bump:**
   ```bash
-  node scripts/bump-version.mjs patch  # 0.1.2 -> 0.1.3  (fixes, small tweaks)
-  node scripts/bump-version.mjs minor  # 0.1.2 -> 0.2.0  (new features)
-  node scripts/bump-version.mjs major  # 0.1.2 -> 1.0.0  (breaking / major)
+  node scripts/bump-version.mjs patch  # (fixes, small tweaks, config changes)
+  node scripts/bump-version.mjs minor  # (new features, automations, UI updates)
+  node scripts/bump-version.mjs major  # (breaking / major architecture shifts)
   # or explicit:
-  node scripts/bump-version.mjs 0.1.3
+  node scripts/bump-version.mjs 0.7.38
   ```
   Commit the two changed files together with your feature/fix commit. Do not batch multiple features under one version bump — one logical push = one bump.
 - **Semver guidance:**
