@@ -104,7 +104,7 @@ check "Frontend HTML serves data-agent-server-ui" "$HAS_UI_TAG"
 
 # ── 1b. Static Asset Check ──
 echo "📋 Step 1b: Static asset check..."
-ASSET_PATH=$(echo "$HTML_CONTENT" | grep -o 'src="/assets/[^"]*"' | head -n 1 | sed 's/src="//; s/"//')
+ASSET_PATH=$(echo "$HTML_CONTENT" | grep -o 'src="/assets/[^"]*"' | head -n 1 | sed 's/src="//; s/"//' || true)
 if [[ -n "$ASSET_PATH" ]]; then
   ASSET_CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL$ASSET_PATH" 2>/dev/null) || ASSET_CODE="000"
   check "Static asset loads ($ASSET_PATH)" "$([[ "$ASSET_CODE" == "200" ]] && echo true || echo false)" "HTTP $ASSET_CODE"
