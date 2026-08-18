@@ -44,10 +44,18 @@ export function UserAssistantEventMessage({
   const parsed = parseMessageFromEvent(event);
   // Route an inline <think> block (e.g. from a streamed reply) to the thinking
   // section so reloaded conversations match the live rendering.
-  const { reasoning, message } =
+  const { reasoning, message: rawMessage } =
     event.source === "agent"
       ? splitInlineThink(parsed)
       : { reasoning: "", message: parsed };
+
+  // Strip leading markdown thematic breaks (---, ***, ___) that some LLMs
+  // emit at the start of a reply. The markdown renderer converts these into
+  // visible <hr> lines which appear as a weird stray line above the response.
+  const message =
+    event.source === "agent"
+      ? rawMessage.replace(/^(\s*([*_-])\2{2,}\s*\n)+/, "")
+      : rawMessage;
 
   const imageUrls: string[] = [];
   if (Array.isArray(event.llm_message.content)) {
