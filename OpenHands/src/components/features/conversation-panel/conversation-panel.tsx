@@ -984,7 +984,7 @@ export function ConversationPanel({
         >
           <div
             data-testid="older-conversations-summary"
-            className="flex min-w-0 flex-nowrap items-center gap-x-2 py-2 pl-4 pr-2.5"
+            className="group flex min-w-0 flex-nowrap items-center gap-x-2 py-2 pl-4 pr-2.5"
           >
             <span className="min-w-0 truncate text-sm font-medium text-[var(--oh-text-secondary)]">
               {t(I18nKey.SIDEBAR$CONVERSATIONS)}

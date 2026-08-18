@@ -21,6 +21,7 @@ import {
 import { I18nKey } from "#/i18n/declaration";
 import type { BackendKind } from "#/api/backend-registry/types";
 import { cn } from "#/utils/utils";
+import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
 import {
   dropdownInstantColorClassName,
   dropdownMenuListClassName,
@@ -174,6 +175,7 @@ export function ConversationPanelFilterMenu({
         className={cn(
           "relative inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)]",
           dropdownInstantColorClassName,
+          hoverRevealActionClassName(),
         )}
       >
         <ListFilter

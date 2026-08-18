@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
+import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
 import type {
   ConversationGroupLaunch,
   GroupFolderDropPosition,
@@ -99,7 +100,7 @@ export function ConversationGroupFolderRow({
       <div className={cn(isDragging && "opacity-0")}>
         <div
           className={cn(
-            "flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md pl-2 pr-1 text-sm font-medium",
+            "group flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md pl-2 pr-1 text-sm font-medium",
             "text-[var(--oh-text-secondary)] transition-colors hover:bg-[var(--oh-surface-raised)] hover:text-white",
           )}
         >
@@ -192,6 +193,7 @@ export function ConversationGroupFolderRow({
               "hover:bg-white/10 hover:text-white",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
               "disabled:cursor-not-allowed disabled:opacity-50",
+              hoverRevealActionClassName(),
             )}
             disabled={isCreatingConversationFlow}
             aria-label={t(

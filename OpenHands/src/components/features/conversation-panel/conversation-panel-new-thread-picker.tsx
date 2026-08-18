@@ -3,6 +3,7 @@ import { FolderPlus } from "lucide-react";
 import { I18nKey } from "#/i18n/declaration";
 import type { BackendKind } from "#/api/backend-registry/types";
 import { cn } from "#/utils/utils";
+import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
 import { LocalNewConversationMenu } from "./local-new-conversation-menu";
 import { CloudNewConversationMenu } from "./cloud-new-conversation-menu";
 
@@ -12,6 +13,7 @@ const triggerClassName = cn(
   "hover:bg-[var(--oh-surface-raised)] hover:text-white",
   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
   "disabled:cursor-not-allowed disabled:opacity-50",
+  hoverRevealActionClassName(),
 );
 
 /**
