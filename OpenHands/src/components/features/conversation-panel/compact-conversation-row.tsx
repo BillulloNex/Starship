@@ -71,10 +71,10 @@ export function CompactConversationRow({
   const preview = (
     <div className="w-[260px] p-3">
       <div className="flex items-center gap-2 mb-1">
-        {statusDot}
         <span className="text-sm font-medium text-white truncate" title={title}>
           {title || t(I18nKey.CONVERSATION$UNTITLED)}
         </span>
+        {statusDot}
       </div>
       <ConversationCardFooter
         selectedRepository={selectedRepository}

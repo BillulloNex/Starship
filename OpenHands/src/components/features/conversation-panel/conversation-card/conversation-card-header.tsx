@@ -22,6 +22,12 @@ export function ConversationCardHeader({
   const isArchived = isArchivedSandboxStatus(sandboxStatus);
   return (
     <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+      <ConversationCardTitle
+        title={title}
+        titleMode={titleMode}
+        onSave={onTitleSave}
+        isConversationArchived={isArchived}
+      />
       {executionStatus !== undefined && (
         <ConversationStatusDot
           executionStatus={executionStatus}
@@ -29,12 +35,6 @@ export function ConversationCardHeader({
           showTooltip={false}
         />
       )}
-      <ConversationCardTitle
-        title={title}
-        titleMode={titleMode}
-        onSave={onTitleSave}
-        isConversationArchived={isArchived}
-      />
     </div>
   );
 }
