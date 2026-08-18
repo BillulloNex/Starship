@@ -177,8 +177,10 @@ if [ -n "${DD_API_KEY:-}" ]; then
   export DD_VERSION="${DD_VERSION:-$(cat /opt/agent-canvas/VERSION 2>/dev/null || echo 'unknown')}"
   # Enable APM
   export DD_TRACE_ENABLED="${DD_TRACE_ENABLED:-true}"
-  # Enable Application Security Monitoring
+  # Enable Application Security Monitoring & SCA
   export DD_APPSEC_ENABLED="${DD_APPSEC_ENABLED:-true}"
+  export DD_APPSEC_SCA_ENABLED="${DD_APPSEC_SCA_ENABLED:-true}"
+
   # Enable LLM Observability in agentless mode by default
   export DD_LLMOBS_ENABLED="${DD_LLMOBS_ENABLED:-1}"
   export DD_LLMOBS_ML_APP="${DD_LLMOBS_ML_APP:-grokbot}"

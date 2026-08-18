@@ -5,13 +5,13 @@ import { useDatadogStatus } from "#/hooks/query/use-datadog-observability";
 import {
   LlmObservabilityView,
   DatadogObservabilityView,
+  SecurityComplianceView,
 } from "#/components/features/settings/observability-settings";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
+import { Info, ShieldCheck } from "lucide-react";
 
-import { Info } from "lucide-react";
-
-export type ObservabilityTab = "llm" | "datadog";
+export type ObservabilityTab = "llm" | "datadog" | "security";
 
 export function ObservabilityScreen() {
   const { t } = useTranslation("openhands");
@@ -19,7 +19,11 @@ export function ObservabilityScreen() {
 
   const tabParam = searchParams.get("tab");
   const initialTab: ObservabilityTab =
-    tabParam === "datadog" ? "datadog" : "llm";
+    tabParam === "security"
+      ? "security"
+      : tabParam === "datadog"
+        ? "datadog"
+        : "llm";
 
   const [activeTab, setActiveTab] = useState<ObservabilityTab>(initialTab);
 
@@ -84,14 +88,31 @@ export function ObservabilityScreen() {
             >
               Infrastructure & Datadog
             </button>
+
+            <button
+              type="button"
+              data-testid="observability-tab-security"
+              onClick={() => handleTabChange("security")}
+              className={cn(
+                "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5",
+                activeTab === "security"
+                  ? "bg-surface-raised text-foreground shadow-xs border border-[var(--oh-border)]"
+                  : "text-[var(--oh-muted)] hover:text-foreground",
+              )}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Security & Compliance
+            </button>
           </div>
         </div>
 
         {/* View Switching */}
         {activeTab === "llm" ? (
           <LlmObservabilityView site={site} />
-        ) : (
+        ) : activeTab === "datadog" ? (
           <DatadogObservabilityView site={site} service={service} />
+        ) : (
+          <SecurityComplianceView site={site} service={service} />
         )}
       </div>
     </main>

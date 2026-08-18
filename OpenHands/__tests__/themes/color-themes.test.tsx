@@ -9,30 +9,43 @@ import {
 
 const NEW_THEMES = [
   {
-    key: "vscode-abyss",
-    label: "Abyss",
-    background: "#000C18",
-    primary: "#6688CC",
+    key: "tokyo-night",
+    label: "Tokyo Night",
+    background: "#1A1B26",
+    primary: "#7AA2F7",
   },
   {
-    key: "catppuccin-frappe",
-    label: "Catppuccin Frappé",
-    background: "#292C3C",
-    primary: "#8CAAEE",
+    key: "vesper",
+    label: "Vesper",
+    background: "#101010",
+    primary: "#FFC799",
   },
   {
-    key: "catppuccin-macchiato",
-    label: "Catppuccin Macchiato",
-    background: "#1E2030",
-    primary: "#8AADF4",
+    key: "gruvbox-dark",
+    label: "Gruvbox Dark",
+    background: "#1D2021",
+    primary: "#FABD2F",
+  },
+  {
+    key: "rose-pine",
+    label: "Rosé Pine",
+    background: "#191724",
+    primary: "#C4A7E7",
+  },
+  {
+    key: "github-dark",
+    label: "GitHub Dark",
+    background: "#0D1117",
+    primary: "#58A6FF",
   },
 ] as const;
+
 
 describe("color themes", () => {
   it("includes OpenHands-Neo as a neutral-based theme with white button tokens", () => {
     const neo = COLOR_THEMES["openhands-neo"];
 
-    expect(neo.label).toBe("OpenHands-Neo");
+    expect(neo.label).toBe("OpenHands Neo");
     expect(neo.scale).toEqual(COLOR_THEMES["openhands-neutral"].scale);
     expect(neo.heroui).toEqual(COLOR_THEMES["openhands-neutral"].heroui);
     expect(neo.tokens?.["--oh-color-primary"]).toBe("#ffffff");
@@ -46,8 +59,9 @@ describe("color themes", () => {
     expect(
       AVAILABLE_COLOR_THEMES.find((theme) => theme.key === "openhands-neo")
         ?.label,
-    ).toBe("OpenHands-Neo");
+    ).toBe("OpenHands Neo");
   });
+
 
   it("exposes the new themes in the settings theme picker", () => {
     expect(AVAILABLE_COLOR_THEMES).toEqual(
