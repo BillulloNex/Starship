@@ -13,5 +13,5 @@ export * from "./datadog-setup-guide-card";
 export * from "./overall-metrics-overview";
 export * from "./llm-observability-view";
 export * from "./datadog-observability-view";
-export * from "./security-compliance";
+
 
