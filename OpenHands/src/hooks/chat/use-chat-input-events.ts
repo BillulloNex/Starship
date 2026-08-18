@@ -5,6 +5,7 @@ import {
   clearEmptyContent,
   getClipboardFiles,
 } from "#/components/features/chat/utils/chat-input.utils";
+import { htmlToMarkdown } from "#/components/features/chat/utils/html-to-markdown";
 
 /**
  * Hook for handling chat input events
@@ -49,11 +50,16 @@ export const useChatInputEvents = (
         return;
       }
 
-      // Handle text paste as before
-      const text = e.clipboardData.getData("text/plain");
-      if (text) {
-        // Insert plain text
-        document.execCommand("insertText", false, text);
+      // Try to get rich HTML content first, falling back to plain text.
+      // When HTML is available (e.g. pasting from a webpage/document),
+      // convert it to Markdown so links, bold, headers, lists, etc.
+      // are preserved as [text](url), **bold**, # heading, - list item.
+      const html = e.clipboardData.getData("text/html");
+      const plainText = e.clipboardData.getData("text/plain");
+      const textToInsert = html ? htmlToMarkdown(html, plainText) : plainText;
+
+      if (textToInsert) {
+        document.execCommand("insertText", false, textToInsert);
         // Trigger resize
         setTimeout(smartResize, 0);
       }
