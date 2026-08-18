@@ -23,7 +23,7 @@ export function sidebarHeaderRowClassName(collapsed: boolean): string {
 }
 
 export const SIDEBAR_ROW_INTERACTIVE_CLASS = {
-  active: "bg-tertiary text-white font-medium",
+  active: "bg-tertiary text-[var(--oh-text-secondary)] font-medium",
   idle: "text-[var(--oh-text-secondary)] hover:text-white hover:bg-[var(--oh-surface-raised)]",
 } as const;
 
@@ -67,7 +67,7 @@ export function sidebarCollapsedIconGlyphClassName(active: boolean): string {
     // Do not set a narrow `w-[18px]` here — with horizontal padding it shrinks the glyph.
     "relative z-[1] flex h-full w-full items-center justify-start pl-2.5 [&_svg]:shrink-0",
     active
-      ? "text-white font-medium"
+      ? "text-[var(--oh-text-secondary)] font-medium"
       : "text-[var(--oh-text-secondary)] group-hover:text-white",
   );
 }

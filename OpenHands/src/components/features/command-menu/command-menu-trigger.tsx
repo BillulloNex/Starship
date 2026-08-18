@@ -62,7 +62,7 @@ export function CommandMenuTrigger({ collapsed }: CommandMenuTriggerProps) {
         <span className={sidebarNavLabelClassName(collapsed)}>{label}</span>
       </span>
       {!collapsed ? (
-        <kbd className="rounded-md border border-[var(--oh-border)] bg-black/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--oh-text-dim)]">
+        <kbd className="rounded-md border border-[var(--oh-border)] bg-black/20 px-1.5 py-0.5 text-sm font-medium text-[var(--oh-text-secondary)]">
           {t(I18nKey.COMMAND_MENU$SHORTCUT)}
         </kbd>
       ) : null}

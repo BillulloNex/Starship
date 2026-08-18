@@ -227,7 +227,7 @@ export function ConversationGroupFolderRow({
                   type="button"
                   data-testid={`thread-folder-view-more-${groupTestIdSuffix}`}
                   onClick={onTogglePreviewExpanded}
-                  className="cursor-pointer text-xs text-[var(--oh-text-secondary)] hover:text-white"
+                  className="cursor-pointer text-sm font-medium text-[var(--oh-text-secondary)] hover:text-white"
                 >
                   {isShowingAll
                     ? t(I18nKey.CONVERSATION_PANEL$LESS)

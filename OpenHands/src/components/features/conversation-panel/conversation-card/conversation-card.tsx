@@ -233,7 +233,7 @@ export function ConversationCard({
       data-active={isActive ? "true" : "false"}
       onClick={onClick}
       className={cn(
-        "group relative h-auto w-full cursor-pointer rounded-md py-1 pl-2 pr-1 transition-colors",
+        "group relative h-auto w-full cursor-pointer rounded-md py-1 pl-2 pr-1 text-sm font-medium text-[var(--oh-text-secondary)] transition-colors",
         !contextMenuOpen && "hover:bg-[var(--oh-surface)]",
         (isActive || contextMenuOpen) && "bg-[var(--oh-surface)]",
       )}
@@ -267,7 +267,7 @@ export function ConversationCard({
           {!showPersistentPinIcon && (createdAt ?? lastUpdatedAt) && (
             <p
               className={cn(
-                "text-xs text-[var(--oh-text-secondary)] text-right whitespace-nowrap transition-opacity -translate-x-1.5",
+                "text-sm font-medium text-[var(--oh-text-secondary)] text-right whitespace-nowrap transition-opacity -translate-x-1.5",
                 hasHoverActions && hoverRevealYieldClassName(contextMenuOpen),
               )}
             >
@@ -308,7 +308,7 @@ export function ConversationCard({
                   <p
                     className={cn(
                       "pointer-events-none absolute inset-0 items-center justify-end",
-                      "text-xs text-[var(--oh-text-secondary)] whitespace-nowrap -translate-x-1.5",
+                      "text-sm font-medium text-[var(--oh-text-secondary)] whitespace-nowrap -translate-x-1.5",
                       hoverRevealPinnedTimestampClassName(contextMenuOpen),
                     )}
                   >
