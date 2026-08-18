@@ -19,6 +19,8 @@ import {
 
 export interface RecentTracesStreamCardProps {
   site?: string;
+  conversationId?: string;
+  events?: OHEvent[];
 }
 
 interface TraceSummary {
@@ -103,10 +105,13 @@ function formatRelativeTime(date: Date): string {
 
 export function RecentTracesStreamCard({
   site = "us5.datadoghq.com",
+  conversationId: propConversationId,
+  events: propEvents,
 }: RecentTracesStreamCardProps) {
   const { data: conversation } = useActiveConversation();
-  const conversationId = conversation?.id;
-  const events = useEventStore((state) => state.events);
+  const conversationId = propConversationId || conversation?.id;
+  const storeEvents = useEventStore((state) => state.events);
+  const events = propEvents !== undefined ? propEvents : storeEvents;
 
   const langfuseUrl = conversationId
     ? getLangfuseSessionUrl(conversationId)
@@ -153,50 +158,36 @@ export function RecentTracesStreamCard({
       {traces.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Layers className="size-6 text-[var(--oh-muted)] mb-2" />
-          <p className="text-xs text-[var(--oh-muted)]">
-            No traces recorded yet
-          </p>
+          <p className="text-xs text-[var(--oh-muted)]">No traces recorded yet</p>
           <p className="text-[10px] text-[var(--oh-muted)] mt-1">
-            Traces appear as the agent processes turns in a conversation
+            Traces are recorded per turn and exported to Langfuse and Datadog APM
           </p>
         </div>
       ) : (
-        <div className="rounded border border-[var(--oh-border)] bg-surface overflow-hidden">
-          <div className="divide-y divide-[var(--oh-border-subtle)] font-mono text-xs">
-            {traces.map((trace) => (
-              <div
-                key={trace.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 hover:bg-surface-raised/40 transition-colors gap-2"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/40">
-                    {trace.status === "success" ? (
-                      <CheckCircle2 className="size-3" />
-                    ) : (
-                      <AlertCircle className="size-3" />
-                    )}
-                    {trace.status === "success" ? "OK" : "ERR"}
-                  </span>
-                  <div>
-                    <span className="font-semibold text-foreground">
-                      {trace.turn}
-                    </span>
-                    <span className="text-[10px] text-[var(--oh-muted)] ml-2">
-                      {trace.timestamp}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-[11px] text-[var(--oh-muted)]">
-                  <span className="flex items-center gap-1">
-                    <Clock className="size-3" />
-                    {trace.duration}
-                  </span>
-                  <span>{trace.steps} tool calls</span>
-                </div>
+        <div className="space-y-2">
+          {traces.map((trace) => (
+            <div
+              key={trace.id}
+              className="flex items-center justify-between p-2.5 rounded-md bg-surface border border-[var(--oh-border)] hover:border-[var(--oh-border-subtle)] transition-colors text-xs font-mono"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                <span className="font-semibold text-foreground truncate">
+                  {trace.turn}
+                </span>
+                <span className="text-[10px] text-[var(--oh-muted)]">
+                  ({trace.steps} tool call{trace.steps === 1 ? "" : "s"})
+                </span>
               </div>
-            ))}
-          </div>
+
+              <div className="flex items-center gap-4 text-[var(--oh-muted)] shrink-0">
+                <span className="text-foreground font-semibold">
+                  {trace.duration}
+                </span>
+                <span className="text-[10px]">{trace.timestamp}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

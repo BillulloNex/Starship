@@ -59,10 +59,12 @@ export interface TurnData {
 
 export interface TurnWaterfallCardProps {
   site?: string;
+  conversationId?: string;
+  events?: OHEvent[];
 }
 
 /**
- * Parse real events from the event store into turn sequences.
+ * Parse real events into turn sequences.
  * A "turn" starts with a user message and ends when the next user message
  * begins (or the event stream ends).
  */
@@ -203,10 +205,13 @@ function truncateText(text: string, maxLen: number): string {
 
 export function TurnWaterfallCard({
   site = "us5.datadoghq.com",
+  conversationId: propConversationId,
+  events: propEvents,
 }: TurnWaterfallCardProps) {
   const { data: conversation } = useActiveConversation();
-  const conversationId = conversation?.id;
-  const events = useEventStore((state) => state.events);
+  const conversationId = propConversationId || conversation?.id;
+  const storeEvents = useEventStore((state) => state.events);
+  const events = propEvents !== undefined ? propEvents : storeEvents;
 
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(
     new Set(),
