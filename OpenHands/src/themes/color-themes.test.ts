@@ -1,89 +1,82 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  generateCustomThemeScale,
-  generateCustomTheme,
-  getThemeColors,
   getThemeDefinition,
-  readPersistedCustomThemeColors,
-  persistCustomThemeColors,
+  readPersistedColorTheme,
+  persistColorTheme,
   applyColorTheme,
-  DEFAULT_CUSTOM_THEME_COLORS,
-  PRESET_DEFAULT_COLORS,
+  AVAILABLE_COLOR_THEMES,
+  DEFAULT_COLOR_THEME,
 } from "./color-themes";
 
-describe("color-themes customizable engine", () => {
+describe("color-themes engine", () => {
   beforeEach(() => {
     localStorage.clear();
     const existing = document.getElementById("oh-color-theme-override");
     if (existing) existing.remove();
   });
 
-  it("generates a valid 13-stop theme scale from custom base colors", () => {
-    const scale = generateCustomThemeScale({
-      background: "#171525",
-      foreground: "#DEDDF0",
-      accent: "#A78BFA",
-    });
-
-    expect(scale[950].toUpperCase()).toBe("#171525");
-    expect(scale[100].toUpperCase()).toBe("#DEDDF0");
-    expect(scale[50]).toMatch(/^#[0-9A-Fa-f]{6}$/);
-    expect(scale[975]).toMatch(/^#[0-9A-Fa-f]{6}$/);
-    expect(scale[500]).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  it("exports all 8 WCAG AAA Golden Standard themes", () => {
+    const keys = AVAILABLE_COLOR_THEMES.map((t) => t.key);
+    expect(keys).toEqual([
+      "openhands-neutral",
+      "openhands-neo",
+      "openhands-deepsea",
+      "tokyo-night",
+      "vesper",
+      "gruvbox-dark",
+      "rose-pine",
+      "github-dark",
+    ]);
   });
 
-  it("generates a complete ColorThemeDefinition with scale, heroui, and tokens", () => {
-    const customDef = generateCustomTheme({
-      background: "#171525",
-      foreground: "#DEDDF0",
-      accent: "#A78BFA",
-    });
+  it("persists and reads valid theme keys, falling back to default for invalid ones", () => {
+    expect(readPersistedColorTheme()).toBe(DEFAULT_COLOR_THEME);
 
-    expect(customDef.label).toBe("Custom");
-    expect(customDef.scale["--cool-grey-950"].toUpperCase()).toBe("#171525");
-    expect(customDef.scale["--cool-grey-100"].toUpperCase()).toBe("#DEDDF0");
-    expect(customDef.tokens?.["--oh-color-primary"]).toBe("#A78BFA");
-    expect(customDef.tokens?.["--oh-accent"]).toBe("#A78BFA");
-    expect(customDef.heroui["--heroui-background"]).toBeDefined();
+    persistColorTheme("tokyo-night");
+    expect(readPersistedColorTheme()).toBe("tokyo-night");
+
+    // Invalid/removed theme fallback
+    localStorage.setItem("openhands-color-theme", "custom");
+    expect(readPersistedColorTheme()).toBe(DEFAULT_COLOR_THEME);
+
+    localStorage.setItem("openhands-color-theme", "vscode-abyss");
+    expect(readPersistedColorTheme()).toBe(DEFAULT_COLOR_THEME);
   });
 
-  it("persists and reads custom theme colors in localStorage", () => {
-    expect(readPersistedCustomThemeColors()).toEqual(
-      DEFAULT_CUSTOM_THEME_COLORS,
-    );
+  it("resolves definitions with accurate scale and tokens", () => {
+    const tokyoDef = getThemeDefinition("tokyo-night");
+    expect(tokyoDef.label).toBe("Tokyo Night");
+    expect(tokyoDef.scale["--cool-grey-950"]).toBe("#1A1B26");
+    expect(tokyoDef.tokens?.["--oh-color-primary"]).toBe("#7AA2F7");
 
-    const newColors = {
-      background: "#001122",
-      foreground: "#EFEFEF",
-      accent: "#FF5500",
-    };
+    const vesperDef = getThemeDefinition("vesper");
+    expect(vesperDef.label).toBe("Vesper");
+    expect(vesperDef.scale["--cool-grey-950"]).toBe("#101010");
+    expect(vesperDef.tokens?.["--oh-color-primary"]).toBe("#FFC799");
 
-    persistCustomThemeColors(newColors);
-    expect(readPersistedCustomThemeColors()).toEqual(newColors);
-  });
+    const gruvboxDef = getThemeDefinition("gruvbox-dark");
+    expect(gruvboxDef.label).toBe("Gruvbox Dark");
+    expect(gruvboxDef.scale["--cool-grey-950"]).toBe("#1D2021");
 
-  it("resolves theme base colors accurately for presets and custom", () => {
-    const abyssColors = getThemeColors("vscode-abyss");
-    expect(abyssColors).toEqual(PRESET_DEFAULT_COLORS["vscode-abyss"]);
+    const rosePineDef = getThemeDefinition("rose-pine");
+    expect(rosePineDef.label).toBe("Rosé Pine");
+    expect(rosePineDef.scale["--cool-grey-950"]).toBe("#191724");
 
-    const customColors = getThemeColors("custom", {
-      background: "#111111",
-      foreground: "#EEEEEE",
-      accent: "#FF00AA",
-    });
-    expect(customColors.accent).toBe("#FF00AA");
+    const githubDarkDef = getThemeDefinition("github-dark");
+    expect(githubDarkDef.label).toBe("GitHub Dark");
+    expect(githubDarkDef.scale["--cool-grey-950"]).toBe("#0D1117");
   });
 
   it("applies theme by injecting the style element into document.head", () => {
-    applyColorTheme("custom", {
-      background: "#171525",
-      foreground: "#DEDDF0",
-      accent: "#A78BFA",
-    });
+    applyColorTheme("tokyo-night");
 
     const styleEl = document.getElementById("oh-color-theme-override");
     expect(styleEl).not.toBeNull();
-    expect(styleEl?.textContent).toContain("--cool-grey-950: #171525;");
-    expect(styleEl?.textContent).toContain("--oh-color-primary: #A78BFA;");
+    expect(styleEl?.textContent).toContain("--cool-grey-950: #1A1B26;");
+    expect(styleEl?.textContent).toContain("--oh-color-primary: #7AA2F7;");
+
+    applyColorTheme("vesper");
+    expect(styleEl?.textContent).toContain("--cool-grey-950: #101010;");
+    expect(styleEl?.textContent).toContain("--oh-color-primary: #FFC799;");
   });
 });

@@ -1,11 +1,4 @@
 import React, { useMemo } from "react";
-import {
-  Layers,
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import {
   getLangfuseSessionUrl,
@@ -32,13 +25,9 @@ interface TraceSummary {
   status: "success" | "error";
 }
 
-/**
- * Build per-turn trace summaries from real events.
- */
 function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
   if (events.length === 0) return [];
 
-  // Group events by turn: split on user messages
   const turnGroups: OHEvent[][] = [];
   let currentGroup: OHEvent[] = [];
 
@@ -54,7 +43,6 @@ function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
     turnGroups.push(currentGroup);
   }
 
-  // Build summaries, most recent first
   return turnGroups
     .map((group, idx) => {
       const turnNumber = idx + 1;
@@ -63,7 +51,7 @@ function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
       const lastTimestamp = "timestamp" in lastEvent ? lastEvent.timestamp : "";
 
       const startMs = firstTimestamp ? new Date(firstTimestamp).getTime() : 0;
-      const endMs = lastTimestamp ? new Date(lastTimestamp).getTime() : startMs;
+      const endMs = lastTimestamp ? new Date(lastTimestamp).getTime() : startMs + 300;
       const durationMs = Math.max(0, endMs - startMs);
 
       const toolCallCount = group.filter((e) => isActionEvent(e)).length;
@@ -75,7 +63,7 @@ function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
 
       const relativeTime = firstTimestamp
         ? formatRelativeTime(new Date(firstTimestamp))
-        : "";
+        : "just now";
 
       return {
         id: `trace-turn-${turnNumber}`,
@@ -87,7 +75,7 @@ function buildTracesFromEvents(events: OHEvent[]): TraceSummary[] {
       };
     })
     .reverse()
-    .slice(0, 10);
+    .slice(0, 8);
 }
 
 function formatRelativeTime(date: Date): string {
@@ -98,8 +86,8 @@ function formatRelativeTime(date: Date): string {
   const diffHr = Math.floor(diffMin / 60);
 
   if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? "" : "s"} ago`;
-  if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? "" : "s"} ago`;
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
   return date.toLocaleDateString();
 }
 
@@ -122,72 +110,70 @@ export function RecentTracesStreamCard({
   const traces = useMemo(() => buildTracesFromEvents(events), [events]);
 
   return (
-    <div className="rounded-lg border border-[var(--oh-border)] bg-surface-raised p-4 transition-all">
+    <div className="rounded-lg border border-[var(--oh-border)] bg-surface-raised p-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--oh-border)] mb-3">
-        <div className="flex items-center gap-2">
-          <Layers className="size-4 text-purple-400" />
-          <h3 className="text-base font-semibold text-foreground">
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-semibold text-foreground">
             Recent Traces & Agent Run Sessions
           </h3>
+          <p className="text-xs text-[var(--oh-muted)]">
+            Execution history per turn
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 text-xs font-mono">
           {isLangfuseEnabled() && langfuseUrl && (
             <a
               href={langfuseUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-medium"
+              className="text-[var(--oh-muted)] hover:text-foreground underline decoration-dotted"
             >
-              <span>Langfuse Explorer</span>
-              <ArrowUpRight className="size-3" />
+              Langfuse ↗
             </a>
           )}
           <a
             href={datadogUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 font-medium ml-2"
+            className="text-[var(--oh-muted)] hover:text-foreground underline decoration-dotted"
           >
-            <span>Datadog APM</span>
-            <ArrowUpRight className="size-3" />
+            Datadog APM ↗
           </a>
         </div>
       </div>
 
       {traces.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Layers className="size-6 text-[var(--oh-muted)] mb-2" />
+        <div className="flex flex-col items-center justify-center py-6 text-center">
           <p className="text-xs text-[var(--oh-muted)]">No traces recorded yet</p>
-          <p className="text-[10px] text-[var(--oh-muted)] mt-1">
-            Traces are recorded per turn and exported to Langfuse and Datadog APM
-          </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {traces.map((trace) => (
-            <div
-              key={trace.id}
-              className="flex items-center justify-between p-2.5 rounded-md bg-surface border border-[var(--oh-border)] hover:border-[var(--oh-border-subtle)] transition-colors text-xs font-mono"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
-                <span className="font-semibold text-foreground truncate">
-                  {trace.turn}
-                </span>
-                <span className="text-[10px] text-[var(--oh-muted)]">
-                  ({trace.steps} tool call{trace.steps === 1 ? "" : "s"})
-                </span>
-              </div>
+        <div className="rounded border border-[var(--oh-border)] bg-surface overflow-hidden">
+          <div className="divide-y divide-[var(--oh-border-subtle)] font-mono text-xs">
+            {traces.map((trace) => (
+              <div
+                key={trace.id}
+                className="flex items-center justify-between p-2.5 hover:bg-surface-raised/40 transition-colors gap-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  <span className="font-semibold text-foreground">
+                    {trace.turn}
+                  </span>
+                  <span className="text-[11px] text-[var(--oh-muted)]">
+                    ({trace.steps} tool call{trace.steps === 1 ? "" : "s"})
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-4 text-[var(--oh-muted)] shrink-0">
-                <span className="text-foreground font-semibold">
-                  {trace.duration}
-                </span>
-                <span className="text-[10px]">{trace.timestamp}</span>
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-foreground">{trace.duration}</span>
+                  <span className="text-[11px] text-[var(--oh-muted)]">
+                    {trace.timestamp}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

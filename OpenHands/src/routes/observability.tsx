@@ -7,9 +7,9 @@ import {
   DatadogObservabilityView,
 } from "#/components/features/settings/observability-settings";
 import { I18nKey } from "#/i18n/declaration";
-import { Bot, Activity } from "lucide-react";
 import { cn } from "#/utils/utils";
-import { isLangfuseEnabled } from "#/services/langfuse-service";
+
+import { Info } from "lucide-react";
 
 export type ObservabilityTab = "llm" | "datadog";
 
@@ -41,34 +41,34 @@ export function ObservabilityScreen() {
     >
       <div className="mx-auto max-w-6xl space-y-5">
         {/* Header & Title */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold text-content">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1 border-b border-[var(--oh-border)]">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-foreground">
               {t(I18nKey.SETTINGS$NAV_OBSERVABILITY)}
             </h1>
-            <p className="text-sm text-muted">
-              {t(I18nKey.SETTINGS$PAGE_OBSERVABILITY_SUBLINE)}
-            </p>
+            <button
+              type="button"
+              className="text-[var(--oh-muted)] hover:text-foreground transition-colors cursor-help"
+              title={t(I18nKey.SETTINGS$PAGE_OBSERVABILITY_SUBLINE)}
+            >
+              <Info className="size-3.5" />
+            </button>
           </div>
 
           {/* Top-Level Segmented Screen Toggle */}
-          <div className="inline-flex items-center p-1 rounded-lg bg-surface border border-[var(--oh-border)] shadow-inner">
+          <div className="inline-flex items-center p-0.5 rounded-lg bg-surface border border-[var(--oh-border)]">
             <button
               type="button"
               data-testid="observability-tab-llm"
               onClick={() => handleTabChange("llm")}
               className={cn(
-                "flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer",
                 activeTab === "llm"
-                  ? "bg-sky-950/60 text-sky-300 border border-sky-700/50 shadow-sm"
+                  ? "bg-surface-raised text-foreground shadow-xs border border-[var(--oh-border)]"
                   : "text-[var(--oh-muted)] hover:text-foreground",
               )}
             >
-              <Bot className="size-3.5 text-sky-400" />
-              <span>LLM & Agent Tracing</span>
-              {isLangfuseEnabled() && (
-                <span className="size-1.5 rounded-full bg-sky-400" />
-              )}
+              LLM & Agent Tracing
             </button>
 
             <button
@@ -76,17 +76,13 @@ export function ObservabilityScreen() {
               data-testid="observability-tab-datadog"
               onClick={() => handleTabChange("datadog")}
               className={cn(
-                "flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer",
                 activeTab === "datadog"
-                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-700/50 shadow-sm"
+                  ? "bg-surface-raised text-foreground shadow-xs border border-[var(--oh-border)]"
                   : "text-[var(--oh-muted)] hover:text-foreground",
               )}
             >
-              <Activity className="size-3.5 text-emerald-400" />
-              <span>Infrastructure & Datadog</span>
-              {statusData?.isValidKey && (
-                <span className="size-1.5 rounded-full bg-emerald-400" />
-              )}
+              Infrastructure & Datadog
             </button>
           </div>
         </div>

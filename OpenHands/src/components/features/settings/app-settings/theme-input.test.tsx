@@ -15,27 +15,28 @@ describe("ThemeInput component", () => {
     if (existing) existing.remove();
   });
 
-  it("renders the theme customizer with presets and color pickers", () => {
+  it("renders the theme customizer with the theme cards grid", () => {
     render(<ThemeInput />);
 
     expect(screen.getByTestId("theme-customizer")).toBeInTheDocument();
-    expect(screen.getByTestId("color-theme-preset-input")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("color-theme-background-picker"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("color-theme-foreground-picker"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("color-theme-accent-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-cards-grid")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-openhands-neutral")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-tokyo-night")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-vesper")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-gruvbox-dark")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-rose-pine")).toBeInTheDocument();
+    expect(screen.getByTestId("theme-card-github-dark")).toBeInTheDocument();
   });
 
-  it("updates theme when a color hex is changed", () => {
+  it("updates theme when a theme card is clicked", () => {
     render(<ThemeInput />);
 
-    const bgInput = screen.getByLabelText(/background hex code/i);
-    fireEvent.change(bgInput, { target: { value: "112233" } });
+    const tokyoCard = screen.getByTestId("theme-card-tokyo-night");
+    fireEvent.click(tokyoCard);
 
     const styleEl = document.getElementById("oh-color-theme-override");
-    expect(styleEl?.textContent).toContain("--cool-grey-950: #112233;");
+    expect(styleEl?.textContent).toContain("--cool-grey-950: #1A1B26;");
+    expect(styleEl?.textContent).toContain("--oh-color-primary: #7AA2F7;");
+    expect(localStorage.getItem("openhands-color-theme")).toBe("tokyo-night");
   });
 });

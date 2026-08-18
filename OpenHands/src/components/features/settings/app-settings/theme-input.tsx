@@ -1,21 +1,165 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
-import { SettingsDropdownInput } from "../settings-dropdown-input";
-import { ColorPickerInput } from "./color-picker-input";
-import URefreshIcon from "#/icons/u-refresh.svg?react";
 import {
   AVAILABLE_COLOR_THEMES,
   type ColorThemeKey,
-  type CustomThemeColors,
+  type ThemeMeta,
   applyColorTheme,
   persistColorTheme,
   readPersistedColorTheme,
-  readPersistedCustomThemeColors,
-  persistCustomThemeColors,
-  getThemeColors,
-  PRESET_DEFAULT_COLORS,
 } from "#/themes/color-themes";
+
+function ThemeCard({
+  theme,
+  isSelected,
+  onSelect,
+}: {
+  theme: ThemeMeta;
+  isSelected: boolean;
+  onSelect: (key: ColorThemeKey) => void;
+}) {
+  const { key, label, description, colors } = theme;
+
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isSelected}
+      tabIndex={0}
+      data-testid={`theme-card-${key}`}
+      onClick={() => onSelect(key)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(key);
+        }
+      }}
+      className={`group relative flex flex-col justify-between text-left p-3.5 rounded-xl border transition-all duration-150 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--oh-color-primary)] ${
+        isSelected
+          ? "border-[var(--oh-color-primary)] ring-2 ring-[var(--oh-color-primary)]/30 shadow-md"
+          : "border-[var(--oh-border)] hover:border-[var(--oh-border-strong)] hover:shadow-sm"
+      }`}
+      style={{
+        backgroundColor: colors.surface,
+      }}
+    >
+      {/* Header: Label + Selected Radio Checkmark */}
+      <div className="flex items-start justify-between gap-2 w-full mb-2">
+        <div className="flex flex-col min-w-0">
+          <span
+            className="text-xs font-semibold tracking-wide truncate"
+            style={{ color: colors.foreground }}
+          >
+            {label}
+          </span>
+          <span
+            className="text-[11px] leading-tight line-clamp-1 mt-0.5"
+            style={{ color: colors.muted }}
+            title={description}
+          >
+            {description}
+          </span>
+        </div>
+
+        {/* Selected Indicator */}
+        <div
+          className={`size-4 rounded-full flex items-center justify-center shrink-0 border transition-colors ${
+            isSelected
+              ? "border-transparent"
+              : "border-white/20 bg-black/20"
+          }`}
+          style={{
+            backgroundColor: isSelected ? colors.accent : undefined,
+          }}
+        >
+          {isSelected && (
+            <svg
+              className="size-2.5 text-black"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="3.5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.5 12.75l6 6 9-13.5"
+              />
+            </svg>
+          )}
+        </div>
+      </div>
+
+      {/* Mini Visual UI Mock Preview */}
+      <div
+        className="w-full h-12 rounded-lg p-1.5 flex flex-col justify-between border"
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.border,
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <div
+            className="size-2 rounded-full"
+            style={{ backgroundColor: colors.accent }}
+          />
+          <div
+            className="h-1.5 w-12 rounded-full"
+            style={{ backgroundColor: colors.foreground, opacity: 0.8 }}
+          />
+          <div
+            className="h-1.5 w-6 rounded-full ml-auto"
+            style={{ backgroundColor: colors.muted, opacity: 0.5 }}
+          />
+        </div>
+
+        <div className="flex items-center gap-1">
+          <div
+            className="h-3.5 px-1.5 rounded flex items-center justify-center text-[8px] font-bold"
+            style={{
+              backgroundColor: colors.accent,
+              color: "#000000",
+            }}
+          >
+            Action
+          </div>
+          <div
+            className="h-3.5 flex-1 rounded border"
+            style={{
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Palette Swatch Bar */}
+      <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-white/5 w-full">
+        <div
+          className="size-3 rounded-full border border-white/20 shadow-xs"
+          style={{ backgroundColor: colors.background }}
+          title={`Canvas BG: ${colors.background}`}
+        />
+        <div
+          className="size-3 rounded-full border border-white/20 shadow-xs"
+          style={{ backgroundColor: colors.surface }}
+          title={`Surface: ${colors.surface}`}
+        />
+        <div
+          className="size-3 rounded-full border border-white/20 shadow-xs"
+          style={{ backgroundColor: colors.foreground }}
+          title={`Text: ${colors.foreground}`}
+        />
+        <div
+          className="size-3 rounded-full border border-white/20 shadow-xs ml-auto"
+          style={{ backgroundColor: colors.accent }}
+          title={`Accent: ${colors.accent}`}
+        />
+      </div>
+    </button>
+  );
+}
 
 export function ThemeInput() {
   const { t } = useTranslation("openhands");
@@ -24,125 +168,41 @@ export function ThemeInput() {
     () => readPersistedColorTheme(),
   );
 
-  const [colors, setColors] = React.useState<CustomThemeColors>(() =>
-    getThemeColors(readPersistedColorTheme(), readPersistedCustomThemeColors()),
-  );
-
-  const handlePresetChange = React.useCallback((key: React.Key | null) => {
-    if (!key) return;
-    const nextKey = key as ColorThemeKey;
+  const handleSelectTheme = React.useCallback((nextKey: ColorThemeKey) => {
     setSelectedThemeKey(nextKey);
     persistColorTheme(nextKey);
-
-    if (nextKey === "custom") {
-      const customColors = readPersistedCustomThemeColors();
-      setColors(customColors);
-      applyColorTheme("custom", customColors);
-    } else {
-      const presetColors = getThemeColors(nextKey);
-      setColors(presetColors);
-      applyColorTheme(nextKey);
-    }
+    applyColorTheme(nextKey);
   }, []);
-
-  const handleColorChange = React.useCallback(
-    (field: keyof CustomThemeColors, hex: string) => {
-      const nextColors = {
-        ...colors,
-        [field]: hex,
-      };
-      setColors(nextColors);
-      setSelectedThemeKey("custom");
-      persistColorTheme("custom");
-      persistCustomThemeColors(nextColors);
-      applyColorTheme("custom", nextColors);
-    },
-    [colors],
-  );
-
-  const handleReset = React.useCallback(() => {
-    let resetColors: CustomThemeColors;
-    if (
-      selectedThemeKey !== "custom" &&
-      selectedThemeKey in PRESET_DEFAULT_COLORS
-    ) {
-      resetColors =
-        PRESET_DEFAULT_COLORS[
-          selectedThemeKey as keyof typeof PRESET_DEFAULT_COLORS
-        ];
-    } else {
-      resetColors = PRESET_DEFAULT_COLORS["openhands-neutral"];
-    }
-
-    setColors(resetColors);
-    if (selectedThemeKey === "custom") {
-      persistCustomThemeColors(resetColors);
-      applyColorTheme("custom", resetColors);
-    } else {
-      applyColorTheme(selectedThemeKey);
-    }
-  }, [selectedThemeKey]);
 
   return (
     <div
-      className="flex flex-col gap-2.5 w-full min-w-0"
+      className="flex flex-col gap-3 w-full min-w-0"
       data-testid="theme-customizer"
     >
-      <div className="rounded-xl border border-[var(--oh-border)] bg-[var(--oh-surface)] p-4 flex flex-col gap-3 shadow-sm">
-        {/* Preset Row */}
-        <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--oh-border-subtle)]">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[var(--oh-foreground)]">
-              {t(I18nKey.SETTINGS$COLOR_THEME) || "Theme Preset"}
-            </span>
-            <button
-              type="button"
-              onClick={handleReset}
-              title="Reset colors to preset defaults"
-              className="p-1 rounded-md text-[var(--oh-muted)] hover:text-[var(--oh-foreground)] hover:bg-[var(--oh-interactive-hover)] transition-colors focus:outline-none"
-              aria-label="Reset colors"
-            >
-              <URefreshIcon className="size-3.5" />
-            </button>
-          </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-[var(--oh-foreground)]">
+          {t(I18nKey.SETTINGS$COLOR_THEME) || "Color Theme"}
+        </span>
+        <span className="text-xs text-[var(--oh-muted)]">
+          Choose from curated WCAG AAA Golden-Standard themes optimized for readability and developer workflows.
+        </span>
+      </div>
 
-          <div className="w-52 sm:w-60">
-            <SettingsDropdownInput
-              testId="color-theme-preset-input"
-              name="color-theme-preset-input"
-              items={AVAILABLE_COLOR_THEMES.map((theme) => ({
-                key: theme.key,
-                label: theme.label,
-              }))}
-              selectedKey={selectedThemeKey}
-              onSelectionChange={handlePresetChange}
-              isClearable={false}
-              wrapperClassName="w-full min-w-0"
-            />
-          </div>
-        </div>
-
-        {/* Customizable Base Color Rows */}
-        <div className="flex flex-col">
-          <ColorPickerInput
-            testId="color-theme-background-picker"
-            label="Background"
-            value={colors.background}
-            onChange={(hex) => handleColorChange("background", hex)}
+      {/* Responsive Grid of Theme Cards */}
+      <div
+        role="radiogroup"
+        aria-label="Color themes"
+        data-testid="theme-cards-grid"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full"
+      >
+        {AVAILABLE_COLOR_THEMES.map((theme) => (
+          <ThemeCard
+            key={theme.key}
+            theme={theme}
+            isSelected={selectedThemeKey === theme.key}
+            onSelect={handleSelectTheme}
           />
-          <ColorPickerInput
-            testId="color-theme-foreground-picker"
-            label="Foreground"
-            value={colors.foreground}
-            onChange={(hex) => handleColorChange("foreground", hex)}
-          />
-          <ColorPickerInput
-            testId="color-theme-accent-picker"
-            label="Accent"
-            value={colors.accent}
-            onChange={(hex) => handleColorChange("accent", hex)}
-          />
-        </div>
+        ))}
       </div>
     </div>
   );

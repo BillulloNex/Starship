@@ -26,7 +26,7 @@ describe("ObservabilityScreen", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the 2-screen toggle and defaults to LLM & Agent Tracing", async () => {
+  it("renders the 2-screen toggle and defaults to LLM & Agent Tracing Overview", async () => {
     vi.spyOn(DatadogService, "getStatus").mockResolvedValue({
       enabled: true,
       hasApiKey: true,
@@ -81,17 +81,21 @@ describe("ObservabilityScreen", () => {
     expect(screen.getByTestId("observability-tab-llm")).toBeInTheDocument();
     expect(screen.getByTestId("observability-tab-datadog")).toBeInTheDocument();
 
+    // Verify Overview (All Sessions) KPIs and sections
+    expect(screen.getByText("Overview (All Sessions)")).toBeInTheDocument();
+    expect(screen.getByText("Session Tracing")).toBeInTheDocument();
+    expect(screen.getByText("Total Sessions")).toBeInTheDocument();
+    expect(screen.getByText("Total Tokens")).toBeInTheDocument();
+    expect(screen.getByText("Estimated Spend")).toBeInTheDocument();
+    expect(screen.getByText("Token Usage Over Time")).toBeInTheDocument();
+
+    // Switch to Session Tracing
+    fireEvent.click(screen.getByText("Session Tracing"));
 
     expect(screen.getByText("Avg Turn Duration")).toBeInTheDocument();
     expect(screen.getByText("Turn Execution Lifecycle Waterfall")).toBeInTheDocument();
     expect(screen.getByText("MCP & Tool Performance Breakdown")).toBeInTheDocument();
     expect(screen.getByText("Model Usage & Cost Attribution")).toBeInTheDocument();
-
-    // Verify empty states render
-    expect(screen.getByText("No turns recorded yet")).toBeInTheDocument();
-    expect(screen.getByText("No model usage data yet")).toBeInTheDocument();
-    expect(screen.getByText("No tool executions recorded yet")).toBeInTheDocument();
-    expect(screen.getByText("No traces recorded yet")).toBeInTheDocument();
   });
 
   it("switches to Infrastructure & Datadog screen when clicking the toggle", async () => {
@@ -151,8 +155,7 @@ describe("ObservabilityScreen", () => {
     fireEvent.click(screen.getByTestId("observability-tab-datadog"));
 
     // Datadog view components should be visible
-    expect(await screen.findByText("Agent Observability Cockpit")).toBeInTheDocument();
-    expect(screen.getByText("APM Performance & System Metrics")).toBeInTheDocument();
+    expect(await screen.findByText("APM Throughput & Activity")).toBeInTheDocument();
     expect(screen.getByText("Agent Server")).toBeInTheDocument();
     expect(screen.getByText("Automation Server")).toBeInTheDocument();
     expect(screen.getByText("Frontend & Ingress")).toBeInTheDocument();
