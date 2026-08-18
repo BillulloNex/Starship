@@ -154,7 +154,7 @@ export function ConversationCardFooter({
           ))}
         <div className="flex items-center gap-2 shrink-0 ml-auto">
           {showTimestamp && (createdAt ?? lastUpdatedAt) && (
-            <p className="text-xs text-[var(--oh-muted)] text-right">
+            <p className="text-xs text-[var(--oh-text-secondary)] text-right">
               <time>
                 {`${formatTimeDelta(lastUpdatedAt ?? createdAt)} ${t(I18nKey.CONVERSATION$AGO)}`}
               </time>

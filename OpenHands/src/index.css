@@ -1,6 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Outfit:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 :root {
   --oh-bg-dark: var(--cool-grey-950);
@@ -12,7 +11,11 @@
   --oh-bg-editor-sidebar: var(--cool-grey-925);
   --oh-bg-editor-active: var(--cool-grey-900);
   --oh-border-editor-sidebar: var(--cool-grey-800);
-  --oh-bg-neutral-muted: color-mix(in srgb, var(--cool-grey-300) 20%, transparent);
+  --oh-bg-neutral-muted: color-mix(
+    in srgb,
+    var(--cool-grey-300) 20%,
+    transparent
+  );
   --bg-dark: var(--oh-bg-dark);
   --bg-light: var(--oh-bg-light);
   --bg-input: var(--oh-bg-input);
@@ -26,19 +29,19 @@
   background-color: var(--oh-color-base) !important;
 
   /* ── Cool Grey Scale (13 shades + 2 pure anchors: white / black) ──────── */
-  --cool-grey-50:  #F7F9FC;
-  --cool-grey-100: #EEF2F7;
-  --cool-grey-200: #DCE3EE;
-  --cool-grey-300: #C3CDDC;
-  --cool-grey-400: #A3B0C4;
-  --cool-grey-500: #7E8A9E;
-  --cool-grey-600: #626D82;
-  --cool-grey-700: #4B5468;
-  --cool-grey-800: #383F50;
-  --cool-grey-900: #2C313F;
-  --cool-grey-925: #21252F;
-  --cool-grey-950: #0B0E14; /* intentional override: preserves original app-shell depth */
-  --cool-grey-975: #05070A;
+  --cool-grey-50: #f7f9fc;
+  --cool-grey-100: #eef2f7;
+  --cool-grey-200: #dce3ee;
+  --cool-grey-300: #c3cddc;
+  --cool-grey-400: #a3b0c4;
+  --cool-grey-500: #7e8a9e;
+  --cool-grey-600: #626d82;
+  --cool-grey-700: #4b5468;
+  --cool-grey-800: #383f50;
+  --cool-grey-900: #2c313f;
+  --cool-grey-925: #21252f;
+  --cool-grey-950: #0b0e14; /* intentional override: preserves original app-shell depth */
+  --cool-grey-975: #05070a;
   /* ─────────────────────────────────────────────────────────────────────── */
 }
 
@@ -46,7 +49,12 @@ body {
   margin: 0;
   background-color: var(--oh-color-base);
   font-family:
-    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Roboto",
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    "Roboto",
     sans-serif;
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
@@ -55,7 +63,8 @@ body {
 
 code {
   font-family:
-    "IBM Plex Mono", source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+    "IBM Plex Mono", source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
 }
 
 .markdown-body code {
@@ -63,7 +72,11 @@ code {
   margin: 0;
   font-size: 85%;
   white-space: break-spaces;
-  background-color: color-mix(in srgb, var(--oh-foreground) 8%, var(--oh-surface-raised));
+  background-color: color-mix(
+    in srgb,
+    var(--oh-foreground) 8%,
+    var(--oh-surface-raised)
+  );
   border-radius: 6px;
   color: var(--oh-foreground);
   border: 1px solid rgba(255, 255, 255, 0.08);

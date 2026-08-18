@@ -2076,7 +2076,12 @@ describe("ConversationPanel", () => {
         within(noWorkspaceFolder).getByTestId(
           "thread-folder-children-__none_workspace",
         ),
-      ).toHaveClass("ml-5", "border-l", "pl-2");
+      ).toHaveClass("ml-5", "pl-3");
+      expect(
+        within(noWorkspaceFolder).getByTestId(
+          "thread-folder-children-__none_workspace",
+        ),
+      ).not.toHaveClass("border-l");
       expect(
         within(noWorkspaceFolder).getAllByTestId("conversation-card"),
       ).toHaveLength(5);

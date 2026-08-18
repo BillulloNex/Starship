@@ -99,8 +99,8 @@ export function ConversationGroupFolderRow({
       <div className={cn(isDragging && "opacity-0")}>
         <div
           className={cn(
-            "flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md pl-2 pr-1 text-sm font-normal",
-            "text-[var(--oh-muted)] transition-colors hover:bg-[var(--oh-surface-raised)] hover:text-white",
+            "flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md pl-2 pr-1 text-sm font-medium",
+            "text-[var(--oh-text-secondary)] transition-colors hover:bg-[var(--oh-surface-raised)] hover:text-white",
           )}
         >
           <button
@@ -218,7 +218,7 @@ export function ConversationGroupFolderRow({
           <div
             id={`thread-folder-content-${groupTestIdSuffix}`}
             data-testid={`thread-folder-children-${groupTestIdSuffix}`}
-            className="mt-0.5 ml-5 space-y-0.5 border-l border-[var(--oh-border-subtle)] pl-2"
+            className="mt-0.5 ml-5 space-y-0.5 pl-3"
           >
             {visibleConversations.map(renderConversationCard)}
             {isPreviewTruncated ? (
@@ -227,7 +227,7 @@ export function ConversationGroupFolderRow({
                   type="button"
                   data-testid={`thread-folder-view-more-${groupTestIdSuffix}`}
                   onClick={onTogglePreviewExpanded}
-                  className="cursor-pointer text-xs text-[var(--oh-text-dim)] hover:text-white"
+                  className="cursor-pointer text-xs text-[var(--oh-text-secondary)] hover:text-white"
                 >
                   {isShowingAll
                     ? t(I18nKey.CONVERSATION_PANEL$LESS)

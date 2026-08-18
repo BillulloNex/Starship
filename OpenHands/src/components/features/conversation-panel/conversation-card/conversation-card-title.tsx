@@ -40,7 +40,7 @@ export function ConversationCardTitle({
         }}
         type="text"
         defaultValue={title}
-        className="text-sm leading-6 font-semibold bg-transparent w-full"
+        className="text-sm leading-5 font-medium bg-transparent w-full"
       />
     );
   }
@@ -49,7 +49,7 @@ export function ConversationCardTitle({
     <p
       data-testid="conversation-card-title"
       className={cn(
-        "text-xs leading-6 font-semibold bg-transparent truncate overflow-hidden",
+        "text-sm leading-5 font-medium bg-transparent truncate overflow-hidden",
         isConversationArchived && "opacity-60",
       )}
     >

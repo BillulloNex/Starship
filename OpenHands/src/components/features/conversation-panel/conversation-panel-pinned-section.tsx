@@ -45,7 +45,7 @@ export function ConversationPanelPinnedSection({
           : "pb-2",
       )}
     >
-      <h3 className="flex items-center gap-1.5 py-1.5 pl-2 text-sm font-normal text-[var(--oh-muted)]">
+      <h3 className="flex items-center gap-1.5 py-1.5 pl-2 text-sm font-semibold text-[var(--oh-foreground)]">
         <Pin className="h-3.5 w-3.5 shrink-0" aria-hidden />
         {t(I18nKey.CONVERSATION_PANEL$PINNED)}
       </h3>
@@ -58,7 +58,7 @@ export function ConversationPanelPinnedSection({
             type="button"
             data-testid="conversation-panel-pinned-view-more"
             onClick={onTogglePreviewExpanded}
-            className="cursor-pointer text-xs text-[var(--oh-text-dim)] hover:text-white"
+            className="cursor-pointer text-xs text-[var(--oh-text-secondary)] hover:text-white"
           >
             {isShowingAll
               ? t(I18nKey.CONVERSATION_PANEL$LESS)

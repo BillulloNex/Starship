@@ -984,9 +984,9 @@ export function ConversationPanel({
         >
           <div
             data-testid="older-conversations-summary"
-            className="flex min-w-0 flex-nowrap items-center gap-x-2 py-2 pl-4 pr-2.5 text-[var(--oh-muted)]"
+            className="flex min-w-0 flex-nowrap items-center gap-x-2 py-2 pl-4 pr-2.5"
           >
-            <span className="min-w-0 truncate text-sm font-medium text-[var(--oh-muted)]">
+            <span className="min-w-0 truncate text-sm font-semibold text-[var(--oh-foreground)]">
               {t(I18nKey.SIDEBAR$CONVERSATIONS)}
             </span>
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -1049,7 +1049,7 @@ export function ConversationPanel({
             data-testid="conversation-panel-empty-state"
             className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-8"
           >
-            <p className="text-xs text-[var(--oh-muted)]">
+            <p className="text-sm text-[var(--oh-text-secondary)]">
               {t(
                 emptyDueToAutomationFilter
                   ? I18nKey.CONVERSATION_PANEL$NO_AUTOMATION_MATCHES
@@ -1143,7 +1143,7 @@ export function ConversationPanel({
                 type="button"
                 data-testid="load-more-conversations"
                 onClick={requestLoadMore}
-                className="text-xs text-[var(--oh-muted)] hover:text-white"
+                className="text-xs text-[var(--oh-text-secondary)] hover:text-white"
               >
                 {t(I18nKey.CONVERSATION$LOAD_MORE)}
               </button>
