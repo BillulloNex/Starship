@@ -15,6 +15,43 @@ export interface DatadogObservabilityViewProps {
   service?: string;
 }
 
+/**
+ * Formats and strips raw Datadog template handlebars/variables (e.g. {{host.name}}, {{device.name}})
+ * into clean, readable titles without template code artifacts.
+ */
+export function formatMonitorName(rawName: string): string {
+  if (!rawName) return "";
+  let name = rawName;
+
+  // Deduplicate redundant prefixes like [Synthetics] [Synthetic] -> [Synthetic]
+  name = name.replace(/\[Synthetics\]\s*\[Synthetic\]/gi, "[Synthetic]");
+
+  // Strip handlebars conditionals {{#is_alert}}...{{/is_alert}} or other block tags {{#...}}...{{/...}}
+  name = name.replace(/\{\{#[^}]+\}\}[\s\S]*?\{\{\/[^}]+\}\}/g, "");
+  name = name.replace(/\{\{[#^/][^}]+\}\}/g, "");
+
+  // If preceded by "host", "device", "service", "env" (e.g. "for host {{host.name}}", "on device {{device.name}}"),
+  // strip the redundant template placeholder
+  name = name.replace(/(host|device|service|env)\s*\{\{(?:host|device|service|env)(?:\.[^}]+)?\}\}/gi, "$1");
+
+  // If not preceded by the keyword (e.g. "Alert on {{host.name}}"), replace with clean entity name
+  name = name.replace(/\{\{host(?:\.[^}]+)?\}\}/gi, "host");
+  name = name.replace(/\{\{device(?:\.[^}]+)?\}\}/gi, "device");
+  name = name.replace(/\{\{service(?:\.[^}]+)?\}\}/gi, "service");
+  name = name.replace(/\{\{env(?:\.[^}]+)?\}\}/gi, "env");
+
+  // Fallback: strip any remaining {{...}} tags
+  name = name.replace(/\{\{[^}]+\}\}/g, "");
+
+  // Strip empty parentheses
+  name = name.replace(/\(\s*\)/g, "");
+
+  // Normalize whitespace
+  name = name.replace(/\s+/g, " ").trim();
+
+  return name;
+}
+
 interface APMTrendPoint {
   timeLabel: string;
   requests: number;
@@ -296,7 +333,13 @@ export function DatadogObservabilityView({
     let list = [...monitorsList];
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
-      list = list.filter((m) => m.name.toLowerCase().includes(q) || m.type.toLowerCase().includes(q));
+      list = list.filter(
+        (m) =>
+          formatMonitorName(m.name).toLowerCase().includes(q) ||
+          m.name.toLowerCase().includes(q) ||
+          m.type.toLowerCase().includes(q) ||
+          (m.query || "").toLowerCase().includes(q),
+      );
     }
     return list;
   }, [monitorsList, searchFilter]);
@@ -742,11 +785,17 @@ export function DatadogObservabilityView({
 
                   return (
                     <tr key={m.id} className="hover:bg-surface/50 transition-colors">
-                      <td className="py-3 px-4 font-sans font-semibold text-foreground max-w-xs truncate">
-                        {m.name}
+                      <td
+                        className="py-3 px-4 font-sans font-semibold text-foreground max-w-xs truncate"
+                        title={m.name}
+                      >
+                        {formatMonitorName(m.name)}
                       </td>
                       <td className="py-3 px-4 text-[var(--oh-muted)]">{m.type}</td>
-                      <td className="py-3 px-4 text-[10px] text-[var(--oh-muted)] max-w-sm truncate">
+                      <td
+                        className="py-3 px-4 text-[10px] text-[var(--oh-muted)] max-w-sm truncate"
+                        title={m.query}
+                      >
                         {m.query}
                       </td>
                       

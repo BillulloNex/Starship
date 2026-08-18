@@ -8,6 +8,7 @@ import {
   Shield,
 } from "lucide-react";
 import { DatadogMonitorItem } from "#/api/observability-service/datadog.types";
+import { formatMonitorName } from "./datadog-observability-view";
 
 export interface MonitorsAlertsCardProps {
   monitors: DatadogMonitorItem[];
@@ -125,8 +126,8 @@ export function MonitorsAlertsCard({
                       {getMonitorStateBadge(m.state)}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-medium text-foreground truncate">
-                        {m.name}
+                      <div className="font-medium text-foreground truncate" title={m.name}>
+                        {formatMonitorName(m.name)}
                       </div>
                       <div className="text-[11px] text-[var(--oh-muted)] flex items-center gap-2 mt-0.5">
                         <span className="capitalize">{m.type}</span>

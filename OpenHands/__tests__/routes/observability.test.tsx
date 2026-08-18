@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ObservabilityScreen } from "#/routes/observability";
 import { DatadogService } from "#/api/observability-service/datadog-service.api";
+import { formatMonitorName } from "#/components/features/settings/observability-settings";
 
 function renderObservabilityScreen(initialEntry: string = "/observability") {
   return render(
@@ -159,5 +160,47 @@ describe("ObservabilityScreen", () => {
     expect(screen.getByText("Agent Server")).toBeInTheDocument();
     expect(screen.getByText("Automation Server")).toBeInTheDocument();
     expect(screen.getByText("Frontend & Ingress")).toBeInTheDocument();
+  });
+});
+
+describe("formatMonitorName", () => {
+  it("cleans host and device template variables from monitor names", () => {
+    expect(
+      formatMonitorName("CPU usage is high for host {{host.name}}"),
+    ).toBe("CPU usage is high for host");
+
+    expect(
+      formatMonitorName("Disk latency is high for host {{host.name}} on device {{device.name}}"),
+    ).toBe("Disk latency is high for host on device");
+
+    expect(
+      formatMonitorName("Disk usage is high for host {{host.name}} on device {{device.name}}"),
+    ).toBe("Disk usage is high for host on device");
+
+    expect(
+      formatMonitorName("System load is high for host {{host.name}}"),
+    ).toBe("System load is high for host");
+
+    expect(
+      formatMonitorName("Network traffic (received) is high on host {{host.name}}"),
+    ).toBe("Network traffic (received) is high on host");
+
+    expect(
+      formatMonitorName("Network traffic (sent) is high on host {{host.name}}"),
+    ).toBe("Network traffic (sent) is high on host");
+
+    expect(
+      formatMonitorName("Memory space is low for host {{host.name}}"),
+    ).toBe("Memory space is low for host");
+  });
+
+  it("cleans redundant synthetic tags and handlebar conditionals", () => {
+    expect(
+      formatMonitorName("[Synthetics] [Synthetic] Cal.com Uptime"),
+    ).toBe("[Synthetic] Cal.com Uptime");
+
+    expect(
+      formatMonitorName("Service {{#is_alert}}Alert{{/is_alert}} on {{service.name}}"),
+    ).toBe("Service on service");
   });
 });
