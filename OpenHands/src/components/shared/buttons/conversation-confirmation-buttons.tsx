@@ -34,15 +34,16 @@ export function ConversationConfirmationButtons() {
       if (ev.source !== "agent") return false;
       return curAgentState === AgentState.AWAITING_USER_CONFIRMATION;
     });
+  const awaitingActionId = awaitingAction?.id;
 
   const handleConfirmation = useCallback(
     (accept: boolean) => {
-      if (!awaitingAction || !conversation) {
+      if (!awaitingAction || !conversation || awaitingActionId === undefined) {
         return;
       }
 
       // Mark event as submitted to prevent duplicate submissions
-      addSubmittedEventId(awaitingAction.id);
+      addSubmittedEventId(awaitingActionId);
 
       // Call the agent-server API endpoint
       respondToConfirmation({
@@ -52,7 +53,13 @@ export function ConversationConfirmationButtons() {
         accept,
       });
     },
-    [awaitingAction, conversation, addSubmittedEventId, respondToConfirmation],
+    [
+      awaitingAction,
+      awaitingActionId,
+      conversation,
+      addSubmittedEventId,
+      respondToConfirmation,
+    ],
   );
 
   // Handle keyboard shortcuts
@@ -91,7 +98,8 @@ export function ConversationConfirmationButtons() {
   if (
     curAgentState !== AgentState.AWAITING_USER_CONFIRMATION ||
     !awaitingAction ||
-    submittedEventIds.includes(awaitingAction.id)
+    awaitingActionId === undefined ||
+    submittedEventIds.includes(awaitingActionId)
   ) {
     return null;
   }

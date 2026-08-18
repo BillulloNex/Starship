@@ -22,7 +22,7 @@ type SearchTranscriptEvents = (
 const compareEventTimestamps = (
   first: OpenHandsEvent,
   second: OpenHandsEvent,
-): number => first.timestamp.localeCompare(second.timestamp);
+): number => (first.timestamp ?? "").localeCompare(second.timestamp ?? "");
 
 /**
  * Loads the persisted history from the newest page back to the beginning,
@@ -62,12 +62,16 @@ export const loadCompleteTranscriptEvents = async (
     let pageOldestTimestamp: string | undefined;
     let addedEvent = false;
     page.items.forEach((event) => {
-      if (!fetchedEventIds.has(event.id)) {
+      if (event.id && !fetchedEventIds.has(event.id)) {
         fetchedEventIds.add(event.id);
         addedEvent = true;
       }
-      if (!pageOldestTimestamp || event.timestamp < pageOldestTimestamp) {
-        pageOldestTimestamp = event.timestamp;
+      const timestamp = event.timestamp;
+      if (
+        timestamp &&
+        (!pageOldestTimestamp || timestamp < pageOldestTimestamp)
+      ) {
+        pageOldestTimestamp = timestamp;
       }
     });
 
@@ -116,11 +120,13 @@ export const loadCompleteTranscriptEvents = async (
   persistedDescending
     .slice()
     .reverse()
-    .forEach((event) => {
-      if (!eventsById.has(event.id)) eventsById.set(event.id, event);
+    .forEach((event, index) => {
+      const eventId = event.id ?? `persisted-without-id-${index}`;
+      if (!eventsById.has(eventId)) eventsById.set(eventId, event);
     });
-  loadedEvents.forEach((event) => {
-    if (!eventsById.has(event.id)) eventsById.set(event.id, event);
+  loadedEvents.forEach((event, index) => {
+    const eventId = event.id ?? `loaded-without-id-${index}`;
+    if (!eventsById.has(eventId)) eventsById.set(eventId, event);
   });
   // Array.prototype.sort is stable, so equal-timestamp events keep the causal
   // order returned by the server/store rather than being reordered by id.

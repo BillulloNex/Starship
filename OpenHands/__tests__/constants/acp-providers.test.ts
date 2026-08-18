@@ -54,16 +54,10 @@ describe("ACP provider registry", () => {
           ? [...sdk!.default_command, "--dangerously-skip-permissions"]
           : [...sdk!.default_command];
       expect(provider.default_command).toEqual(expectedCommand);
-      const expectedModels =
-        provider.key === "claude-code"
-          ? [
-              { id: "default", label: "Default (recommended)" },
-              { id: "claude-5-opus", label: "Claude 5 Opus" },
-              ...sdk!.available_models
-                .filter((m) => m.id !== "default")
-                .map((m) => ({ id: m.id, label: m.label })),
-            ]
-          : sdk!.available_models.map((m) => ({ id: m.id, label: m.label }));
+      const expectedModels = sdk!.available_models.map((m) => ({
+        id: m.id,
+        label: m.label,
+      }));
       expect(provider.available_models).toEqual(expectedModels);
       expect(provider.default_model).toBe(sdk!.default_model ?? undefined);
       // UI-only overlay stays local.

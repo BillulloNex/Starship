@@ -339,7 +339,7 @@ const buildTranscriptEntries = (
           ]
             .filter(Boolean)
             .join("\n"),
-          timestamp: event.timestamp,
+          timestamp: event.timestamp ?? "",
         });
         continue;
       }
@@ -401,7 +401,7 @@ const buildTranscriptEntries = (
         entries.push({
           kind: "error",
           content: event.error,
-          timestamp: event.timestamp,
+          timestamp: event.timestamp ?? "",
         });
         continue;
       }

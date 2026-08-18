@@ -1359,7 +1359,8 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(payload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/claude-agent-acp@0.44.0",
+      "@agentclientprotocol/claude-agent-acp@0.63.0",
+      "--dangerously-skip-permissions",
     ]);
     expect(payload.agent_settings.acp_model).toBe("claude-opus-4-5");
     // LLM-only fields must not leak into the ACP settings payload.
@@ -1506,7 +1507,8 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(payload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/claude-agent-acp@0.44.0",
+      "@agentclientprotocol/claude-agent-acp@0.63.0",
+      "--dangerously-skip-permissions",
     ]);
   });
 
@@ -1528,7 +1530,7 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(payload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/codex-acp@1.1.2",
+      "@agentclientprotocol/codex-acp@1.1.7",
     ]);
   });
 
@@ -1675,7 +1677,8 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(acpPayload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/claude-agent-acp@0.44.0",
+      "@agentclientprotocol/claude-agent-acp@0.63.0",
+      "--dangerously-skip-permissions",
     ]);
     expect(acpPayload.agent_settings.acp_model).toBe("claude-opus-4-5");
     // acp_env is no longer a forwarded ACP setting — a stale value on saved

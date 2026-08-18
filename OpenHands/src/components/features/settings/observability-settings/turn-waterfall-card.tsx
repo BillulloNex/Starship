@@ -102,8 +102,10 @@ function buildTurnsFromEvents(events: OHEvent[]): TurnData[] {
     let stepIndex = 0;
 
     for (const event of group) {
-      const eventTime =
-        "timestamp" in event ? new Date(event.timestamp).getTime() : startMs;
+      const eventTimestamp = "timestamp" in event ? event.timestamp : undefined;
+      const eventTime = eventTimestamp
+        ? new Date(eventTimestamp).getTime()
+        : startMs;
       const offsetMs = Math.max(0, eventTime - startMs);
 
       if (isUserMessageEvent(event)) {
@@ -130,10 +132,13 @@ function buildTurnsFromEvents(events: OHEvent[]): TurnData[] {
             "action_id" in e &&
             e.action_id === event.id,
         );
-        const obTime =
+        const matchingObsTimestamp =
           matchingObs && "timestamp" in matchingObs
-            ? new Date(matchingObs.timestamp).getTime()
-            : eventTime;
+            ? matchingObs.timestamp
+            : undefined;
+        const obTime = matchingObsTimestamp
+          ? new Date(matchingObsTimestamp).getTime()
+          : eventTime;
         const durationMs = Math.max(0, obTime - eventTime);
 
         steps.push({

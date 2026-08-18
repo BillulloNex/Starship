@@ -166,19 +166,6 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
       label: model.label,
     })) ?? [];
 
-  if (key === "claude-code") {
-    const hasOpus5 = available_models.some(
-      (m) => m.id === "claude-5-opus" || m.id === "claude-opus-5",
-    );
-    if (!hasOpus5) {
-      // Add Claude 5 Opus to the suggested list
-      available_models.splice(1, 0, {
-        id: "claude-5-opus",
-        label: "Claude 5 Opus",
-      });
-    }
-  }
-
   return {
     key,
     display_name: info?.display_name ?? key,
