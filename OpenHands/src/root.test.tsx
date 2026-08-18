@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { displayErrorToast } from "#/utils/custom-toast-handlers";
 import {
   setActiveSelection,
   setRegisteredBackends,
@@ -15,7 +16,7 @@ import { CLOUD_BACKEND_API_KEY_OR_NETWORK_ERROR } from "#/hooks/query/use-backen
 import type { Backend } from "#/api/backend-registry/types";
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import { ONBOARDING_COMPLETED_STORAGE_KEY } from "#/components/features/onboarding/use-onboarding-completion";
-import App from "#/root";
+import App, { AppToaster } from "#/root";
 
 // The recovery screen lazy-loads the Manage Backends modal; stub it so the test
 // asserts the routing decision rather than the modal's internals.
@@ -89,5 +90,34 @@ describe("App root — active cloud backend connectivity gate", () => {
       await screen.findByTestId("agent-server-onboarding-screen"),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("app-outlet-content")).not.toBeInTheDocument();
+  });
+
+  it("renders a close button on error toasts and dismisses when clicked", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    render(<AppToaster />);
+
+    act(() => {
+      displayErrorToast("This conversation does not exist");
+    });
+
+    const closeButton = await screen.findByRole("button", {
+      name: "Close notification",
+    });
+    expect(closeButton).toBeInTheDocument();
+
+    fireEvent.click(closeButton);
   });
 });

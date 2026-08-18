@@ -20,7 +20,8 @@ import {
   reloadOnChunkError,
 } from "#/utils/handle-chunk-load-error";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Toaster } from "react-hot-toast";
+import toast, { ToastBar, Toaster } from "react-hot-toast";
+import { X } from "lucide-react";
 import {
   clearCachedAgentServerInfo,
   isAgentServerUnavailableError,
@@ -139,6 +140,37 @@ const PRE_HYDRATION_ERROR_HANDLER = `(function(){
   window.addEventListener('unhandledrejection',function(e){if(isChunkErr(null,e.reason)){recover();}});
 })();`;
 
+export function AppToaster() {
+  return (
+    <Toaster toastOptions={TOAST_OPTIONS}>
+      {(t) => (
+        <ToastBar toast={t}>
+          {({ icon, message }) => (
+            <>
+              {icon}
+              {message}
+              {t.type !== "loading" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.dismiss(t.id);
+                  }}
+                  className="ml-auto shrink-0 self-start rounded p-1 text-[var(--oh-muted,#9ca3af)] hover:bg-white/10 hover:text-white transition-colors cursor-pointer -mr-1 mt-0.5"
+                  /* eslint-disable-next-line i18next/no-literal-string */
+                  aria-label="Close notification"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              )}
+            </>
+          )}
+        </ToastBar>
+      )}
+    </Toaster>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -155,7 +187,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <AgentServerUIRoot contentClassName="min-h-screen">
           <ColorThemeApplier />
           {children}
-          <Toaster toastOptions={TOAST_OPTIONS} />
+          <AppToaster />
           <div id="modal-portal-exit" />
         </AgentServerUIRoot>
         <ScrollRestoration />
