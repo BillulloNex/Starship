@@ -182,7 +182,11 @@ export function ChatInputLlmProfilePicker() {
       <button
         ref={triggerRef}
         type="button"
-        className={cn(chatInputPillButtonClassName, "max-w-[200px]")}
+        className={cn(
+          chatInputPillButtonClassName,
+          "max-w-[200px]",
+          isPopoverOpen && "bg-white/20 border-white/30 text-white",
+        )}
         title={currentProfileName ?? undefined}
         data-testid="chat-input-llm-profile"
         aria-expanded={isPopoverOpen}

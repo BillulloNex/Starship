@@ -162,8 +162,11 @@ export function ChatInputModel() {
       <button
         ref={triggerRef}
         type="button"
-        className={chatInputPillButtonClassName}
-        title={model.displayModel}
+        className={cn(
+          chatInputPillButtonClassName,
+          isPopoverOpen && "bg-white/20 border-white/30 text-white",
+        )}
+        title={model.displayModel ?? undefined}
         data-testid="chat-input-llm-model"
         aria-expanded={isPopoverOpen}
         aria-haspopup="dialog"

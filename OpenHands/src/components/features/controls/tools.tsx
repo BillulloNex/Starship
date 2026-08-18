@@ -56,7 +56,11 @@ export function Tools() {
     <div className="relative">
       <button
         type="button"
-        className={cn(chatInputPillButtonClassName, "group flex")}
+        className={cn(
+          chatInputPillButtonClassName,
+          "group flex",
+          contextMenuOpen && "bg-white/20 border-white/30 text-white",
+        )}
         onClick={handleClick}
       >
         <Wrench

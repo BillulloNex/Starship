@@ -45,17 +45,17 @@ export const formControlTransformTransitionClassName = cn(
 export const formControlMutedHoverClassName =
   "hover:text-white hover:bg-white/10";
 
-/** Text/icon pill triggers in the chat input actions row. */
+/** Text/icon pill triggers in the chat input actions row (elevated frosted style). */
 export const chatInputPillButtonClassName = cn(
-  "inline-flex items-center gap-1.5 rounded-lg border border-white/5 bg-[var(--oh-surface)] px-2.5 py-1",
-  "text-xs font-medium leading-5 text-[var(--oh-foreground)] whitespace-nowrap min-w-0 cursor-pointer shadow-sm",
+  "inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1",
+  "text-xs font-medium leading-5 text-white whitespace-nowrap min-w-0 cursor-pointer shadow-xs backdrop-blur-xs",
   formControlTransitionClassName,
-  "hover:bg-[var(--oh-interactive-hover)] hover:text-white hover:border-white/10",
+  "hover:bg-white/15 hover:border-white/25 hover:text-white active:bg-white/20",
 );
 
 /** Circular/rounded icon triggers in the chat input actions row. */
 export const chatInputIconButtonClassName = cn(
-  "flex items-center justify-center rounded-lg text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-interactive-hover)] cursor-pointer p-1 transition-all",
+  "flex items-center justify-center rounded-lg text-[var(--oh-muted)] hover:text-white hover:bg-white/10 cursor-pointer p-1",
   formControlTransitionClassName,
 );
 
