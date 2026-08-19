@@ -3,7 +3,6 @@ import { ExternalLink } from "lucide-react";
 import { Typography } from "#/ui/typography";
 import { I18nKey } from "#/i18n/declaration";
 import { SidebarNavLink } from "#/components/features/sidebar/sidebar-nav-link";
-import { BackendSyncedSettingsBadge } from "#/components/features/settings/backend-synced-settings-badge";
 import { useActiveBackendContext } from "#/contexts/active-backend-context";
 import { isNoBackend } from "#/api/backend-registry/active-store";
 import { cn } from "#/utils/utils";
@@ -76,9 +75,6 @@ export function ExtensionsMobileHub() {
           );
         })}
       </nav>
-      <div className="pt-1">
-        <BackendSyncedSettingsBadge />
-      </div>
     </div>
   );
 }
