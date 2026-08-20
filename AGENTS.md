@@ -34,19 +34,41 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 
 - `/projects/Grokbot` is the persisted clone (keep work here, not ephemeral workspace).
 - `OpenHands/` is the upstream agent-canvas app (frontend + services). Grokbot customizations live alongside upstream code.
-- `Dockerfile` builds a combined image (agent-server + automation + frontend) and deploys via Coolify on push to `main`.
+- `Dockerfile` builds the backend image (agent-server + automation) deployed via Coolify.
+- `scripts/deploy-frontend.sh` builds the Vite SPA and deploys it to **Cloudflare Pages**.
 - `OpenHands/config/defaults.json` holds version pins; `OpenHands/package.json` is the upstream npm version — do not confuse with Grokbot's `VERSION`.
 
-## Deployment Workflow (CRITICAL — Auto-Deploy via GitHub App)
+## Deployment Workflow (CRITICAL — Frontend vs Backend)
 
-- **Pushing or merging to `main` automatically triggers Coolify deployment.** Coolify is connected to GitHub via the GitHub App and automatically queues a build upon every push.
+Grokbot has a **split deployment**: the frontend and backend deploy separately.
+
+### Frontend → Cloudflare Pages (MANDATORY for all UI/frontend changes)
+
+- **Any change under `OpenHands/src/`, `OpenHands/public/`, or any file that affects the Vite build MUST be deployed via Cloudflare Pages.**
+- **How to deploy frontend:**
+  ```bash
+  ./scripts/deploy-frontend.sh
+  ```
+  This runs `npm --prefix OpenHands run build` then `npx wrangler pages deploy` to push the static build globally.
+- **DO NOT rely on the Coolify Docker build to deploy frontend changes.** The production frontend is served from Cloudflare Pages, not from the Docker container.
+- Run `npm --prefix OpenHands run lint` / `build` before deploying to catch errors early.
+
+### Backend → Coolify (auto-deploy on push to main)
+
+- **Pushing or merging to `main` automatically triggers Coolify deployment** for the backend Docker container (agent-server, automation server). Coolify is connected via the GitHub App.
 - **NEVER call the manual Coolify `deploy` tool after pushing to `main`.** Doing so creates a duplicate deployment of the exact same commit.
-- **How to monitor and verify deployment:**
+- **How to monitor and verify backend deployment:**
   1. Commit and push/merge to `main`.
   2. Coolify will automatically start building within ~5 seconds.
   3. Use `list_deployments` or `deployment(action: "get")` (read-only monitoring) to watch the build until status is `finished`.
   4. Verify production health via `curl -s http://grok.beenex.org/health`.
-- Run `npm --prefix OpenHands run lint` / `build` when touching frontend code; keep diffs minimal.
+
+### Combined changes (frontend + backend)
+
+When a change touches both frontend and backend code:
+1. Commit and push to `main` (triggers Coolify backend deploy automatically).
+2. Run `./scripts/deploy-frontend.sh` to deploy the frontend to Cloudflare Pages.
+3. Verify both are live.
 
 ## Environment Variables (Coolify as Source of Truth)
 
@@ -54,11 +76,11 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 - **Never commit secrets, tokens, or environment values to Git.** (`.env.local` is strictly for local machine testing and is git-ignored).
 - **Managing Environment Variables:**
   - **Runtime Variables** (backend API keys, server settings, ports): Configure in Coolify under `grokbot` $\rightarrow$ Environment Variables with **Build-Time: No**. Updating these requires a container restart/redeploy.
-  - **Build-Time Variables** (frontend `VITE_*` variables): Configure in Coolify under `grokbot` $\rightarrow$ Environment Variables with **Build-Time: Yes**. Updating these requires a full rebuild/redeploy so Vite bakes them into the static assets.
+  - **Build-Time Variables** (frontend `VITE_*` variables): These are baked in at build time by `scripts/deploy-frontend.sh`. Set them in the environment before running the deploy script, or configure them in Cloudflare Pages dashboard.
 - **Introducing New Variables in Code:**
-  1. Frontend: Declare the `ARG` and `ENV` in `Dockerfile` (lines 33–60) and access via `import.meta.env.VITE_*`.
-  2. Backend: Access via `process.env.*` or `os.environ.get(*)`.
-  3. Bump version, commit code changes to Git, and set the actual value in Coolify.
+  1. Frontend: Access via `import.meta.env.VITE_*`. Ensure the variable is available at build time when running `deploy-frontend.sh`.
+  2. Backend: Access via `process.env.*` or `os.environ.get(*)`. Set the value in Coolify.
+  3. Bump version, commit code changes to Git.
 
 ## Live App Preview (shareable URLs)
 
