@@ -1,6 +1,7 @@
 import { ACP_SETTINGS_KEYS } from "@openhands/typescript-client";
 import { ServerClient } from "@openhands/typescript-client/clients";
 import { SKILLS_CATALOG } from "@openhands/extensions/skills";
+import { GROKBOT_BUILTIN_SKILLS } from "#/constants/grokbot-builtin-skills";
 import { DEFAULT_SETTINGS } from "#/services/settings";
 import { ExecutionStatus } from "#/types/agent-server/core";
 import { AgentKind, Settings, SettingsValue } from "#/types/settings";
@@ -293,21 +294,28 @@ export function buildRuntimeServicesSystemSuffix(
     const reserved = appPreview.reserved_ports ?? [];
     lines.push(
       "",
-      "PUBLIC WEB APPLICATION DEPLOYMENTS & PREVIEWS (PERMANENT & SHAREABLE)",
-      "Whenever the user asks you to build, create, or host a web app / website / game / demo / landing page / tool:",
-      "1. STATIC APPS & GAMES (HTML/JS/CSS, Canvas Games, SPAs, React/Vite builds):",
-      "   • ALWAYS deploy static web apps directly to Cloudflare Pages for permanent, 24/7/365 global edge hosting.",
-      "   • Deploy in 1 step: `grokbot-deploy <dir> --name <app-slug>` (e.g. `grokbot-deploy ./workspace --name space-invaders` or `grokbot-app deploy-pages ./dist --name my-game`).",
-      "   • In your final response, ALWAYS give the user their permanent live URL: 👉 https://<app-slug>.pages.dev",
-      "   • NEVER start an unmanaged `python -m http.server` or temporary foreground server when asked for a shareable link — subshell processes terminate when command turns finish!",
+      "PUBLIC WEB APPLICATION DEPLOYMENTS & LIVE PREVIEWS (PERMANENT & SHAREABLE)",
+      "Whenever the user asks you to build, create, modify, or host a web app / website / game / demo / landing page / tool:",
       "",
-      "2. DYNAMIC FULL-STACK APPS (Stateful Node.js / Python / FastAPI / WebSocket backends):",
+      "1. LIVE APPLICATION PREVIEW IN CANVAS (AUTOMATIC BACKGROUND SERVER):",
+      "   • When creating or updating ANY web app (HTML/CSS/JS, Vite, Next.js, Flask, FastAPI), ALWAYS start the web server in the background inside this container (e.g. `npx -y serve . -p 3000 &` or `python3 -m http.server 3000 &` or `npm run dev -- --host 0.0.0.0 --port 3000 &`).",
+      "   • Starting a server immediately renders the live app in the user's interactive Canvas Browser tab (and provides public link: https://p3000.beenex.org).",
+      "   • NEVER tell the user to manually serve files locally or visit `http://localhost:<port>` on their machine!",
+      "",
+      "2. PERMANENT EDGE HOSTING (Cloudflare Pages):",
+      "   • For static web apps & games that need a permanent 24/7/365 shareable URL, deploy in 1 step: `grokbot-deploy <dir> --name <app-slug>` (e.g. `grokbot-deploy ./ --name space-invaders` or `grokbot-deploy ./dist --name my-game`).",
+      "   • In your final response, ALWAYS deliver the permanent live URL: 👉 https://<app-slug>.pages.dev",
+      "   • NEVER run an unmanaged foreground server for permanent shareable requests.",
+      "",
+      "3. DYNAMIC FULL-STACK APPS (Stateful Node.js / Python / FastAPI / WebSocket backends):",
       "   • Place project files in `/projects/<app-name>` (e.g. `/projects/chat-backend`) so the app is saved in the persistent volume.",
-      "   • Register with: `grokbot-app register <app-name> --port <port> --dir /projects/<app-name> --start-cmd \"<start command>\"`.",
+      '   • Register with: `grokbot-app register <app-name> --port <port> --dir /projects/<app-name> --start-cmd "<start command>"`.',
       "   • Start your backend in the background bound to 0.0.0.0, and hand the user: 👉 https://<app-name>.beenex.space",
       "   • To stop/remove a dynamic app: `grokbot-app stop <app-name> --unregister`.",
       "",
-      "CRITICAL: Never give a localhost URL (e.g. http://localhost:8080) to the user. Always deliver their public live URL!",
+      "4. STRICT GUARDRAILS & FORBIDDEN ACTIONS:",
+      "   • NEVER use GITHUB_TOKEN or GITHUB_PERSONAL_ACCESS_TOKEN to create a new public GitHub repository or enable GitHub Pages for user demos/previews unless the user explicitly requests: 'Create a GitHub repository'.",
+      "   • NEVER give localhost URLs (e.g. http://localhost:8080) to the user. Always deliver their public live URL!",
     );
     if (reserved.length > 0) {
       lines.push(
@@ -764,7 +772,8 @@ interface BundledSkill {
  * Skills with no triggers get `trigger: null` (always-active / on-demand).
  */
 function buildBundledSkills(): BundledSkill[] {
-  return SKILLS_CATALOG.map((entry) => {
+  const allSkills = [...GROKBOT_BUILTIN_SKILLS, ...SKILLS_CATALOG];
+  return allSkills.map((entry) => {
     const trigger: BundledSkill["trigger"] =
       entry.triggers?.length > 0
         ? { type: "keyword", keywords: entry.triggers }

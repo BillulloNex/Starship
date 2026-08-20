@@ -37,6 +37,7 @@ vi.mock("@openhands/extensions/skills", () => ({
 }));
 
 import SkillsService from "#/api/skills-service";
+import { GROKBOT_BUILTIN_SKILLS } from "#/constants/grokbot-builtin-skills";
 
 const localBackend: Backend = {
   id: "local",
@@ -88,11 +89,13 @@ describe("SkillsService.getSkills against the agent-server backend", () => {
 
     // Result = local skills first, then all bundled public skills.
     expect(skills[0]?.name).toBe("my-custom-skill");
-    expect(skills).toHaveLength(1 + MOCK_PUBLIC_CATALOG.length);
+    expect(skills).toHaveLength(
+      1 + GROKBOT_BUILTIN_SKILLS.length + MOCK_PUBLIC_CATALOG.length,
+    );
 
     // Every public skill from the bundled catalog is present.
     const publicNames = skills.slice(1).map((s) => s.name);
-    for (const entry of MOCK_PUBLIC_CATALOG) {
+    for (const entry of [...GROKBOT_BUILTIN_SKILLS, ...MOCK_PUBLIC_CATALOG]) {
       expect(publicNames).toContain(entry.name);
     }
     expect(skills.slice(1).every((s) => s.source === "public")).toBe(true);
@@ -103,7 +106,9 @@ describe("SkillsService.getSkills against the agent-server backend", () => {
 
     const skills = await SkillsService.getSkills();
 
-    expect(skills).toHaveLength(MOCK_PUBLIC_CATALOG.length);
+    expect(skills).toHaveLength(
+      GROKBOT_BUILTIN_SKILLS.length + MOCK_PUBLIC_CATALOG.length,
+    );
     expect(skills.every((s) => s.source === "public")).toBe(true);
   });
 });
