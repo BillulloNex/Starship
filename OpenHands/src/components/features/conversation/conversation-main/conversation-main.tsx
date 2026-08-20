@@ -1,4 +1,6 @@
 import { cn } from "#/utils/utils";
+import "#/styles/agent-phase-glow.css";
+import { useAgentPhaseStore } from "#/stores/agent-phase-store";
 import { ChatInterfaceWrapper } from "./chat-interface-wrapper";
 import { ConversationTabContent } from "../conversation-tabs/conversation-tab-content/conversation-tab-content";
 import { ConversationNameWithStatus } from "../conversation-name-with-status";
@@ -22,6 +24,7 @@ export function ConversationMain() {
   const isMobile = useBreakpoint();
   const isSidebarRailHidden = useBreakpoint(SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH);
   const { isRightPanelShown } = useConversationStore();
+  const agentPhaseClass = useAgentPhaseStore((s) => s.phaseClass);
 
   const { leftWidth, rightWidth, isDragging, containerRef, handleMouseDown } =
     useResizablePanels({
@@ -58,6 +61,7 @@ export function ConversationMain() {
         <div
           className={cn(
             "flex flex-col bg-base overflow-hidden",
+            agentPhaseClass,
             isMobile ? "flex-1" : "transition-all duration-300 ease-in-out",
           )}
           // panel width computed at runtime by resize hook; transition toggled by drag state

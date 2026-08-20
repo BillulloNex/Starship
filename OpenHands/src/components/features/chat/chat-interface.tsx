@@ -1,5 +1,6 @@
 import React from "react";
 import "#/styles/agent-phase-glow.css";
+import { useAgentPhaseStore } from "#/stores/agent-phase-store";
 import { useNavigate } from "react-router";
 import { useTracking } from "#/hooks/use-tracking";
 import { useTranslation } from "react-i18next";
@@ -109,6 +110,15 @@ export function ChatInterface() {
   const { curAgentState } = useAgentState();
   const { handleBuildPlanClick } = useHandleBuildPlanClick();
   const agentPhaseClass = useAgentPhaseClass(allConversationEvents);
+
+  // Sync the phase class into a store so the full-width chat pane in
+  // ConversationMain can read it and render the gradient across the
+  // entire panel — not just the 800px content column.
+  const setPhaseClass = useAgentPhaseStore((s) => s.setPhaseClass);
+  React.useEffect(() => {
+    setPhaseClass(agentPhaseClass);
+    return () => setPhaseClass(null);
+  }, [agentPhaseClass, setPhaseClass]);
 
   // Cloud conversations whose sandbox is MISSING or ERROR are read-only:
   // the sandbox is gone and cannot be resumed, so we hide the chat input
@@ -477,7 +487,7 @@ export function ChatInterface() {
   return (
     <ScrollProvider value={scrollProviderValue}>
       <div
-        className={`relative flex h-full flex-col justify-between px-4${agentPhaseClass ? ` ${agentPhaseClass}` : ""}`}
+        className="relative flex h-full flex-col justify-between px-4"
         data-testid="chat-interface"
       >
         {!hasSubstantiveAgentActions &&
