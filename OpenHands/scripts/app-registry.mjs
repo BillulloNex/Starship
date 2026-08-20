@@ -8,7 +8,7 @@
 
 import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { spawn } from "node:child_process";
+import { spawn, exec } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { DEFAULT_BLOCKED_PORTS, isPreviewablePort, listListeningPorts } from "./preview-proxy.mjs";
@@ -283,3 +283,73 @@ export async function autoStartApps(options = {}) {
 
   return results;
 }
+
+/**
+ * Stops an application by killing processes listening on its port.
+ */
+export async function stopApp(name, registryPath = DEFAULT_REGISTRY_PATH) {
+  const app = await getApp(name, registryPath);
+  if (!app) {
+    throw new Error(`App "${name}" not found in registry.`);
+  }
+
+  const { port } = app;
+  return new Promise((resolve) => {
+    exec(`fuser -k ${port}/tcp 2>/dev/null || (lsof -t -i :${port} | xargs kill -9 2>/dev/null) || true`, (err) => {
+      resolve({ success: true, name, port });
+    });
+  });
+}
+
+/**
+ * Starts a single registered application.
+ */
+export async function startApp(name, registryPath = DEFAULT_REGISTRY_PATH) {
+  const app = await getApp(name, registryPath);
+  if (!app) {
+    throw new Error(`App "${name}" not found in registry.`);
+  }
+
+  let listening = [];
+  try {
+    listening = await listListeningPorts();
+  } catch {}
+  if (listening.includes(app.port)) {
+    return { success: true, name, status: "already_running", port: app.port };
+  }
+
+  if (!app.dir || !existsSync(app.dir)) {
+    throw new Error(`App directory "${app.dir}" does not exist.`);
+  }
+
+  let cmd = app.start_cmd;
+  if (!cmd) {
+    if (existsSync(path.join(app.dir, "package.json"))) {
+      cmd = `npm run dev -- --port ${app.port} --host 0.0.0.0`;
+    } else if (existsSync(path.join(app.dir, "server.js"))) {
+      cmd = `node server.js`;
+    } else if (existsSync(path.join(app.dir, "index.html"))) {
+      cmd = `npx serve -l ${app.port} .`;
+    }
+  }
+
+  if (!cmd) {
+    throw new Error(`No start command found or specified for app "${name}".`);
+  }
+
+  const child = spawn(cmd, {
+    cwd: app.dir,
+    shell: true,
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      PORT: String(app.port),
+      HOST: "0.0.0.0",
+    },
+  });
+  child.unref();
+
+  return { success: true, name, status: "started", port: app.port, pid: child.pid };
+}
+

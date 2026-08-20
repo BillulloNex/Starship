@@ -4,6 +4,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  Globe,
   Plus,
   Server,
   Settings,
@@ -186,6 +187,13 @@ export function SidebarRailBody({
           testId="sidebar-observability-link"
           collapsed={collapsed}
           icon={<Activity width={ICON_SIZE} height={ICON_SIZE} />}
+        />
+        <SidebarNavLink
+          to="/apps"
+          label="Web Apps"
+          testId="sidebar-apps-link"
+          collapsed={collapsed}
+          icon={<Globe width={ICON_SIZE} height={ICON_SIZE} />}
         />
       </nav>
 

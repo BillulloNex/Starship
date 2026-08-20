@@ -58,6 +58,8 @@ import {
   registerApp,
   unregisterApp,
   getApp,
+  startApp,
+  stopApp,
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
 
@@ -682,15 +684,44 @@ async function handlePreviewPortsRequest(
   res.end(body);
 }
 
-async function handlePreviewAppsRequest(req, res, registryPath) {
+async function handlePreviewAppsRequest(
+  req,
+  res,
+  registryPath,
+  blockedPorts = [],
+  infrastructurePorts = new Set(),
+) {
   applyCorsHeaders(req, res);
   if (req.method === "GET") {
-    const apps = await listApps(registryPath);
+    const rawApps = await listApps(registryPath);
+    let listening = [];
+    try {
+      listening = await listListeningPorts(
+        blockedPorts,
+        undefined,
+        infrastructurePorts,
+      );
+    } catch {}
+
+    const listeningSet = new Set(listening);
+    const registeredPorts = new Set();
+    const apps = rawApps.map((app) => {
+      registeredPorts.add(app.port);
+      return {
+        ...app,
+        is_listening: listeningSet.has(app.port),
+        url_space: `https://${app.name}.beenex.space`,
+        url_org: `https://${app.name}.beenex.org`,
+      };
+    });
+
+    const unassignedPorts = listening.filter((p) => !registeredPorts.has(p));
+
     res.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end(JSON.stringify(apps));
+    res.end(JSON.stringify({ apps, listening, unassignedPorts }));
     return;
   }
 
@@ -703,6 +734,28 @@ async function handlePreviewAppsRequest(req, res, registryPath) {
     req.on("end", async () => {
       try {
         const payload = JSON.parse(body || "{}");
+        const { action, name } = payload;
+
+        if (action === "start") {
+          if (!name) throw new Error("Missing app name for start action");
+          const result = await startApp(name, registryPath);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          res.end(JSON.stringify({ success: true, ...result }));
+          return;
+        }
+
+        if (action === "stop") {
+          if (!name) throw new Error("Missing app name for stop action");
+          const result = await stopApp(name, registryPath);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          res.end(JSON.stringify({ success: true, ...result }));
+          return;
+        }
+
         const record = await registerApp(payload, registryPath);
         res.writeHead(200, {
           "Content-Type": "application/json; charset=utf-8",
@@ -728,6 +781,10 @@ async function handlePreviewAppsRequest(req, res, registryPath) {
       res.end(JSON.stringify({ success: false, error: "Missing ?name=" }));
       return;
     }
+    // Optionally stop port before unregistering
+    try {
+      await stopApp(name, registryPath);
+    } catch {}
     const success = await unregisterApp(name, registryPath);
     res.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
@@ -829,8 +886,13 @@ export function startStaticServer(config) {
     }
 
     if (parsedUrl.pathname === PREVIEW_APPS_PATH) {
-      handlePreviewAppsRequest(req, res, config.appsRegistryPath).catch(
-        (err) => {
+      handlePreviewAppsRequest(
+        req,
+        res,
+        config.appsRegistryPath,
+        blockedPreviewPorts,
+        infrastructurePorts,
+      ).catch((err) => {
           console.error("Preview apps error:", err);
           if (!res.headersSent) {
             res.writeHead(500, { "Content-Type": "application/json" });

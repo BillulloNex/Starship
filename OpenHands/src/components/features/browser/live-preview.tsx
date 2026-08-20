@@ -9,6 +9,7 @@ import {
   buildPreviewUrl,
   usePreviewPorts,
 } from "#/hooks/query/use-preview-ports";
+import { useApps, type AppRecord } from "#/hooks/query/use-apps";
 import { ConversationTabEmptyState } from "#/components/features/conversation/conversation-tab-empty-state";
 
 const iconButtonClassName = cn(
@@ -31,7 +32,16 @@ export function LivePreview() {
   const { previewPort, previewReloadCounter, setPreviewPort, reloadPreview } =
     useBrowserStore();
   const { data, isLoading } = usePreviewPorts();
+  const { data: appsData } = useApps();
   const [didCopy, setDidCopy] = useState(false);
+
+  const registeredAppByPort = useMemo(() => {
+    const map = new Map<number, AppRecord>();
+    for (const app of appsData?.apps || []) {
+      map.set(app.port, app);
+    }
+    return map;
+  }, [appsData?.apps]);
 
   // Every listening port is previewable — the proxy matches preview hostnames
   // by pattern, so there is no per-port registration to fall out of sync with.
@@ -47,8 +57,9 @@ export function LivePreview() {
   }, [previewPort, previewable, setPreviewPort]);
 
   const activePort = previewPort ?? previewable[0] ?? null;
+  const activeApp = activePort ? registeredAppByPort.get(activePort) : null;
   const previewUrl = activePort
-    ? buildPreviewUrl(data?.urlTemplate ?? null, activePort)
+    ? (activeApp?.url_space || buildPreviewUrl(data?.urlTemplate ?? null, activePort))
     : null;
 
   useEffect(() => {
@@ -109,11 +120,14 @@ export function LivePreview() {
               "bg-[var(--oh-surface-raised)] px-1.5 text-xs text-[var(--oh-text-tertiary)]",
             )}
           >
-            {previewable.map((port) => (
-              <option key={port} value={port}>
-                :{port}
-              </option>
-            ))}
+            {previewable.map((port) => {
+              const app = registeredAppByPort.get(port);
+              return (
+                <option key={port} value={port}>
+                  {app ? `${app.title || app.name} (:${port})` : `:${port}`}
+                </option>
+              );
+            })}
           </select>
         ) : null}
 
