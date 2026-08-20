@@ -74,12 +74,22 @@ function syncLauncherDefaultLocalBackend(backends: Backend[]): Backend[] {
 
   let didSync = false;
   const syncedBackends = backends.map((backend) => {
+    // Automatically migrate old grok.beenex.org backend URLs to grok-api.beenex.org
+    if (backend.host === "https://grok.beenex.org" || backend.host === "http://grok.beenex.org") {
+      didSync = true;
+      return {
+        ...backend,
+        host: defaultBackend.host,
+        ...(defaultBackend.apiKey ? { apiKey: defaultBackend.apiKey } : {}),
+      };
+    }
+
     if (!shouldSyncLauncherDefaultLocalBackend(backend, defaultBackend)) {
       return backend;
     }
 
     if (
-      backend.apiKey === defaultBackend.apiKey &&
+      (!defaultBackend.apiKey || backend.apiKey === defaultBackend.apiKey) &&
       backend.host === defaultBackend.host
     ) {
       return backend;
@@ -89,7 +99,7 @@ function syncLauncherDefaultLocalBackend(backends: Backend[]): Backend[] {
     return {
       ...backend,
       host: defaultBackend.host,
-      apiKey: defaultBackend.apiKey,
+      ...(defaultBackend.apiKey ? { apiKey: defaultBackend.apiKey } : {}),
     };
   });
 

@@ -56,9 +56,9 @@ export function makeDefaultLocalBackend(): Backend | null {
   if (getLockedCloudHost()) return null;
 
   const host = getAgentServerBaseUrl();
-  const apiKey = getAgentServerSessionApiKey();
+  const apiKey = getAgentServerSessionApiKey() ?? "";
 
-  if (!host || !apiKey) return null;
+  if (!host) return null;
 
   return {
     id: SEEDED_DEFAULT_BACKEND_ID,
