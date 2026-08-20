@@ -477,7 +477,7 @@ export function ChatInterface() {
   return (
     <ScrollProvider value={scrollProviderValue}>
       <div
-        className="relative flex h-full flex-col justify-between px-4"
+        className={`relative flex h-full flex-col justify-between px-4${agentPhaseClass ? ` agent-phase-glow ${agentPhaseClass}` : ""}`}
         data-testid="chat-interface"
       >
         {!hasSubstantiveAgentActions &&
@@ -507,7 +507,7 @@ export function ChatInterface() {
             maybeLoadOlder(e.currentTarget);
           }}
           onWheel={handleWheelForPagination}
-          className={`custom-scrollbar-always flex min-h-0 grow flex-col gap-2 overflow-x-hidden overflow-y-auto px-0 pt-4 pb-8 md:px-4${agentPhaseClass ? ` agent-phase-glow ${agentPhaseClass}` : ""}`}
+          className="custom-scrollbar-always flex min-h-0 grow flex-col gap-2 overflow-x-hidden overflow-y-auto px-0 pt-4 pb-8 md:px-4"
         >
           {isChatLoading && isReturningToConversation && (
             <ChatMessagesSkeleton />
