@@ -60,3 +60,20 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
   2. Backend: Access via `process.env.*` or `os.environ.get(*)`.
   3. Bump version, commit code changes to Git, and set the actual value in Coolify.
 
+## Live App Preview (shareable URLs)
+
+- Apps the agent starts inside the container are exposed by **hostname**, not path:
+  `PREVIEW_HOST_PATTERN=p{port}.beenex.org` makes `https://p3000.beenex.org` proxy
+  1:1 to `127.0.0.1:3000`. No path rewriting, so absolute asset URLs, the app's own
+  `/api/*`, client-side routing, and WebSockets/HMR all work unmodified.
+- **Every previewable port needs a Traefik router**, created by listing the hostname
+  in the Coolify FQDN field. `PREVIEW_PORTS` (entrypoint default:
+  `3000,3001,4200,5000,5173,7860,8080,8501`) must stay in sync with that list — it is
+  what the UI advertises as shareable, so a mismatch shows users links that 404.
+- The stack's own ports (proxy 8000, agent-server 18000, automation 18001) are always
+  refused, and ports below 1024 are never proxied. Preview hostnames are **public** —
+  anyone with the link reaches the app, matching how `grok.beenex.org` already behaves.
+- A separate hostname is also a separate origin, which is deliberate: the session API
+  key lives in `localStorage` on the canvas origin, and previews must not be able to
+  read it.
+

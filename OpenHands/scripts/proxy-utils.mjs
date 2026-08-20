@@ -193,9 +193,25 @@ function once(fn) {
   };
 }
 
+/**
+ * Per-response override for the 502 body, stashed on the response object.
+ *
+ * httpxy surfaces upstream failures twice — once by rejecting the `proxy.web`
+ * promise and once through the proxy-level "error" event — and the event
+ * usually wins the race. Without somewhere shared to look, whichever fires
+ * first writes a plain-text `Bad Gateway`, and the caller's nicer handler then
+ * finds `headersSent` already true and silently does nothing.
+ */
+const ERROR_HANDLER = Symbol("proxyErrorHandler");
+
 function writeProxyError(res, message) {
   if (res.destroyed) return;
   if (!res.headersSent) {
+    const override = res[ERROR_HANDLER];
+    if (override) {
+      override(res);
+      return;
+    }
     res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
     res.end(`Bad Gateway: ${message}`);
     return;
@@ -236,7 +252,13 @@ export function createProxyHandlers({
     }
   });
 
-  function proxyHttp(req, res, target) {
+  /**
+   * @param {Function} [onError] - Replaces the default plain-text 502 body.
+   *   Used by the live-preview route, whose audience is whoever the user
+   *   shared the link with, not a developer reading `Bad Gateway: ECONNREFUSED`.
+   */
+  function proxyHttp(req, res, target, onError) {
+    if (onError) res[ERROR_HANDLER] = onError;
     metrics.activeHttpRequests += 1;
     metrics.totalHttpRequests += 1;
     const finish = once(() => {

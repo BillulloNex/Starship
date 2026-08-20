@@ -357,6 +357,36 @@ RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
   --agent-server-url "$AGENT_SERVER_URL" \
   --automation-url "$AUTOMATION_BASE_URL")"
 
+# ── Live app preview ─────────────────────────────────────────────────────────
+# Maps a public hostname to a port inside this container, so an app the agent
+# starts on localhost:3000 becomes shareable:
+#
+#   PREVIEW_HOST_PATTERN=p{port}.beenex.org
+#     -> https://p3000.beenex.org  reaches  127.0.0.1:3000
+#
+# Each concrete hostname needs DNS *and* a reverse-proxy route pointing at this
+# container. PREVIEW_PORTS declares which ones the operator actually published,
+# so the UI only offers links that resolve. Unset PREVIEW_HOST_PATTERN disables
+# the feature; the stack's own ports are always refused regardless.
+PREVIEW_HOST_PATTERN="${PREVIEW_HOST_PATTERN:-}"
+PREVIEW_PORTS="${PREVIEW_PORTS:-3000,3001,4200,5000,5173,7860,8080,8501}"
+PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
+
+PREVIEW_ARGS=()
+if [ -n "$PREVIEW_HOST_PATTERN" ]; then
+  PREVIEW_ARGS=(
+    --preview-host-pattern "$PREVIEW_HOST_PATTERN"
+    --preview-ports "$PREVIEW_PORTS"
+    --preview-url-scheme "$PREVIEW_URL_SCHEME"
+    --preview-block-port "$PORT"
+    --preview-block-port "$AGENT_SERVER_PORT"
+    --preview-block-port "$AUTOMATION_PORT"
+  )
+  log "Live app preview enabled: ${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN} (published ports: ${PREVIEW_PORTS})"
+else
+  log "Live app preview disabled (set PREVIEW_HOST_PATTERN to enable)"
+fi
+
 # EFFECTIVE_SESSION_KEY is set above from LOCAL_BACKEND_API_KEY or the persisted api-key.txt
 node /opt/agent-canvas/static-server.mjs \
   --port "$PORT" \
@@ -365,6 +395,7 @@ node /opt/agent-canvas/static-server.mjs \
   --base-path "$AGENT_CANVAS_BASE_PATH" \
   --session-api-key "$EFFECTIVE_SESSION_KEY" \
   --runtime-services-info "$RUNTIME_SERVICES_INFO" \
+  ${PREVIEW_ARGS[@]+"${PREVIEW_ARGS[@]}"} \
   --route "/api/automation=http://127.0.0.1:${AUTOMATION_PORT}" \
   --route "/api=http://127.0.0.1:${AGENT_SERVER_PORT}" \
   --route "/server_info=http://127.0.0.1:${AGENT_SERVER_PORT}" \

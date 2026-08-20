@@ -44,6 +44,15 @@ import {
 import { handleDatadogProxy } from "./datadog-proxy.mjs";
 import { handlePostHogProxy } from "./posthog-proxy.mjs";
 import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
+import {
+  DEFAULT_BLOCKED_PORTS,
+  createPreviewHostMatcher,
+  listListeningPorts,
+  writePreviewUnavailable,
+} from "./preview-proxy.mjs";
+
+/** Where the frontend reads the live-preview state from. */
+const PREVIEW_PORTS_PATH = "/api/preview/ports";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPA fallback helpers
@@ -92,6 +101,10 @@ export function parseArgs(argv = process.argv.slice(2)) {
     runtimeServicesInfo: null,
     lockToCloud: null,
     basePath: "/",
+    previewHostPattern: null,
+    previewRoutablePorts: [],
+    previewUrlScheme: "https",
+    previewBlockedPorts: [...DEFAULT_BLOCKED_PORTS],
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -136,6 +149,23 @@ export function parseArgs(argv = process.argv.slice(2)) {
       case "--base-path":
         config.basePath = normalizeBasePath(argv[++i]);
         break;
+      case "--preview-host-pattern":
+        config.previewHostPattern = argv[++i] || null;
+        break;
+      case "--preview-ports":
+        config.previewRoutablePorts = (argv[++i] || "")
+          .split(",")
+          .map((value) => Number.parseInt(value.trim(), 10))
+          .filter(Number.isInteger);
+        break;
+      case "--preview-url-scheme":
+        config.previewUrlScheme = argv[++i] || "https";
+        break;
+      case "--preview-block-port": {
+        const port = Number.parseInt(argv[++i], 10);
+        if (Number.isInteger(port)) config.previewBlockedPorts.push(port);
+        break;
+      }
 
       case "--auth-required":
         config.authRequired = true;
@@ -218,6 +248,21 @@ OPTIONS:
                                instead of SPA-fallbacking to index.html;
                                may be repeated. Useful in --frontend-only
                                mode to cleanly reject API paths.
+  --preview-host-pattern <pat> Enable live app preview. Requests whose Host
+                               matches <pat> (which must contain '{port}',
+                               e.g. 'p{port}.beenex.org') are proxied 1:1 to
+                               127.0.0.1:<port>, with no path rewriting.
+                               Requires a DNS record + proxy route per host.
+  --preview-ports <list>       Comma-separated ports that actually have a
+                               route pointing at this server, e.g.
+                               '3000,5173,8080'. Advertised to the frontend so
+                               it only offers share links that resolve.
+  --preview-url-scheme <s>     Scheme for advertised preview URLs
+                               (default: https — TLS usually terminates at an
+                               upstream CDN while the origin speaks http).
+  --preview-block-port <port>  Never proxy this port, even if it matches the
+                               host pattern; may be repeated. The stack's own
+                               ports (${DEFAULT_BLOCKED_PORTS.join(", ")}) are always blocked.
   -h, --help                   Show this help
 
 ROUTING:
@@ -586,6 +631,44 @@ async function handleStatic(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Live app preview
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Report what the frontend needs to render the preview picker:
+ *
+ *   listening — ports with a server answering on them right now, discovered
+ *               from /proc. This is "what the agent started".
+ *   routable  — ports the operator has published a hostname for. A port can
+ *               be listening but not routable (nothing outside can reach it),
+ *               so the two lists are reported separately rather than merged;
+ *               the UI needs to tell the user *why* a running app has no link.
+ *   template  — how to turn a port into a URL, so the share link is built from
+ *               deploy-time config rather than guessed in the browser.
+ */
+async function handlePreviewPortsRequest(res, config, blockedPorts) {
+  const enabled = Boolean(
+    config.previewHostPattern && config.previewHostPattern.includes("{port}"),
+  );
+  const listening = await listListeningPorts(blockedPorts);
+
+  const body = JSON.stringify({
+    enabled,
+    listening,
+    routable: config.previewRoutablePorts ?? [],
+    urlTemplate: enabled
+      ? `${config.previewUrlScheme}://${config.previewHostPattern}`
+      : null,
+  });
+
+  res.writeHead(200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(body);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Server
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -604,10 +687,43 @@ export function startStaticServer(config) {
   const rejectPrefixes = config.rejectPrefixes ?? [];
   const staticMiddleware = createStaticMiddleware(dirAbs);
 
+  const blockedPreviewPorts = config.previewBlockedPorts ?? DEFAULT_BLOCKED_PORTS;
+  const previewPortForHost = createPreviewHostMatcher(
+    config.previewHostPattern,
+    blockedPreviewPorts,
+  );
+
   const uninstallDiagnostics = proxy.installDiagnostics();
 
   const server = createServer((req, res) => {
+    // Live app preview is matched on Host before anything else: a preview
+    // hostname must never fall through to the canvas SPA, its API routes, or
+    // the static handler, all of which are keyed on path alone.
+    const previewPort = previewPortForHost?.(req.headers.host) ?? null;
+    if (previewPort !== null) {
+      proxy.proxyHttp(
+        req,
+        res,
+        `http://127.0.0.1:${previewPort}`,
+        (errorRes) => writePreviewUnavailable(errorRes, previewPort),
+      );
+      return;
+    }
+
     const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+
+    if (parsedUrl.pathname === PREVIEW_PORTS_PATH) {
+      handlePreviewPortsRequest(res, config, blockedPreviewPorts).catch(
+        (err) => {
+          console.error("Preview ports error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
+      return;
+    }
     if (parsedUrl.pathname.startsWith("/api/observability/datadog")) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
       handleDatadogProxy(req, res, parsedUrl.pathname, query).catch((err) => {
@@ -675,6 +791,15 @@ export function startStaticServer(config) {
   });
 
   server.on("upgrade", (req, socket, head) => {
+    // Same Host-first ordering as the request handler — without this, a
+    // previewed app's WebSocket (Vite HMR, most notably) would be matched
+    // against the canvas route table and dropped.
+    const previewPort = previewPortForHost?.(req.headers.host) ?? null;
+    if (previewPort !== null) {
+      proxy.proxyWebSocket(req, socket, head, `http://127.0.0.1:${previewPort}`);
+      return;
+    }
+
     const backend = route(req.url ?? "/");
     if (backend) {
       proxy.proxyWebSocket(req, socket, head, backend);
@@ -703,6 +828,16 @@ export function startStaticServer(config) {
         for (const prefix of rejectPrefixes) {
           console.log(`  ${prefix} -> 503 (rejected)`);
         }
+      }
+      if (previewPortForHost) {
+        console.log(
+          `  ${config.previewUrlScheme}://${config.previewHostPattern} -> http://127.0.0.1:{port} (live preview)`,
+        );
+        console.log(
+          `  Preview routable ports: ${
+            (config.previewRoutablePorts ?? []).join(", ") || "(none declared)"
+          }`,
+        );
       }
       if (config.lockToCloud) {
         console.log(`  Backend setup locked to Cloud: ${config.lockToCloud}`);
