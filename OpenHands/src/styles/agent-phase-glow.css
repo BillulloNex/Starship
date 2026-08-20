@@ -1,6 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Agent Phase Glow — animated gradient overlay on the chat scroll container
-   that shifts colour palette and speed per agent activity phase.
+   Agent Phase Glow — animated gradient background on the chat scroll
+   container that shifts colour palette and speed per agent activity phase.
+
+   The gradient covers the ENTIRE background and sits BEHIND all content
+   (messages, input fields, typing indicators) via z-index layering.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Keyframes ─────────────────────────────────────────────────────────── */
@@ -43,7 +46,7 @@
 
 @keyframes phase-finished-fade {
   0% {
-    opacity: 0.6;
+    opacity: var(--phase-opacity);
   }
   100% {
     opacity: 0;
@@ -53,10 +56,10 @@
 @keyframes phase-error-throb {
   0%,
   100% {
-    opacity: 0.25;
+    opacity: calc(var(--phase-opacity) * 0.5);
   }
   50% {
-    opacity: 0.55;
+    opacity: var(--phase-opacity);
   }
 }
 
@@ -64,69 +67,32 @@
 
 .agent-phase-glow {
   position: relative;
+  /* Create a stacking context so z-index:-1 on the pseudo stays inside
+     this container rather than falling behind the page background. */
+  isolation: isolate;
 }
 
-/* Top/bottom edge gradient bars */
+/* Full-coverage background gradient — sits BEHIND all child content. */
 .agent-phase-glow::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   border-radius: inherit;
   opacity: 0;
   transition: opacity 0.6s ease;
-  /* Gradient fills the entire container but at very low opacity,
-     combined with a mask that concentrates the glow at the edges. */
-  background-size: 300% 300%;
-  mask-image: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0) 12%,
-    rgba(0, 0, 0, 0) 88%,
-    rgba(0, 0, 0, 0.7) 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0) 12%,
-    rgba(0, 0, 0, 0) 88%,
-    rgba(0, 0, 0, 0.7) 100%
-  );
-}
-
-/* Left/right edge glow (separate pseudo-element via a wrapper) */
-.agent-phase-glow::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.6s ease;
-  background-size: 300% 300%;
-  mask-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.5) 0%,
-    rgba(0, 0, 0, 0) 8%,
-    rgba(0, 0, 0, 0) 92%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.5) 0%,
-    rgba(0, 0, 0, 0) 8%,
-    rgba(0, 0, 0, 0) 92%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
+  background-size: 400% 400%;
 }
 
 /* ── Phase: Waiting (Loading / Init) ───────────────────────────────────── */
 
-.agent-phase-waiting::before,
-.agent-phase-waiting::after {
-  opacity: 0.45;
+.agent-phase-waiting {
+  --phase-opacity: 0.35;
+}
+
+.agent-phase-waiting::before {
+  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
     #f59e0b,
@@ -141,9 +107,12 @@
 
 /* ── Phase: Thinking ───────────────────────────────────────────────────── */
 
-.agent-phase-thinking::before,
-.agent-phase-thinking::after {
-  opacity: 0.4;
+.agent-phase-thinking {
+  --phase-opacity: 0.3;
+}
+
+.agent-phase-thinking::before {
+  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
     #6366f1,
@@ -158,9 +127,12 @@
 
 /* ── Phase: Running (tool calls, full rainbow) ─────────────────────────── */
 
-.agent-phase-running::before,
-.agent-phase-running::after {
-  opacity: 0.5;
+.agent-phase-running {
+  --phase-opacity: 0.35;
+}
+
+.agent-phase-running::before {
+  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
     #ef4444,
@@ -177,8 +149,11 @@
 
 /* ── Phase: Finished ───────────────────────────────────────────────────── */
 
-.agent-phase-finished::before,
-.agent-phase-finished::after {
+.agent-phase-finished {
+  --phase-opacity: 0.35;
+}
+
+.agent-phase-finished::before {
   background-image: linear-gradient(
     135deg,
     #22c55e,
@@ -186,14 +161,17 @@
     #06b6d4,
     #22c55e
   );
-  background-size: 300% 300%;
+  background-size: 400% 400%;
   animation: phase-finished-fade 2.5s ease forwards;
 }
 
 /* ── Phase: Error ──────────────────────────────────────────────────────── */
 
-.agent-phase-error::before,
-.agent-phase-error::after {
+.agent-phase-error {
+  --phase-opacity: 0.4;
+}
+
+.agent-phase-error::before {
   background-image: linear-gradient(
     135deg,
     #ef4444,
@@ -201,15 +179,14 @@
     #dc2626,
     #ef4444
   );
-  background-size: 300% 300%;
+  background-size: 400% 400%;
   animation: phase-error-throb 1s ease infinite;
 }
 
 /* ── Accessibility: respect reduced motion preference ──────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-phase-glow::before,
-  .agent-phase-glow::after {
+  .agent-phase-glow::before {
     animation: none !important;
     transition: none !important;
   }
