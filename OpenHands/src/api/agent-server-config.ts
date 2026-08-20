@@ -182,7 +182,7 @@ export function getAgentServerBaseUrl(): string | null {
   const configuredUrl = getConfiguredBaseUrl();
   if (configuredUrl) return configuredUrl;
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && window.location?.hostname) {
     const hostname = window.location.hostname.toLowerCase();
     if (
       hostname === "grok.beenex.org" ||
