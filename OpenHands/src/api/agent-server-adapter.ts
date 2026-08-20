@@ -293,18 +293,21 @@ export function buildRuntimeServicesSystemSuffix(
     const reserved = appPreview.reserved_ports ?? [];
     lines.push(
       "",
-      "PUBLIC WEB APPLICATION SUBDOMAINS & PREVIEWS (PERSISTENT & SHAREABLE)",
-      "Whenever the user asks you to build, create, or host a web app / website / backend / game / demo:",
-      "1. ALWAYS place project files in `/projects/<app-name>` (e.g. `/projects/mario-game`) so the app is permanently saved in the persistent volume.",
-      "2. Pick a concise, clean slug for the app (e.g. `mario-game`, `snake-game`, `task-tracker`).",
-      "3. Register the app using `grokbot-app register <app-name> --port <port> --dir /projects/<app-name> --start-cmd \"<start command>\"` (or query `grokbot-app next-port` to automatically allocate an unused port in the 3000-3999 range).",
-      "4. Start your dev server/process in the background bound to 0.0.0.0 on that port (e.g. `npm run dev -- --host 0.0.0.0 --port <port>` or `node server.js`).",
-      "5. In your final response, ALWAYS give the user their live, public shareable URL:",
-      "   👉 https://<app-name>.beenex.space (and port fallback https://p<port>.beenex.space)",
-      "6. STOPPING/UNREGISTERING: If the user asks to stop, take down, or turn off an app, run `grokbot-app stop <app-name> --unregister` and terminate its process.",
-      "CRITICAL: Do NOT use temporary cloudflare/localtunnel/ngrok tunnels or random ephemeral domains. The native beenex.space subdomain is permanently routed, persists across container rebuilds, and auto-starts on boot.",
-      "CRITICAL: Never give a localhost URL (e.g. http://localhost:3000) to the user — they cannot open localhost from their machine.",
-      "Always give them the public https://<app-name>.beenex.space URL!",
+      "PUBLIC WEB APPLICATION DEPLOYMENTS & PREVIEWS (PERMANENT & SHAREABLE)",
+      "Whenever the user asks you to build, create, or host a web app / website / game / demo / landing page / tool:",
+      "1. STATIC APPS & GAMES (HTML/JS/CSS, Canvas Games, SPAs, React/Vite builds):",
+      "   • ALWAYS deploy static web apps directly to Cloudflare Pages for permanent, 24/7/365 global edge hosting.",
+      "   • Deploy in 1 step: `grokbot-deploy <dir> --name <app-slug>` (e.g. `grokbot-deploy ./workspace --name space-invaders` or `grokbot-app deploy-pages ./dist --name my-game`).",
+      "   • In your final response, ALWAYS give the user their permanent live URL: 👉 https://<app-slug>.pages.dev",
+      "   • NEVER start an unmanaged `python -m http.server` or temporary foreground server when asked for a shareable link — subshell processes terminate when command turns finish!",
+      "",
+      "2. DYNAMIC FULL-STACK APPS (Stateful Node.js / Python / FastAPI / WebSocket backends):",
+      "   • Place project files in `/projects/<app-name>` (e.g. `/projects/chat-backend`) so the app is saved in the persistent volume.",
+      "   • Register with: `grokbot-app register <app-name> --port <port> --dir /projects/<app-name> --start-cmd \"<start command>\"`.",
+      "   • Start your backend in the background bound to 0.0.0.0, and hand the user: 👉 https://<app-name>.beenex.space",
+      "   • To stop/remove a dynamic app: `grokbot-app stop <app-name> --unregister`.",
+      "",
+      "CRITICAL: Never give a localhost URL (e.g. http://localhost:8080) to the user. Always deliver their public live URL!",
     );
     if (reserved.length > 0) {
       lines.push(

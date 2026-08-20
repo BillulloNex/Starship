@@ -1238,6 +1238,22 @@ describe("buildRuntimeServicesSystemSuffix", () => {
     expect(suffix).toContain("Automation backend: not running");
   });
 
+  it("renders Cloudflare Pages deployment instructions when appPreview is present", () => {
+    const suffix = buildRuntimeServicesSystemSuffix({
+      mode: "dev:automation",
+      services: {
+        agent_server: { url_from_agent: "http://localhost:18000" },
+        app_preview: {
+          url_template: "https://p{port}.beenex.org",
+        },
+      },
+    });
+    expect(suffix).toBeDefined();
+    expect(suffix).toContain("Cloudflare Pages");
+    expect(suffix).toContain("pages.dev");
+    expect(suffix).toContain("grokbot-deploy");
+  });
+
   it("fetches runtime services from cached server_info when available", async () => {
     mockGetCachedAgentServerInfo.mockReturnValue({
       version: "1.28.0",

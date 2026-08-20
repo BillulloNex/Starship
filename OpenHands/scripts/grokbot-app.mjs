@@ -23,14 +23,18 @@ import {
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
 import { listListeningPorts } from "./preview-proxy.mjs";
+import { deployToCloudflarePages } from "./grokbot-deploy.mjs";
 
 function printHelp() {
   console.log(`
-Grokbot App Registry CLI
+Grokbot App Registry & Deployment CLI
 
 COMMANDS:
+  deploy-pages <dir> [--name <slug>] [--branch <branch>]
+      Deploy static HTML/JS/CSS app or build to Cloudflare Pages (permanent 24/7 https://<slug>.pages.dev)
+
   register <name> --port <port> [--title <title>] [--dir <dir>] [--start-cmd <cmd>]
-      Register an app to a port and subdomain slug (e.g. mario-game -> 3000)
+      Register a dynamic app to a port and subdomain slug (e.g. mario-game -> 3000)
 
   unregister <name>
       Remove an app registration
@@ -51,7 +55,7 @@ COMMANDS:
       Stop a running app process by killing its port listener and optionally unregistering it
 
 OPTIONS:
-  --registry-path <path>  Override registry JSON path (default: ${DEFAULT_REGISTRY_PATH})
+  --registry-path <path>  Override registry JSON path (default: \${DEFAULT_REGISTRY_PATH})
   -h, --help              Show this help
 `);
 }
@@ -77,6 +81,35 @@ async function main() {
   }
 
   switch (command) {
+    case "deploy-pages":
+    case "deploy": {
+      let targetDir = ".";
+      let name = null;
+      let branch = "main";
+
+      for (let i = 0; i < filteredArgs.length; i++) {
+        const arg = filteredArgs[i];
+        if (arg === "--name" || arg === "-n") {
+          name = filteredArgs[++i];
+        } else if (arg === "--branch" || arg === "-b") {
+          branch = filteredArgs[++i];
+        } else if (!arg.startsWith("-") && targetDir === ".") {
+          targetDir = arg;
+        }
+      }
+
+      try {
+        const res = deployToCloudflarePages(targetDir, { name, branch });
+        if (process.env.GROKBOT_OUTPUT_FORMAT === "json") {
+          console.log(JSON.stringify(res));
+        }
+      } catch (err) {
+        console.error(`Error deploying to Cloudflare Pages: ${err.message}`);
+        process.exit(1);
+      }
+      break;
+    }
+
     case "register": {
       const name = filteredArgs[0];
       if (!name) {

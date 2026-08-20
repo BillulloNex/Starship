@@ -201,6 +201,8 @@ COPY OpenHands/scripts/preview-proxy.mjs /opt/agent-canvas/preview-proxy.mjs
 COPY OpenHands/scripts/app-registry.mjs /opt/agent-canvas/app-registry.mjs
 COPY OpenHands/scripts/grokbot-app.mjs /opt/agent-canvas/grokbot-app.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-app.mjs && ln -sf /opt/agent-canvas/grokbot-app.mjs /usr/local/bin/grokbot-app
+COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs
+RUN chmod +x /opt/agent-canvas/grokbot-deploy.mjs && ln -sf /opt/agent-canvas/grokbot-deploy.mjs /usr/local/bin/grokbot-deploy
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka
