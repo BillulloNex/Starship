@@ -23,10 +23,22 @@
 
 @keyframes phase-finished-fade {
   0% {
-    opacity: 1;
+    background-image: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.25),
+      rgba(20, 184, 166, 0.2),
+      rgba(6, 182, 212, 0.18),
+      rgba(34, 197, 94, 0.25)
+    );
   }
   100% {
-    opacity: 0;
+    background-image: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0),
+      rgba(20, 184, 166, 0),
+      rgba(6, 182, 212, 0),
+      rgba(34, 197, 94, 0)
+    );
   }
 }
 
@@ -34,11 +46,9 @@
   0%,
   100% {
     background-position: 0% 50%;
-    filter: brightness(0.7);
   }
   50% {
     background-position: 100% 50%;
-    filter: brightness(1.2);
   }
 }
 
