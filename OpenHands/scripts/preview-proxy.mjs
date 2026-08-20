@@ -44,6 +44,16 @@ export const DEFAULT_BLOCKED_PORTS = [8000, 18000, 18001];
 const MIN_PREVIEW_PORT = 1024;
 const MAX_PREVIEW_PORT = 65535;
 
+/**
+ * Linux's default ephemeral range (net.ipv4.ip_local_port_range). Sockets here
+ * were assigned by the kernel, not chosen by a person, so a listener in this
+ * range is some library's incidental RPC/debug socket rather than an app worth
+ * previewing. Excluded from discovery so the UI doesn't report noise like
+ * ":46069" as "your app".
+ */
+const EPHEMERAL_PORT_MIN = 32768;
+const EPHEMERAL_PORT_MAX = 60999;
+
 /** TCP_LISTEN, as reported in the `st` column of /proc/net/tcp{,6}. */
 const TCP_LISTEN_STATE = "0A";
 
@@ -68,7 +78,7 @@ export function createPreviewHostMatcher(
   pattern,
   blockedPorts = DEFAULT_BLOCKED_PORTS,
 ) {
-  if (!pattern || !pattern.includes("{port}")) return null;
+  if (!pattern?.includes("{port}")) return null;
 
   const [before, after] = pattern.split("{port}", 2);
   const regex = new RegExp(
@@ -129,6 +139,7 @@ export function parseListeningPorts(procNetTcpContents) {
 export async function listListeningPorts(
   blockedPorts = DEFAULT_BLOCKED_PORTS,
   procFiles = ["/proc/net/tcp", "/proc/net/tcp6"],
+  ignoredPorts = new Set(),
 ) {
   const ports = new Set();
 
@@ -145,7 +156,25 @@ export async function listListeningPorts(
 
   return [...ports]
     .filter((port) => isPreviewablePort(port, blockedPorts))
+    .filter((port) => port < EPHEMERAL_PORT_MIN || port > EPHEMERAL_PORT_MAX)
+    .filter((port) => !ignoredPorts.has(port))
     .sort((a, b) => a - b);
+}
+
+/**
+ * Ports already listening before the agent could have started anything.
+ *
+ * The ingress is the last thing the entrypoint starts, so whatever is bound at
+ * that moment belongs to the image itself (the agent-server's own auxiliary
+ * services, for instance, which vary by base-image version and can't be
+ * hardcoded). Subtracting this baseline is what lets the UI say "no app is
+ * running yet" instead of pointing at an internal service and calling it the
+ * user's app.
+ */
+export async function captureInfrastructurePorts(
+  blockedPorts = DEFAULT_BLOCKED_PORTS,
+) {
+  return new Set(await listListeningPorts(blockedPorts));
 }
 
 /**
@@ -187,9 +216,15 @@ export function writePreviewUnavailable(res, port) {
 </body>
 </html>`;
 
-  res.writeHead(502, {
+  // Deliberately 200, not 502. A CDN in front of the origin (Cloudflare here)
+  // replaces 5xx bodies with its own "error code: 502" page, which would throw
+  // away this explanation for exactly the audience it's written for — whoever
+  // the user shared the link with. The header carries the real state for
+  // anything reading this programmatically.
+  res.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
+    "X-Preview-Status": `no-listener-on-${port}`,
   });
   res.end(body);
 }

@@ -46,6 +46,7 @@ import { handlePostHogProxy } from "./posthog-proxy.mjs";
 import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
+  captureInfrastructurePorts,
   createPreviewHostMatcher,
   listListeningPorts,
   writePreviewUnavailable,
@@ -646,11 +647,20 @@ async function handleStatic(
  *   template  — how to turn a port into a URL, so the share link is built from
  *               deploy-time config rather than guessed in the browser.
  */
-async function handlePreviewPortsRequest(res, config, blockedPorts) {
+async function handlePreviewPortsRequest(
+  res,
+  config,
+  blockedPorts,
+  infrastructurePorts,
+) {
   const enabled = Boolean(
-    config.previewHostPattern && config.previewHostPattern.includes("{port}"),
+    config.previewHostPattern?.includes("{port}"),
   );
-  const listening = await listListeningPorts(blockedPorts);
+  const listening = await listListeningPorts(
+    blockedPorts,
+    undefined,
+    infrastructurePorts,
+  );
 
   const body = JSON.stringify({
     enabled,
@@ -687,11 +697,14 @@ export function startStaticServer(config) {
   const rejectPrefixes = config.rejectPrefixes ?? [];
   const staticMiddleware = createStaticMiddleware(dirAbs);
 
-  const blockedPreviewPorts = config.previewBlockedPorts ?? DEFAULT_BLOCKED_PORTS;
+  const blockedPreviewPorts =
+    config.previewBlockedPorts ?? DEFAULT_BLOCKED_PORTS;
   const previewPortForHost = createPreviewHostMatcher(
     config.previewHostPattern,
     blockedPreviewPorts,
   );
+  // Filled in just below, before the server accepts its first connection.
+  let infrastructurePorts = new Set();
 
   const uninstallDiagnostics = proxy.installDiagnostics();
 
@@ -701,11 +714,8 @@ export function startStaticServer(config) {
     // the static handler, all of which are keyed on path alone.
     const previewPort = previewPortForHost?.(req.headers.host) ?? null;
     if (previewPort !== null) {
-      proxy.proxyHttp(
-        req,
-        res,
-        `http://127.0.0.1:${previewPort}`,
-        (errorRes) => writePreviewUnavailable(errorRes, previewPort),
+      proxy.proxyHttp(req, res, `http://127.0.0.1:${previewPort}`, (errorRes) =>
+        writePreviewUnavailable(errorRes, previewPort),
       );
       return;
     }
@@ -713,15 +723,18 @@ export function startStaticServer(config) {
     const parsedUrl = new URL(req.url ?? "/", "http://localhost");
 
     if (parsedUrl.pathname === PREVIEW_PORTS_PATH) {
-      handlePreviewPortsRequest(res, config, blockedPreviewPorts).catch(
-        (err) => {
-          console.error("Preview ports error:", err);
-          if (!res.headersSent) {
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: err.message }));
-          }
-        },
-      );
+      handlePreviewPortsRequest(
+        res,
+        config,
+        blockedPreviewPorts,
+        infrastructurePorts,
+      ).catch((err) => {
+        console.error("Preview ports error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
       return;
     }
     if (parsedUrl.pathname.startsWith("/api/observability/datadog")) {
@@ -750,13 +763,15 @@ export function startStaticServer(config) {
 
     if (parsedUrl.pathname.startsWith("/api/observability/codex")) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
-      handleCodexUsageProxy(req, res, parsedUrl.pathname, query).catch((err) => {
-        console.error("Codex usage proxy error:", err);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: err.message }));
-        }
-      });
+      handleCodexUsageProxy(req, res, parsedUrl.pathname, query).catch(
+        (err) => {
+          console.error("Codex usage proxy error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
       return;
     }
 
@@ -796,7 +811,12 @@ export function startStaticServer(config) {
     // against the canvas route table and dropped.
     const previewPort = previewPortForHost?.(req.headers.host) ?? null;
     if (previewPort !== null) {
-      proxy.proxyWebSocket(req, socket, head, `http://127.0.0.1:${previewPort}`);
+      proxy.proxyWebSocket(
+        req,
+        socket,
+        head,
+        `http://127.0.0.1:${previewPort}`,
+      );
       return;
     }
 
@@ -810,7 +830,11 @@ export function startStaticServer(config) {
   server.on("close", uninstallDiagnostics);
 
   return new Promise((resolveListen) => {
-    server.listen(config.port, config.host, () => {
+    server.listen(config.port, config.host, async () => {
+      if (previewPortForHost) {
+        infrastructurePorts =
+          await captureInfrastructurePorts(blockedPreviewPorts);
+      }
       const displayPath = basePath === "/" ? "/" : `${basePath}/`;
       console.log("");
       console.log(
