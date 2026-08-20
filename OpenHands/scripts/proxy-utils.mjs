@@ -50,9 +50,18 @@ export function applyCorsHeaders(req, res) {
     "Access-Control-Allow-Methods",
     "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
   );
+  const requestHeaders = req.headers?.["access-control-request-headers"];
+  if (requestHeaders) {
+    res.setHeader("Access-Control-Allow-Headers", requestHeaders);
+  } else {
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Session-API-Key, X-Requested-With, Accept, Origin, Range, X-Expose-Secrets, X-Org-Id, X-OpenHands-Telemetry-Distinct-Id, X-OpenHands-Client-Version, X-OpenHands-Client-Name",
+    );
+  }
   res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Session-API-Key, X-Requested-With, Accept, Origin, Range",
+    "Access-Control-Expose-Headers",
+    "Content-Length, Content-Range, X-Session-API-Key, X-Expose-Secrets",
   );
   res.setHeader("Access-Control-Max-Age", "86400");
 }
