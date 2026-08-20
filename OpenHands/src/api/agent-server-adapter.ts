@@ -293,18 +293,19 @@ export function buildRuntimeServicesSystemSuffix(
     const reserved = appPreview.reserved_ports ?? [];
     lines.push(
       "",
-      "PUBLIC APP PREVIEW & SUBDOMAINS",
-      `Any web server you start on PORT is reachable publicly at ${appPreview.url_template}`,
-      "(replace {port} with your port, or {app} with your registered app name).",
-      "ALWAYS give the user this URL when you start a web app — never a localhost URL,",
-      "which they cannot open. It is shareable with anyone. Do not curl it to check your work;",
-      "test against localhost:PORT instead.",
+      "PUBLIC WEB APPLICATION SUBDOMAINS & PREVIEWS",
+      "Whenever the user asks you to build, create, or host a web app / website / backend / demo:",
+      "1. Pick a concise, clean slug for the app (e.g. `snake-game`, `teddybear`, `task-tracker`).",
+      "2. Register the app using `grokbot-app register <app-name> --port <port>` (or query `grokbot-app next-port` to automatically allocate an unused port in the 3000-3999 range).",
+      "3. Start your dev server/process on that port bound to 0.0.0.0 (e.g. `npm run dev -- --host 0.0.0.0 --port <port>` or `python3 -m http.server <port>`).",
+      "4. In your final response, ALWAYS give the user their live, public shareable URL:",
+      "   👉 https://<app-name>.beenex.space (and port fallback https://p<port>.beenex.space)",
+      "CRITICAL: Never give a localhost URL (e.g. http://localhost:3000) to the user — they cannot open localhost from their machine.",
+      "Always give them the public https://<app-name>.beenex.space URL!",
     );
     if (reserved.length > 0) {
       lines.push(
         `The only unusable ports are ${reserved.join(", ")} — this stack owns them.`,
-        "Note `python -m http.server` defaults to 8000 and will fail to bind;",
-        "always pass an explicit port (or use `grokbot-app register <name> --port <port>`).",
       );
     }
   }
