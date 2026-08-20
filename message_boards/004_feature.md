@@ -1,0 +1,1 @@
+When waiting for an agent response it's kinda boring ngl. What if at every stage of the response (wait before the first token coming out, thinking..., tool call, etc, finished) has an animating gradient rainbow background in the chat background.

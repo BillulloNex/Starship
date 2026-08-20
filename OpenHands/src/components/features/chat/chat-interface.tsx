@@ -1,4 +1,5 @@
 import React from "react";
+import "#/styles/agent-phase-glow.css";
 import { useNavigate } from "react-router";
 import { useTracking } from "#/hooks/use-tracking";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,7 @@ import { useSendMessage } from "#/hooks/use-send-message";
 import { useAgentState } from "#/hooks/use-agent-state";
 import { useIsArchivedConversation } from "#/hooks/use-is-archived-conversation";
 import { useHandleBuildPlanClick } from "#/hooks/use-handle-build-plan-click";
+import { useAgentPhaseClass } from "#/hooks/use-agent-phase-class";
 
 import { ScrollToBottomButton } from "#/components/shared/buttons/scroll-to-bottom-button";
 import { LoadingSpinner } from "#/components/shared/loading-spinner";
@@ -106,6 +108,7 @@ export function ChatInterface() {
 
   const { curAgentState } = useAgentState();
   const { handleBuildPlanClick } = useHandleBuildPlanClick();
+  const agentPhaseClass = useAgentPhaseClass(allConversationEvents);
 
   // Cloud conversations whose sandbox is MISSING or ERROR are read-only:
   // the sandbox is gone and cannot be resumed, so we hide the chat input
@@ -504,7 +507,7 @@ export function ChatInterface() {
             maybeLoadOlder(e.currentTarget);
           }}
           onWheel={handleWheelForPagination}
-          className="custom-scrollbar-always flex min-h-0 grow flex-col gap-2 overflow-x-hidden overflow-y-auto px-0 pt-4 pb-8 md:px-4"
+          className={`custom-scrollbar-always flex min-h-0 grow flex-col gap-2 overflow-x-hidden overflow-y-auto px-0 pt-4 pb-8 md:px-4${agentPhaseClass ? ` agent-phase-glow ${agentPhaseClass}` : ""}`}
         >
           {isChatLoading && isReturningToConversation && (
             <ChatMessagesSkeleton />

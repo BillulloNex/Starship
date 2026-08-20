@@ -1,0 +1,216 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Agent Phase Glow — animated gradient overlay on the chat scroll container
+   that shifts colour palette and speed per agent activity phase.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
+
+@keyframes phase-waiting {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes phase-thinking {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes phase-running {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes phase-finished-fade {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes phase-error-throb {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── Base glow layer ───────────────────────────────────────────────────── */
+
+.agent-phase-glow {
+  position: relative;
+}
+
+/* Top/bottom edge gradient bars */
+.agent-phase-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  /* Gradient fills the entire container but at very low opacity,
+     combined with a mask that concentrates the glow at the edges. */
+  background-size: 300% 300%;
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0) 12%,
+    rgba(0, 0, 0, 0) 88%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0) 12%,
+    rgba(0, 0, 0, 0) 88%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+}
+
+/* Left/right edge glow (separate pseudo-element via a wrapper) */
+.agent-phase-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  background-size: 300% 300%;
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0) 8%,
+    rgba(0, 0, 0, 0) 92%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0) 8%,
+    rgba(0, 0, 0, 0) 92%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+}
+
+/* ── Phase: Waiting (Loading / Init) ───────────────────────────────────── */
+
+.agent-phase-waiting::before,
+.agent-phase-waiting::after {
+  opacity: 0.45;
+  background-image: linear-gradient(
+    135deg,
+    #f59e0b,
+    #f97316,
+    #ef4444,
+    #f59e0b,
+    #eab308,
+    #f97316
+  );
+  animation: phase-waiting 4s ease infinite;
+}
+
+/* ── Phase: Thinking ───────────────────────────────────────────────────── */
+
+.agent-phase-thinking::before,
+.agent-phase-thinking::after {
+  opacity: 0.4;
+  background-image: linear-gradient(
+    135deg,
+    #6366f1,
+    #8b5cf6,
+    #a78bfa,
+    #6366f1,
+    #14b8a6,
+    #818cf8
+  );
+  animation: phase-thinking 3s ease infinite;
+}
+
+/* ── Phase: Running (tool calls, full rainbow) ─────────────────────────── */
+
+.agent-phase-running::before,
+.agent-phase-running::after {
+  opacity: 0.5;
+  background-image: linear-gradient(
+    135deg,
+    #ef4444,
+    #f97316,
+    #eab308,
+    #22c55e,
+    #06b6d4,
+    #3b82f6,
+    #8b5cf6,
+    #ef4444
+  );
+  animation: phase-running 2s ease infinite;
+}
+
+/* ── Phase: Finished ───────────────────────────────────────────────────── */
+
+.agent-phase-finished::before,
+.agent-phase-finished::after {
+  background-image: linear-gradient(
+    135deg,
+    #22c55e,
+    #14b8a6,
+    #06b6d4,
+    #22c55e
+  );
+  background-size: 300% 300%;
+  animation: phase-finished-fade 2.5s ease forwards;
+}
+
+/* ── Phase: Error ──────────────────────────────────────────────────────── */
+
+.agent-phase-error::before,
+.agent-phase-error::after {
+  background-image: linear-gradient(
+    135deg,
+    #ef4444,
+    #f97316,
+    #dc2626,
+    #ef4444
+  );
+  background-size: 300% 300%;
+  animation: phase-error-throb 1s ease infinite;
+}
+
+/* ── Accessibility: respect reduced motion preference ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-phase-glow::before,
+  .agent-phase-glow::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
