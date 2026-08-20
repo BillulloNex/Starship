@@ -5,6 +5,7 @@ import { useGripResize } from "#/hooks/chat/use-grip-resize";
 import { useChatInputEvents } from "#/hooks/chat/use-chat-input-events";
 import { useChatSubmission } from "#/hooks/chat/use-chat-submission";
 import { useSlashCommand } from "#/hooks/chat/use-slash-command";
+import { useAtMention } from "#/hooks/chat/use-at-mention";
 import { ChatInputGrip } from "./components/chat-input-grip";
 import { ChatInputContainer } from "./components/chat-input-container";
 import { HiddenFileInput } from "./components/hidden-file-input";
@@ -154,6 +155,16 @@ export function CustomChatInput({
     closeMenu: closeSlashMenu,
   } = useSlashCommand(chatInputRef as React.RefObject<HTMLDivElement | null>);
 
+  const {
+    isMenuOpen: isAtMenuOpen,
+    filteredItems: atItems,
+    selectedIndex: atSelectedIndex,
+    updateAtMentionMenu,
+    selectItem: selectAtItem,
+    handleAtMentionKeyDown,
+    closeMenu: closeAtMentionMenu,
+  } = useAtMention(chatInputRef as React.RefObject<HTMLDivElement | null>);
+
   // Cleanup: reset suggestions visibility when component unmounts
   useEffect(
     () => () => {
@@ -204,24 +215,31 @@ export function CustomChatInput({
           onInput={() => {
             handleInput();
             updateSlashMenu();
+            updateAtMentionMenu();
             saveDraft();
             syncCanSubmit();
           }}
           onPaste={handlePaste}
           onKeyDown={(e) => {
             if (handleSlashKeyDown(e)) return;
+            if (handleAtMentionKeyDown(e)) return;
             handleKeyDown(e, isDisabled, handleSubmitAndSync);
           }}
           onFocus={handleFocus}
           onBlur={() => {
             handleBlur();
             closeSlashMenu();
+            closeAtMentionMenu();
             syncCanSubmit();
           }}
           isSlashMenuOpen={isSlashMenuOpen}
           slashItems={slashItems}
           slashSelectedIndex={slashSelectedIndex}
           onSlashSelect={selectSlashItem}
+          isAtMenuOpen={isAtMenuOpen}
+          atItems={atItems}
+          atSelectedIndex={atSelectedIndex}
+          onAtSelect={selectAtItem}
         />
       </div>
     </div>
