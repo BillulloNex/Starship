@@ -477,7 +477,7 @@ export function ChatInterface() {
   return (
     <ScrollProvider value={scrollProviderValue}>
       <div
-        className={`relative flex h-full flex-col justify-between px-4${agentPhaseClass ? ` agent-phase-glow ${agentPhaseClass}` : ""}`}
+        className={`relative flex h-full flex-col justify-between px-4${agentPhaseClass ? ` ${agentPhaseClass}` : ""}`}
         data-testid="chat-interface"
       >
         {!hasSubstantiveAgentActions &&

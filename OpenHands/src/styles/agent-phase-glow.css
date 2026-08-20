@@ -1,38 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Agent Phase Glow — animated gradient background on the chat scroll
-   container that shifts colour palette and speed per agent activity phase.
+   Agent Phase Glow — animated gradient background on the chat container.
+   Applied directly as a CSS background (no pseudo-elements) so it always
+   covers the entire element regardless of layout/stacking context.
 
-   The gradient covers the ENTIRE background and sits BEHIND all content
-   (messages, input fields, typing indicators) via z-index layering.
+   Child elements (message bubbles, input fields) have their own opaque
+   backgrounds, so the gradient shows through naturally in the gaps.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Keyframes ─────────────────────────────────────────────────────────── */
 
-@keyframes phase-waiting {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes phase-thinking {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes phase-running {
+@keyframes phase-sweep {
   0% {
     background-position: 0% 50%;
   }
@@ -46,7 +23,7 @@
 
 @keyframes phase-finished-fade {
   0% {
-    opacity: var(--phase-opacity);
+    opacity: 1;
   }
   100% {
     opacity: 0;
@@ -56,138 +33,101 @@
 @keyframes phase-error-throb {
   0%,
   100% {
-    opacity: calc(var(--phase-opacity) * 0.5);
+    background-position: 0% 50%;
+    filter: brightness(0.7);
   }
   50% {
-    opacity: var(--phase-opacity);
+    background-position: 100% 50%;
+    filter: brightness(1.2);
   }
-}
-
-/* ── Base glow layer ───────────────────────────────────────────────────── */
-
-.agent-phase-glow {
-  position: relative;
-  /* Create a stacking context so z-index:-1 on the pseudo stays inside
-     this container rather than falling behind the page background. */
-  isolation: isolate;
-}
-
-/* Full-coverage background gradient — sits BEHIND all child content. */
-.agent-phase-glow::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.6s ease;
-  background-size: 400% 400%;
 }
 
 /* ── Phase: Waiting (Loading / Init) ───────────────────────────────────── */
 
 .agent-phase-waiting {
-  --phase-opacity: 0.35;
-}
-
-.agent-phase-waiting::before {
-  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
-    #f59e0b,
-    #f97316,
-    #ef4444,
-    #f59e0b,
-    #eab308,
-    #f97316
-  );
-  animation: phase-waiting 4s ease infinite;
+    rgba(245, 158, 11, 0.2),
+    rgba(249, 115, 22, 0.25),
+    rgba(239, 68, 68, 0.15),
+    rgba(245, 158, 11, 0.2),
+    rgba(234, 179, 8, 0.18),
+    rgba(249, 115, 22, 0.2)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: phase-sweep 4s ease infinite !important;
 }
 
 /* ── Phase: Thinking ───────────────────────────────────────────────────── */
 
 .agent-phase-thinking {
-  --phase-opacity: 0.3;
-}
-
-.agent-phase-thinking::before {
-  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
-    #6366f1,
-    #8b5cf6,
-    #a78bfa,
-    #6366f1,
-    #14b8a6,
-    #818cf8
-  );
-  animation: phase-thinking 3s ease infinite;
+    rgba(99, 102, 241, 0.25),
+    rgba(139, 92, 246, 0.3),
+    rgba(167, 139, 250, 0.2),
+    rgba(99, 102, 241, 0.25),
+    rgba(20, 184, 166, 0.2),
+    rgba(129, 140, 248, 0.25)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: phase-sweep 3s ease infinite !important;
 }
 
 /* ── Phase: Running (tool calls, full rainbow) ─────────────────────────── */
 
 .agent-phase-running {
-  --phase-opacity: 0.35;
-}
-
-.agent-phase-running::before {
-  opacity: var(--phase-opacity);
   background-image: linear-gradient(
     135deg,
-    #ef4444,
-    #f97316,
-    #eab308,
-    #22c55e,
-    #06b6d4,
-    #3b82f6,
-    #8b5cf6,
-    #ef4444
-  );
-  animation: phase-running 2s ease infinite;
+    rgba(239, 68, 68, 0.2),
+    rgba(249, 115, 22, 0.22),
+    rgba(234, 179, 8, 0.2),
+    rgba(34, 197, 94, 0.22),
+    rgba(6, 182, 212, 0.2),
+    rgba(59, 130, 246, 0.22),
+    rgba(139, 92, 246, 0.2),
+    rgba(239, 68, 68, 0.2)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: phase-sweep 2s ease infinite !important;
 }
 
 /* ── Phase: Finished ───────────────────────────────────────────────────── */
 
 .agent-phase-finished {
-  --phase-opacity: 0.35;
-}
-
-.agent-phase-finished::before {
   background-image: linear-gradient(
     135deg,
-    #22c55e,
-    #14b8a6,
-    #06b6d4,
-    #22c55e
-  );
-  background-size: 400% 400%;
-  animation: phase-finished-fade 2.5s ease forwards;
+    rgba(34, 197, 94, 0.25),
+    rgba(20, 184, 166, 0.2),
+    rgba(6, 182, 212, 0.18),
+    rgba(34, 197, 94, 0.25)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: phase-finished-fade 2.5s ease forwards !important;
 }
 
 /* ── Phase: Error ──────────────────────────────────────────────────────── */
 
 .agent-phase-error {
-  --phase-opacity: 0.4;
-}
-
-.agent-phase-error::before {
   background-image: linear-gradient(
     135deg,
-    #ef4444,
-    #f97316,
-    #dc2626,
-    #ef4444
-  );
-  background-size: 400% 400%;
-  animation: phase-error-throb 1s ease infinite;
+    rgba(239, 68, 68, 0.3),
+    rgba(249, 115, 22, 0.25),
+    rgba(220, 38, 38, 0.3),
+    rgba(239, 68, 68, 0.3)
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: phase-error-throb 1s ease infinite !important;
 }
 
 /* ── Accessibility: respect reduced motion preference ──────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-phase-glow::before {
+  .agent-phase-waiting,
+  .agent-phase-thinking,
+  .agent-phase-running,
+  .agent-phase-finished,
+  .agent-phase-error {
     animation: none !important;
-    transition: none !important;
   }
 }
