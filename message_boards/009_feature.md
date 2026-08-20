@@ -1,7 +1,7 @@
 # Instant 3-Second Production Deployment via Cloudflare Pages
 
 ## Overview
-GrokBot's frontend is decoupled from the monolithic Docker container build lifecycle. UI, styling, hooks, and frontend changes deploy directly to Cloudflare Pages edge network in ~3 seconds. The backend (agent-server, automation, python, proxies) remains hosted on Coolify at `api.grok.beenex.org`.
+GrokBot's frontend is decoupled from the monolithic Docker container build lifecycle. UI, styling, hooks, and frontend changes deploy directly to Cloudflare Pages edge network in ~3 seconds. The backend (agent-server, automation, python, proxies) remains hosted on Coolify at `grok-api.beenex.org`.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ User / Browser
     ├── HTML/JS/CSS (Static UI) ────► https://grok.beenex.org (Cloudflare Pages CDN)
     │                                 Deployed in ~3 seconds via scripts/deploy-frontend.sh
     │
-    └── API / WebSockets / Previews ─► https://api.grok.beenex.org (Coolify Container)
+    └── API / WebSockets / Previews ─► https://grok-api.beenex.org (Coolify Container)
                                       Full agent-server & automation backend
 ```
 
