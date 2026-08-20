@@ -72,7 +72,7 @@ export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
         config.commit,
       );
     },
-    enabled: config.enabled && (!isDeleted || !!config.commit),
+    enabled: config.enabled && (!isDeleted || !!config.commit) && !!conversationId,
     staleTime: config.commit ? Infinity : 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 15, // 15 minutes
   });

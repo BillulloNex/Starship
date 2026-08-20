@@ -7,13 +7,5 @@ export function useOptionalConversationId() {
 }
 
 export function useConversationId() {
-  const { conversationId } = useOptionalConversationId();
-
-  if (!conversationId) {
-    throw new Error(
-      "useConversationId must be used within a route that has a conversationId parameter",
-    );
-  }
-
-  return { conversationId };
+  return useOptionalConversationId();
 }
