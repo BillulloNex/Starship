@@ -26,10 +26,68 @@ interface RuntimeServicesInfoShape {
       openapi_url: string;
       auth_env_var: string;
     };
+    app_preview?: {
+      url_template: string;
+      ports: number[];
+      reserved_ports: number[];
+    };
   };
 }
 
 describe("runtime-services-info.mjs", () => {
+  describe("app preview", () => {
+    it("advertises the template, publishable ports, and reserved ports", () => {
+      const info = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+        appPreview: {
+          urlTemplate: "https://p{port}.example.org",
+          ports: [3000, 5173],
+          reservedPorts: [8000, 18000],
+        },
+      }) as RuntimeServicesInfoShape;
+
+      expect(info.services.app_preview).toMatchObject({
+        url_template: "https://p{port}.example.org",
+        ports: [3000, 5173],
+        reserved_ports: [8000, 18000],
+      });
+    });
+
+    it("omits the entry when no template is configured", () => {
+      // A deployment with no published hostnames must not advertise a preview
+      // the agent would then hand to the user as a dead link.
+      const info = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+        appPreview: { ports: [3000] },
+      }) as RuntimeServicesInfoShape;
+
+      expect(info.services.app_preview).toBeUndefined();
+    });
+
+    it("parses the preview flags from argv", () => {
+      const options = parseArgs([
+        "--preview-url-template",
+        "https://p{port}.example.org",
+        "--preview-ports",
+        "3000, 5173",
+        "--preview-reserved-ports",
+        "8000",
+      ]) as {
+        appPreview?: {
+          urlTemplate?: string;
+          ports?: number[];
+          reservedPorts?: number[];
+        };
+      };
+
+      expect(options.appPreview).toEqual({
+        urlTemplate: "https://p{port}.example.org",
+        ports: [3000, 5173],
+        reservedPorts: [8000],
+      });
+    });
+  });
+
   // Port-based behavior (the dev path) is covered in dev-safe.test.ts. These
   // cover the URL-override path the Docker image uses.
   describe("buildRuntimeServicesInfo — URL overrides", () => {

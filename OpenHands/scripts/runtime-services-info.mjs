@@ -44,6 +44,19 @@ import { pathToFileURL } from "node:url";
  *   accepted for backward compat with older launchers. Remove after one release.
  * @param {"vite"|"static"} [options.frontendKind="vite"] - Whether the
  *   frontend port hosts Vite or a static build. Only affects the description.
+ * @param {object} [options.appPreview] - Public preview info. Skipped entirely
+ *   unless `.urlTemplate` is provided. Unlike every other entry here, these
+ *   URLs are written from the *browser's* point of view — they are what the
+ *   agent should hand the user, not something it can curl from the sandbox.
+ * @param {string} [options.appPreview.urlTemplate] - e.g.
+ *   "https://p{port}.beenex.org"; `{port}` is substituted with the port the
+ *   agent's server listens on.
+ * @param {number[]} [options.appPreview.ports] - Ports that actually have a
+ *   public hostname. Servers started on anything else are unreachable from
+ *   outside the container, so the agent needs the exact list, not a hint.
+ * @param {number[]} [options.appPreview.reservedPorts] - Ports already taken by
+ *   this stack. Called out explicitly because `python -m http.server` defaults
+ *   to 8000, which collides with the ingress.
  * @param {object} [options.automation] - Automation backend info. Skipped
  *   entirely unless `.url` or `.port` is provided, so passing `{}` is safe.
  * @param {string} [options.automation.url] - Explicit automation base URL, from
@@ -69,6 +82,7 @@ export function buildRuntimeServicesInfo(options) {
     frontendPort = vitePort,
     frontendKind = "vite",
     automation,
+    appPreview,
   } = options;
 
   // Prefer an explicit URL (containers reach the agent-server over a specific
@@ -141,6 +155,30 @@ export function buildRuntimeServicesInfo(options) {
     };
   }
 
+  // Public app preview. This is the one entry whose URL the agent *cannot*
+  // reach from inside the sandbox — every other service here is written from
+  // the agent's point of view. It uses `url_template` rather than
+  // `url_from_agent` so that difference is visible in the shape itself, and
+  // note_from_agent spells it out, because an agent that curls this and gets
+  // nothing would reasonably conclude the feature is broken.
+  if (appPreview?.urlTemplate) {
+    services.app_preview = {
+      description:
+        "Public URL for web servers you start. A server listening on PORT " +
+        "inside this container is reachable from the outside world at the " +
+        "url_template below, with {port} replaced by PORT. Only the ports in " +
+        "`ports` have a public hostname — a server on any other port works " +
+        "locally but no URL reaches it. Give the user this URL when you " +
+        "start a web app; it is shareable with anyone.",
+      url_template: appPreview.urlTemplate,
+      ports: appPreview.ports ?? [],
+      reserved_ports: appPreview.reservedPorts ?? [],
+      note_from_agent:
+        "This URL is for the user's browser, not for you — curling it from " +
+        "the sandbox is not a useful check. Verify with localhost:PORT instead.",
+    };
+  }
+
   return {
     mode,
     agent_host_alias: agentHostAlias,
@@ -153,7 +191,7 @@ export function buildRuntimeServicesInfo(options) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function parseArgs(argv) {
-  const options = { automation: {} };
+  const options = { automation: {}, appPreview: {} };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     switch (flag) {
@@ -165,6 +203,21 @@ export function parseArgs(argv) {
         break;
       case "--agent-server-url":
         options.agentServerUrl = argv[++i] || undefined;
+        break;
+      case "--preview-url-template":
+        options.appPreview.urlTemplate = argv[++i] || undefined;
+        break;
+      case "--preview-ports":
+        options.appPreview.ports = (argv[++i] || "")
+          .split(",")
+          .map((value) => Number.parseInt(value.trim(), 10))
+          .filter(Number.isInteger);
+        break;
+      case "--preview-reserved-ports":
+        options.appPreview.reservedPorts = (argv[++i] || "")
+          .split(",")
+          .map((value) => Number.parseInt(value.trim(), 10))
+          .filter(Number.isInteger);
         break;
       case "--automation-url":
         options.automation.url = argv[++i] || undefined;
@@ -182,6 +235,9 @@ export function parseArgs(argv) {
   // Omit the automation entry entirely when no URL was supplied, rather than
   // advertising a backend the agent cannot reach.
   if (!options.automation.url) delete options.automation;
+  // Same rule as automation: omit the entry rather than advertise a preview
+  // the deployment has not actually published hostnames for.
+  if (!options.appPreview.urlTemplate) delete options.appPreview;
   return options;
 }
 

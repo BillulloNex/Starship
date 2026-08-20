@@ -351,10 +351,28 @@ log "Starting frontend + proxy on port $PORT..."
 # from the sandbox-facing URLs the entrypoint already exports. static-server.mjs
 # appends it to /server_info as runtime_services and also injects the legacy
 # window global for older frontend bundles.
+PREVIEW_HOST_PATTERN="${PREVIEW_HOST_PATTERN:-}"
+PREVIEW_PORTS="${PREVIEW_PORTS:-3000,3001,4200,5000,5173,7860,8080,8501}"
+PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
+
+# Tell the agent about the public preview so it starts servers on a port that
+# actually has a hostname, and hands the user a shareable URL instead of a
+# localhost one it cannot reach. Without this the agent picks a port at random
+# and the preview only works by luck.
+RSI_PREVIEW_ARGS=()
+if [ -n "$PREVIEW_HOST_PATTERN" ]; then
+  RSI_PREVIEW_ARGS=(
+    --preview-url-template "${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN}"
+    --preview-ports "$PREVIEW_PORTS"
+    --preview-reserved-ports "${PORT},${AGENT_SERVER_PORT},${AUTOMATION_PORT}"
+  )
+fi
+
 RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
   --mode docker \
   --agent-host-alias 127.0.0.1 \
   --agent-server-url "$AGENT_SERVER_URL" \
+  ${RSI_PREVIEW_ARGS[@]+"${RSI_PREVIEW_ARGS[@]}"} \
   --automation-url "$AUTOMATION_BASE_URL")"
 
 # ── Live app preview ─────────────────────────────────────────────────────────
@@ -368,10 +386,6 @@ RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
 # container. PREVIEW_PORTS declares which ones the operator actually published,
 # so the UI only offers links that resolve. Unset PREVIEW_HOST_PATTERN disables
 # the feature; the stack's own ports are always refused regardless.
-PREVIEW_HOST_PATTERN="${PREVIEW_HOST_PATTERN:-}"
-PREVIEW_PORTS="${PREVIEW_PORTS:-3000,3001,4200,5000,5173,7860,8080,8501}"
-PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
-
 PREVIEW_ARGS=()
 if [ -n "$PREVIEW_HOST_PATTERN" ]; then
   PREVIEW_ARGS=(

@@ -114,10 +114,12 @@ function browserToolsEnabled() {
 
 /**
  * Shape of the runtime services info served by Agent Canvas backends in
- * `/server_info.runtime_services`. All URLs are written from the agent's point of
- * view, not the browser's. The block is rendered into the agent's system prompt
- * via `AgentContext.system_message_suffix` so the agent knows what's reachable
- * from inside its sandbox without having to probe.
+ * `/server_info.runtime_services`. URLs are written from the agent's point of
+ * view, not the browser's — the sole exception is `app_preview`, which carries
+ * a `url_template` the agent is meant to hand to the user rather than fetch.
+ * The block is rendered into the agent's system prompt via
+ * `AgentContext.system_message_suffix` so the agent knows what's reachable from
+ * inside its sandbox without having to probe.
  */
 export interface RuntimeServicesInfo {
   mode?: string;
@@ -140,6 +142,18 @@ export interface RuntimeServicesInfo {
       docs_url?: string;
       openapi_url?: string;
       auth_env_var?: string;
+    };
+    /**
+     * Public, browser-facing URL for servers the agent starts. `url_template`
+     * contains a literal `{port}` placeholder. `ports` is the set that actually
+     * has a public hostname; `reserved_ports` are taken by this stack.
+     */
+    app_preview?: {
+      description?: string;
+      url_template?: string;
+      ports?: number[];
+      reserved_ports?: number[];
+      note_from_agent?: string;
     };
   };
 }
@@ -228,7 +242,7 @@ export function buildRuntimeServicesSystemSuffix(
   );
 
   const { agent_server, ingress, automation } = info.services;
-  const { frontend } = info.services;
+  const { frontend, app_preview: appPreview } = info.services;
 
   if (agent_server?.url_from_agent) {
     lines.push(
@@ -270,6 +284,37 @@ export function buildRuntimeServicesSystemSuffix(
     lines.push(
       "* Automation backend: not running in this dev mode (skip /api/automation calls).",
     );
+  }
+
+  // Public preview URLs. Placed last and given its own paragraph because it is
+  // the one thing here the agent should *hand to the user* rather than call
+  // itself — the port list is the load-bearing part, since a server started on
+  // an unpublished port works locally but is unreachable from any browser.
+  if (appPreview?.url_template) {
+    const ports = appPreview.ports ?? [];
+    const reserved = appPreview.reserved_ports ?? [];
+    lines.push(
+      "",
+      "PUBLIC APP PREVIEW",
+      `Web servers you start are reachable publicly at ${appPreview.url_template}`,
+      "(replace {port} with the port your server listens on). This URL is for",
+      "the user's browser and is shareable with anyone — give it to the user",
+      "whenever you start a web app. Do not curl it to check your work; test",
+      "against localhost:PORT instead.",
+    );
+    if (ports.length > 0) {
+      lines.push(
+        `Bind your server to one of these ports ONLY: ${ports.join(", ")}.`,
+        "A server on any other port still runs, but no public URL reaches it.",
+      );
+    }
+    if (reserved.length > 0) {
+      lines.push(
+        `Never bind to ${reserved.join(", ")} — already used by this stack.`,
+        "Note this means the `python -m http.server` default of 8000 will fail;",
+        "pass an explicit port from the list above.",
+      );
+    }
   }
 
   // Anchor the "don't guess" warning to the actual agent-server URL for
