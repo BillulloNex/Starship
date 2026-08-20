@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAgentServerBaseUrl } from "../agent-server-config";
 import {
   DatadogStatusResponse,
   DatadogSummaryResponse,
@@ -6,14 +7,14 @@ import {
   DatadogMonitorsResponse,
 } from "./datadog.types";
 
-const BASE_PATH = "/api/observability/datadog";
+const getBasePath = () => `${getAgentServerBaseUrl() ?? ""}/api/observability/datadog`;
 
 export class DatadogService {
   /**
    * Fetch status & check credentials
    */
   static async getStatus(): Promise<DatadogStatusResponse> {
-    const res = await axios.get<DatadogStatusResponse>(`${BASE_PATH}/status`);
+    const res = await axios.get<DatadogStatusResponse>(`${getBasePath()}/status`);
     return res.data;
   }
 
@@ -24,7 +25,7 @@ export class DatadogService {
     timeframe: string = "1h",
   ): Promise<DatadogSummaryResponse> {
     const res = await axios.get<DatadogSummaryResponse>(
-      `${BASE_PATH}/summary`,
+      `${getBasePath()}/summary`,
       {
         params: { timeframe },
       },
@@ -39,7 +40,7 @@ export class DatadogService {
     timeframe: string = "1h",
     options?: { status?: string; query?: string; limit?: number },
   ): Promise<DatadogLogsResponse> {
-    const res = await axios.get<DatadogLogsResponse>(`${BASE_PATH}/logs`, {
+    const res = await axios.get<DatadogLogsResponse>(`${getBasePath()}/logs`, {
       params: {
         timeframe,
         status: options?.status,
@@ -55,7 +56,7 @@ export class DatadogService {
    */
   static async getMonitors(): Promise<DatadogMonitorsResponse> {
     const res = await axios.get<DatadogMonitorsResponse>(
-      `${BASE_PATH}/monitors`,
+      `${getBasePath()}/monitors`,
     );
     return res.data;
   }

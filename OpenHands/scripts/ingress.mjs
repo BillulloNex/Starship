@@ -26,6 +26,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import {
+  applyCorsHeaders,
   createProxyHandlers,
   createRouter,
   isBenignSocketError,
@@ -153,6 +154,13 @@ export function startIngress(config) {
   const uninstallDiagnostics = proxy.installDiagnostics();
 
   const server = createServer((req, res) => {
+    applyCorsHeaders(req, res);
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     const parsedUrl = new URL(req.url ?? "/", "http://localhost");
     if (parsedUrl.pathname.startsWith("/api/observability/datadog")) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());

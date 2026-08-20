@@ -35,6 +35,7 @@ import { pathToFileURL } from "node:url";
 import sirv from "sirv";
 
 import {
+  applyCorsHeaders,
   createProxyHandlers,
   createRouter,
   isServerInfoRequest,
@@ -703,6 +704,13 @@ export function startStaticServer(config) {
       proxy.proxyHttp(req, res, `http://127.0.0.1:${previewPort}`, (errorRes) =>
         writePreviewUnavailable(errorRes, previewPort),
       );
+      return;
+    }
+
+    applyCorsHeaders(req, res);
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
       return;
     }
 

@@ -19,6 +19,44 @@ export function matchesPathPrefix(url, prefix) {
   );
 }
 
+export function isAllowedCorsOrigin(origin) {
+  if (!origin) return false;
+  const configured = (process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (configured.includes("*") || configured.includes(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.endsWith(".beenex.org") ||
+      host.endsWith(".pages.dev")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function applyCorsHeaders(req, res) {
+  const origin = req.headers?.origin;
+  if (!origin || !isAllowedCorsOrigin(origin)) return;
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Session-API-Key, X-Requested-With, Accept, Origin, Range",
+  );
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 export function createRouter(routes, defaultBackend = null) {
   const sortedRoutes = Object.entries(routes).sort(
     ([a], [b]) => b.length - a.length,
@@ -250,6 +288,10 @@ export function createProxyHandlers({
     } else if (resOrSocket && typeof resOrSocket.destroy === "function") {
       resOrSocket.destroy();
     }
+  });
+
+  proxy.on("proxyRes", (proxyRes, req, res) => {
+    applyCorsHeaders(req, res);
   });
 
   /**

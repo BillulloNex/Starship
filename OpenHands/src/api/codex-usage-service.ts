@@ -1,6 +1,7 @@
 import axios from "axios";
 import { SettingsClient } from "@openhands/typescript-client/clients";
 import { getAgentServerClientOptions } from "./agent-server-client-options";
+import { getAgentServerBaseUrl } from "./agent-server-config";
 import { CodexUsageQuota } from "./codex-usage-service.types";
 
 export class CodexUsageService {
@@ -13,7 +14,8 @@ export class CodexUsageService {
    * 3. Returns normalized quota info with 5-hour and 7-day rate-limit percentages.
    */
   static async getUsage(refresh = false): Promise<CodexUsageQuota | null> {
-    const url = `/api/observability/codex/usage${refresh ? "?refresh=true" : ""}`;
+    const baseUrl = getAgentServerBaseUrl() ?? "";
+    const url = `${baseUrl}/api/observability/codex/usage${refresh ? "?refresh=true" : ""}`;
     try {
       const response = await axios.get<CodexUsageQuota>(url, {
         timeout: 12000,
