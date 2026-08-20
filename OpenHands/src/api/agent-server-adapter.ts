@@ -293,13 +293,16 @@ export function buildRuntimeServicesSystemSuffix(
     const reserved = appPreview.reserved_ports ?? [];
     lines.push(
       "",
-      "PUBLIC WEB APPLICATION SUBDOMAINS & PREVIEWS",
-      "Whenever the user asks you to build, create, or host a web app / website / backend / demo:",
-      "1. Pick a concise, clean slug for the app (e.g. `snake-game`, `teddybear`, `task-tracker`).",
-      "2. Register the app using `grokbot-app register <app-name> --port <port>` (or query `grokbot-app next-port` to automatically allocate an unused port in the 3000-3999 range).",
-      "3. Start your dev server/process on that port bound to 0.0.0.0 (e.g. `npm run dev -- --host 0.0.0.0 --port <port>` or `python3 -m http.server <port>`).",
-      "4. In your final response, ALWAYS give the user their live, public shareable URL:",
+      "PUBLIC WEB APPLICATION SUBDOMAINS & PREVIEWS (PERSISTENT & SHAREABLE)",
+      "Whenever the user asks you to build, create, or host a web app / website / backend / game / demo:",
+      "1. ALWAYS place project files in `/projects/<app-name>` (e.g. `/projects/mario-game`) so the app is permanently saved in the persistent volume.",
+      "2. Pick a concise, clean slug for the app (e.g. `mario-game`, `snake-game`, `task-tracker`).",
+      "3. Register the app using `grokbot-app register <app-name> --port <port> --dir /projects/<app-name> --start-cmd \"<start command>\"` (or query `grokbot-app next-port` to automatically allocate an unused port in the 3000-3999 range).",
+      "4. Start your dev server/process in the background bound to 0.0.0.0 on that port (e.g. `npm run dev -- --host 0.0.0.0 --port <port>` or `node server.js`).",
+      "5. In your final response, ALWAYS give the user their live, public shareable URL:",
       "   👉 https://<app-name>.beenex.space (and port fallback https://p<port>.beenex.space)",
+      "6. STOPPING/UNREGISTERING: If the user asks to stop, take down, or turn off an app, run `grokbot-app stop <app-name> --unregister` and terminate its process.",
+      "CRITICAL: Do NOT use temporary cloudflare/localtunnel/ngrok tunnels or random ephemeral domains. The native beenex.space subdomain is permanently routed, persists across container rebuilds, and auto-starts on boot.",
       "CRITICAL: Never give a localhost URL (e.g. http://localhost:3000) to the user — they cannot open localhost from their machine.",
       "Always give them the public https://<app-name>.beenex.space URL!",
     );

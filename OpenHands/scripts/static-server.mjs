@@ -667,20 +667,12 @@ async function handlePreviewPortsRequest(
     infrastructurePorts,
   );
 
-  const patterns = (config.previewHostPattern || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const primaryPortPattern =
-    patterns.find((p) => p.includes("{port}")) || patterns[0] || "";
-
   const body = JSON.stringify({
     enabled,
     listening,
-    urlTemplate:
-      enabled && primaryPortPattern
-        ? `${config.previewUrlScheme}://${primaryPortPattern}`
-        : null,
+    urlTemplate: enabled
+      ? `${config.previewUrlScheme}://${config.previewHostPattern}`
+      : null,
   });
 
   res.writeHead(200, {

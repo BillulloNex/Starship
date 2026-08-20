@@ -67,6 +67,8 @@ STATE_DIR="${OPENHANDS_DIR}/${CONFIG_STATE_SUBDIR:-agent-canvas}"
 export OH_PERSISTENCE_DIR="${OH_PERSISTENCE_DIR:-${OPENHANDS_DIR}}"
 export OH_CONVERSATIONS_PATH="${OH_CONVERSATIONS_PATH:-${OPENHANDS_DIR}/${CONFIG_CONVERSATIONS:-agent-canvas/conversations}}"
 export OH_BASH_EVENTS_DIR="${OH_BASH_EVENTS_DIR:-${OPENHANDS_DIR}/${CONFIG_BASH_EVENTS:-agent-canvas/bash_events}}"
+export GROKBOT_APPS_REGISTRY_PATH="${GROKBOT_APPS_REGISTRY_PATH:-/projects/.grokbot/apps.json}"
+mkdir -p "$(dirname "$GROKBOT_APPS_REGISTRY_PATH")" 2>/dev/null || true
 
 # OH_SECRET_KEY is required for settings/secrets encryption. Without it the
 # agent-server refuses to return encrypted secrets → conversation creation
@@ -360,11 +362,8 @@ PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
 # and the preview only works by luck.
 RSI_PREVIEW_ARGS=()
 if [ -n "$PREVIEW_HOST_PATTERN" ]; then
-  # Pick the first pattern that contains {port} for the single url template
-  PRIMARY_PORT_PATTERN="$(echo "$PREVIEW_HOST_PATTERN" | tr ',' '\n' | grep '{port}' | head -n 1)"
-  PRIMARY_PORT_PATTERN="${PRIMARY_PORT_PATTERN:-p{port}.beenex.space}"
   RSI_PREVIEW_ARGS=(
-    --preview-url-template "${PREVIEW_URL_SCHEME}://${PRIMARY_PORT_PATTERN}"
+    --preview-url-template "${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN}"
     --preview-reserved-ports "${PORT},${AGENT_SERVER_PORT},${AUTOMATION_PORT}"
   )
 fi
@@ -400,6 +399,12 @@ if [ -n "$PREVIEW_HOST_PATTERN" ]; then
   log "Live app preview enabled: ${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN} (any port)"
 else
   log "Live app preview disabled (set PREVIEW_HOST_PATTERN to enable)"
+fi
+
+# Auto-start persistent registered applications in the background
+if [ -f /opt/agent-canvas/grokbot-app.mjs ]; then
+  log "Auto-starting persistent web apps from registry..."
+  node /opt/agent-canvas/grokbot-app.mjs auto-start || true
 fi
 
 # EFFECTIVE_SESSION_KEY is set above from LOCAL_BACKEND_API_KEY or the persisted api-key.txt

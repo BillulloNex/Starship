@@ -24,11 +24,7 @@ export function buildPreviewUrl(
   port: number,
 ): string | null {
   if (!urlTemplate) return null;
-  const templates = urlTemplate.split(",").map((s) => s.trim());
-  const portTemplate =
-    templates.find((t) => t.includes("{port}")) ?? templates[0];
-  if (!portTemplate) return null;
-  return portTemplate.replace(/\{port\}/g, String(port));
+  return urlTemplate.replace("{port}", String(port));
 }
 
 async function fetchPreviewPorts(): Promise<PreviewPortsResponse> {

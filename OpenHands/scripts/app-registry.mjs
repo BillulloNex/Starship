@@ -6,14 +6,18 @@
  * preventing separate projects from colliding on the same port.
  */
 
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
-import { DEFAULT_BLOCKED_PORTS, isPreviewablePort } from "./preview-proxy.mjs";
+import { DEFAULT_BLOCKED_PORTS, isPreviewablePort, listListeningPorts } from "./preview-proxy.mjs";
 
 export const DEFAULT_REGISTRY_PATH =
   process.env.GROKBOT_APPS_REGISTRY_PATH ||
-  "/opt/agent-canvas/apps.json";
+  (existsSync("/projects")
+    ? "/projects/.grokbot/apps.json"
+    : "/opt/agent-canvas/apps.json");
 
 export const APP_PORT_RANGE_START = 3000;
 export const APP_PORT_RANGE_END = 3999;
@@ -72,9 +76,19 @@ export async function saveRegistry(registry, registryPath = DEFAULT_REGISTRY_PAT
 
 /**
  * Registers an application with a name and port.
+ * @param {object} options
+ * @param {string} options.name
+ * @param {number|string} options.port
+ * @param {string} [options.title]
+ * @param {number|string} [options.pid]
+ * @param {string} [options.dir]
+ * @param {string} [options.startCmd]
+ * @param {string} [options.start_cmd]
+ * @param {string} [registryPath]
+ * @param {number[]} [blockedPorts]
  */
 export async function registerApp(
-  { name, port, title, pid, dir },
+  { name, port, title, pid, dir, startCmd, start_cmd },
   registryPath = DEFAULT_REGISTRY_PATH,
   blockedPorts = DEFAULT_BLOCKED_PORTS,
 ) {
@@ -101,6 +115,7 @@ export async function registerApp(
     title: title || slug,
     pid: pid ? Number.parseInt(pid, 10) : undefined,
     dir: dir || undefined,
+    start_cmd: startCmd || start_cmd || registry[slug]?.start_cmd || undefined,
     created_at: registry[slug]?.created_at || now,
     updated_at: now,
   };
@@ -192,4 +207,79 @@ export async function allocateNextPort(
   }
 
   throw new Error("No free preview ports available in the 3000-3999 range.");
+}
+
+/**
+ * Auto-starts registered applications on startup or after container restarts.
+ */
+export async function autoStartApps(options = {}) {
+  const { registryPath = DEFAULT_REGISTRY_PATH, logger = console.log } = options;
+  const registry = await loadRegistry(registryPath);
+  const apps = Object.values(registry);
+  if (apps.length === 0) {
+    logger("[app-registry] No registered apps to auto-start.");
+    return [];
+  }
+
+  let listening = [];
+  try {
+    listening = await listListeningPorts();
+  } catch (err) {
+    logger(`[app-registry] Warning: Could not list listening ports: ${err.message}`);
+  }
+  const listeningSet = new Set(listening);
+
+  const results = [];
+  for (const app of apps) {
+    if (listeningSet.has(app.port)) {
+      logger(`[app-registry] App "${app.name}" is already running on port ${app.port}.`);
+      results.push({ app: app.name, status: "already_running", port: app.port });
+      continue;
+    }
+
+    if (!app.dir || !existsSync(app.dir)) {
+      logger(`[app-registry] App "${app.name}" directory "${app.dir}" not found; skipping.`);
+      results.push({ app: app.name, status: "dir_missing", port: app.port });
+      continue;
+    }
+
+    let cmd = app.start_cmd;
+    if (!cmd) {
+      if (existsSync(path.join(app.dir, "package.json"))) {
+        cmd = `npm run dev -- --port ${app.port} --host 0.0.0.0`;
+      } else if (existsSync(path.join(app.dir, "server.js"))) {
+        cmd = `node server.js`;
+      } else if (existsSync(path.join(app.dir, "index.html"))) {
+        cmd = `npx serve -l ${app.port} .`;
+      }
+    }
+
+    if (!cmd) {
+      logger(`[app-registry] App "${app.name}" has no start command; skipping.`);
+      results.push({ app: app.name, status: "no_command", port: app.port });
+      continue;
+    }
+
+    logger(`[app-registry] Auto-starting app "${app.name}" on port ${app.port} in "${app.dir}" (${cmd})...`);
+    try {
+      const child = spawn(cmd, {
+        cwd: app.dir,
+        shell: true,
+        detached: true,
+        stdio: "ignore",
+        env: {
+          ...process.env,
+          PORT: String(app.port),
+          HOST: "0.0.0.0",
+        },
+      });
+      child.unref();
+      results.push({ app: app.name, status: "started", port: app.port, pid: child.pid });
+    } catch (err) {
+      logger(`[app-registry] Failed to start "${app.name}": ${err.message}`);
+      results.push({ app: app.name, status: "error", error: err.message });
+    }
+  }
+
+  return results;
 }

@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
- * Grokbot App CLI — Command-line tool to register, unregister, and list apps.
+ * Grokbot App CLI — Command-line tool to register, unregister, list, and manage apps.
  *
  * Usage:
- *   node scripts/grokbot-app.mjs register <name> --port <port> [--title <title>]
+ *   node scripts/grokbot-app.mjs register <name> --port <port> [--title <title>] [--dir <dir>] [--start-cmd <cmd>]
  *   node scripts/grokbot-app.mjs unregister <name>
  *   node scripts/grokbot-app.mjs list
  *   node scripts/grokbot-app.mjs next-port [--preferred <port>]
+ *   node scripts/grokbot-app.mjs auto-start
+ *   node scripts/grokbot-app.mjs stop <name> [--unregister]
  */
 
+import { execSync } from "node:child_process";
 import process from "node:process";
 import {
   registerApp,
@@ -16,6 +19,7 @@ import {
   listApps,
   getApp,
   allocateNextPort,
+  autoStartApps,
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
 import { listListeningPorts } from "./preview-proxy.mjs";
@@ -25,8 +29,8 @@ function printHelp() {
 Grokbot App Registry CLI
 
 COMMANDS:
-  register <name> --port <port> [--title <title>] [--dir <dir>]
-      Register an app to a port and subdomain slug (e.g. teddybear -> 3000)
+  register <name> --port <port> [--title <title>] [--dir <dir>] [--start-cmd <cmd>]
+      Register an app to a port and subdomain slug (e.g. mario-game -> 3000)
 
   unregister <name>
       Remove an app registration
@@ -39,6 +43,12 @@ COMMANDS:
 
   next-port [--preferred <port>]
       Find the next available port for a new app
+
+  auto-start
+      Auto-start all registered persistent applications
+
+  stop <name> [--unregister]
+      Stop a running app process by killing its port listener and optionally unregistering it
 
 OPTIONS:
   --registry-path <path>  Override registry JSON path (default: ${DEFAULT_REGISTRY_PATH})
@@ -70,13 +80,14 @@ async function main() {
     case "register": {
       const name = filteredArgs[0];
       if (!name) {
-        console.error("Error: App name is required (e.g. grokbot-app register teddybear --port 3000)");
+        console.error("Error: App name is required (e.g. grokbot-app register mario-game --port 3000)");
         process.exit(1);
       }
 
       let port = null;
       let title = null;
       let dir = null;
+      let startCmd = null;
 
       for (let i = 1; i < filteredArgs.length; i++) {
         if (filteredArgs[i] === "--port" && i + 1 < filteredArgs.length) {
@@ -85,6 +96,11 @@ async function main() {
           title = filteredArgs[++i];
         } else if (filteredArgs[i] === "--dir" && i + 1 < filteredArgs.length) {
           dir = filteredArgs[++i];
+        } else if (
+          (filteredArgs[i] === "--start-cmd" || filteredArgs[i] === "--start_cmd") &&
+          i + 1 < filteredArgs.length
+        ) {
+          startCmd = filteredArgs[++i];
         }
       }
 
@@ -94,10 +110,66 @@ async function main() {
       }
 
       try {
-        const record = await registerApp({ name, port, title, dir }, registryPath);
+        const record = await registerApp(
+          { name, port, title, dir, startCmd },
+          registryPath,
+        );
         console.log(JSON.stringify({ success: true, app: record }, null, 2));
       } catch (err) {
         console.error("Error registering app:", err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "auto-start": {
+      try {
+        const results = await autoStartApps({ registryPath });
+        console.log(JSON.stringify({ success: true, count: results.length, results }, null, 2));
+      } catch (err) {
+        console.error("Error auto-starting apps:", err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "stop": {
+      const name = filteredArgs[0];
+      if (!name) {
+        console.error("Error: App name is required (e.g. grokbot-app stop mario-game)");
+        process.exit(1);
+      }
+
+      const shouldUnregister = filteredArgs.includes("--unregister");
+      const app = await getApp(name, registryPath);
+      if (!app) {
+        console.error(`App "${name}" not found in registry.`);
+        process.exit(1);
+      }
+
+      try {
+        // Attempt to kill process listening on port
+        try {
+          execSync(`fuser -k ${app.port}/tcp 2>/dev/null || true`);
+        } catch {
+          // Ignore if fuser is not present or exits non-zero
+        }
+
+        let unregistered = false;
+        if (shouldUnregister) {
+          unregistered = await unregisterApp(name, registryPath);
+        }
+
+        console.log(
+          JSON.stringify({
+            success: true,
+            stopped: app.name,
+            port: app.port,
+            unregistered,
+          }),
+        );
+      } catch (err) {
+        console.error(`Error stopping app "${name}":`, err.message);
         process.exit(1);
       }
       break;

@@ -111,4 +111,25 @@ describe("app-registry.mjs", () => {
       expect(port).toBe(3050);
     });
   });
+
+  describe("start_cmd and autoStartApps", () => {
+    it("persists dir and start_cmd", async () => {
+      const record = await registerApp(
+        {
+          name: "mario-game",
+          port: 3005,
+          dir: "/projects/mario-game",
+          start_cmd: "npm run dev",
+        },
+        registryPath,
+      );
+
+      expect(record.dir).toBe("/projects/mario-game");
+      expect(record.start_cmd).toBe("npm run dev");
+
+      const fetched = await getApp("mario-game", registryPath);
+      expect(fetched?.dir).toBe("/projects/mario-game");
+      expect(fetched?.start_cmd).toBe("npm run dev");
+    });
+  });
 });
