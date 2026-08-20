@@ -63,7 +63,8 @@ function shouldSyncLauncherDefaultLocalBackend(
 
   return (
     backend.host === defaultBackend.host ||
-    (isLoopbackUrl(backend.host) && isLoopbackUrl(defaultBackend.host))
+    (isLoopbackUrl(backend.host) && isLoopbackUrl(defaultBackend.host)) ||
+    (backend.host.includes("grok.beenex.org") && defaultBackend.host.includes("grok-api.beenex.org"))
   );
 }
 
@@ -77,11 +78,17 @@ function syncLauncherDefaultLocalBackend(backends: Backend[]): Backend[] {
       return backend;
     }
 
-    if (backend.apiKey === defaultBackend.apiKey) return backend;
+    if (
+      backend.apiKey === defaultBackend.apiKey &&
+      backend.host === defaultBackend.host
+    ) {
+      return backend;
+    }
 
     didSync = true;
     return {
       ...backend,
+      host: defaultBackend.host,
       apiKey: defaultBackend.apiKey,
     };
   });

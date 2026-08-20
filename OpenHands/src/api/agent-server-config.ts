@@ -189,7 +189,7 @@ export function getAgentServerBaseUrl(): string | null {
       hostname === "grokbot.pages.dev" ||
       hostname.endsWith(".grokbot.pages.dev")
     ) {
-      return "https://api.grok.beenex.org";
+      return "https://grok-api.beenex.org";
     }
     return window.location.origin;
   }
