@@ -144,7 +144,6 @@ describe("Browser", () => {
           portsResponse({
             enabled: true,
             listening: [3000],
-            routable: [3000],
             urlTemplate: "https://p{port}.beenex.org",
           }),
         ),
@@ -179,14 +178,16 @@ describe("Browser", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("explains when the app's port has no public hostname", async () => {
+    it("previews an arbitrary port the agent happened to pick", async () => {
+      // Regression: the agent picks its own port (it chose 8798 in the wild),
+      // so any listening port must produce a working URL without the port
+      // having been registered anywhere.
       vi.stubGlobal(
         "fetch",
         vi.fn(() =>
           portsResponse({
             enabled: true,
-            listening: [7777],
-            routable: [3000, 5173],
+            listening: [8798],
             urlTemplate: "https://p{port}.beenex.org",
           }),
         ),
@@ -196,13 +197,11 @@ describe("Browser", () => {
       renderPanel();
 
       await waitFor(() => {
-        expect(
-          screen.getByText("PREVIEW$PORT_NOT_PUBLISHED"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("live-preview-iframe")).toHaveAttribute(
+          "src",
+          "https://p8798.beenex.org",
+        );
       });
-      expect(
-        screen.queryByTestId("live-preview-iframe"),
-      ).not.toBeInTheDocument();
     });
 
     it("does not offer a preview when the deployment has it disabled", async () => {
@@ -212,7 +211,6 @@ describe("Browser", () => {
           portsResponse({
             enabled: false,
             listening: [],
-            routable: [],
             urlTemplate: null,
           }),
         ),

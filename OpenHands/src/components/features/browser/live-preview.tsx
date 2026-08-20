@@ -33,16 +33,9 @@ export function LivePreview() {
   const { data, isLoading } = usePreviewPorts();
   const [didCopy, setDidCopy] = useState(false);
 
-  const listening = useMemo(() => data?.listening ?? [], [data?.listening]);
-  const routable = useMemo(() => data?.routable ?? [], [data?.routable]);
-
-  // Ports that are both running and publicly reachable — the only ones we can
-  // actually show. A port in one list but not the other is a state the user
-  // needs explaining, handled in the empty states below.
-  const previewable = useMemo(
-    () => listening.filter((port) => routable.includes(port)),
-    [listening, routable],
-  );
+  // Every listening port is previewable — the proxy matches preview hostnames
+  // by pattern, so there is no per-port registration to fall out of sync with.
+  const previewable = useMemo(() => data?.listening ?? [], [data?.listening]);
 
   // Follow the running app automatically until the user picks a port, and let
   // go of a selection once that server stops, so the pane doesn't sit on a
@@ -91,24 +84,10 @@ export function LivePreview() {
     );
   }
 
-  // Running, but on a port with no published hostname — the single most
-  // confusing failure, so name the port and the ports that would work.
-  const unroutable = listening.filter((port) => !routable.includes(port));
-  if (previewable.length === 0 && unroutable.length > 0) {
-    return (
-      <ConversationTabEmptyState icon={<Globe />}>
-        {t(I18nKey.PREVIEW$PORT_NOT_PUBLISHED, {
-          ports: unroutable.join(", "),
-          published: routable.join(", "),
-        })}
-      </ConversationTabEmptyState>
-    );
-  }
-
   if (previewable.length === 0) {
     return (
       <ConversationTabEmptyState icon={<Globe />}>
-        {t(I18nKey.PREVIEW$NO_SERVER, { ports: routable.join(", ") })}
+        {t(I18nKey.PREVIEW$NO_SERVER)}
       </ConversationTabEmptyState>
     );
   }

@@ -352,7 +352,6 @@ log "Starting frontend + proxy on port $PORT..."
 # appends it to /server_info as runtime_services and also injects the legacy
 # window global for older frontend bundles.
 PREVIEW_HOST_PATTERN="${PREVIEW_HOST_PATTERN:-}"
-PREVIEW_PORTS="${PREVIEW_PORTS:-3000,3001,4200,5000,5173,7860,8080,8501}"
 PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
 
 # Tell the agent about the public preview so it starts servers on a port that
@@ -363,7 +362,6 @@ RSI_PREVIEW_ARGS=()
 if [ -n "$PREVIEW_HOST_PATTERN" ]; then
   RSI_PREVIEW_ARGS=(
     --preview-url-template "${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN}"
-    --preview-ports "$PREVIEW_PORTS"
     --preview-reserved-ports "${PORT},${AGENT_SERVER_PORT},${AUTOMATION_PORT}"
   )
 fi
@@ -382,21 +380,21 @@ RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
 #   PREVIEW_HOST_PATTERN=p{port}.beenex.org
 #     -> https://p3000.beenex.org  reaches  127.0.0.1:3000
 #
-# Each concrete hostname needs DNS *and* a reverse-proxy route pointing at this
-# container. PREVIEW_PORTS declares which ones the operator actually published,
-# so the UI only offers links that resolve. Unset PREVIEW_HOST_PATTERN disables
-# the feature; the stack's own ports are always refused regardless.
+# The reverse proxy matches these hostnames by pattern (a Traefik HostRegexp
+# router), so ANY port works with no per-port registration — which matters
+# because the agent picks its own port and will not reliably pick from a list.
+# Unset PREVIEW_HOST_PATTERN disables the feature; the stack's own ports are
+# always refused regardless.
 PREVIEW_ARGS=()
 if [ -n "$PREVIEW_HOST_PATTERN" ]; then
   PREVIEW_ARGS=(
     --preview-host-pattern "$PREVIEW_HOST_PATTERN"
-    --preview-ports "$PREVIEW_PORTS"
     --preview-url-scheme "$PREVIEW_URL_SCHEME"
     --preview-block-port "$PORT"
     --preview-block-port "$AGENT_SERVER_PORT"
     --preview-block-port "$AUTOMATION_PORT"
   )
-  log "Live app preview enabled: ${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN} (published ports: ${PREVIEW_PORTS})"
+  log "Live app preview enabled: ${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN} (any port)"
 else
   log "Live app preview disabled (set PREVIEW_HOST_PATTERN to enable)"
 fi

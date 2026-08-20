@@ -103,7 +103,6 @@ export function parseArgs(argv = process.argv.slice(2)) {
     lockToCloud: null,
     basePath: "/",
     previewHostPattern: null,
-    previewRoutablePorts: [],
     previewUrlScheme: "https",
     previewBlockedPorts: [...DEFAULT_BLOCKED_PORTS],
   };
@@ -152,12 +151,6 @@ export function parseArgs(argv = process.argv.slice(2)) {
         break;
       case "--preview-host-pattern":
         config.previewHostPattern = argv[++i] || null;
-        break;
-      case "--preview-ports":
-        config.previewRoutablePorts = (argv[++i] || "")
-          .split(",")
-          .map((value) => Number.parseInt(value.trim(), 10))
-          .filter(Number.isInteger);
         break;
       case "--preview-url-scheme":
         config.previewUrlScheme = argv[++i] || "https";
@@ -254,10 +247,6 @@ OPTIONS:
                                e.g. 'p{port}.beenex.org') are proxied 1:1 to
                                127.0.0.1:<port>, with no path rewriting.
                                Requires a DNS record + proxy route per host.
-  --preview-ports <list>       Comma-separated ports that actually have a
-                               route pointing at this server, e.g.
-                               '3000,5173,8080'. Advertised to the frontend so
-                               it only offers share links that resolve.
   --preview-url-scheme <s>     Scheme for advertised preview URLs
                                (default: https — TLS usually terminates at an
                                upstream CDN while the origin speaks http).
@@ -640,12 +629,12 @@ async function handleStatic(
  *
  *   listening — ports with a server answering on them right now, discovered
  *               from /proc. This is "what the agent started".
- *   routable  — ports the operator has published a hostname for. A port can
- *               be listening but not routable (nothing outside can reach it),
- *               so the two lists are reported separately rather than merged;
- *               the UI needs to tell the user *why* a running app has no link.
  *   template  — how to turn a port into a URL, so the share link is built from
  *               deploy-time config rather than guessed in the browser.
+ *
+ * Every listening port is previewable: the proxy route matches the hostname by
+ * pattern, so there is no per-port registration and therefore no such thing as
+ * a running-but-unreachable port.
  */
 async function handlePreviewPortsRequest(
   res,
@@ -653,9 +642,7 @@ async function handlePreviewPortsRequest(
   blockedPorts,
   infrastructurePorts,
 ) {
-  const enabled = Boolean(
-    config.previewHostPattern?.includes("{port}"),
-  );
+  const enabled = Boolean(config.previewHostPattern?.includes("{port}"));
   const listening = await listListeningPorts(
     blockedPorts,
     undefined,
@@ -665,7 +652,6 @@ async function handlePreviewPortsRequest(
   const body = JSON.stringify({
     enabled,
     listening,
-    routable: config.previewRoutablePorts ?? [],
     urlTemplate: enabled
       ? `${config.previewUrlScheme}://${config.previewHostPattern}`
       : null,
@@ -856,11 +842,6 @@ export function startStaticServer(config) {
       if (previewPortForHost) {
         console.log(
           `  ${config.previewUrlScheme}://${config.previewHostPattern} -> http://127.0.0.1:{port} (live preview)`,
-        );
-        console.log(
-          `  Preview routable ports: ${
-            (config.previewRoutablePorts ?? []).join(", ") || "(none declared)"
-          }`,
         );
       }
       if (config.lockToCloud) {

@@ -62,18 +62,24 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 
 ## Live App Preview (shareable URLs)
 
-- Apps the agent starts inside the container are exposed by **hostname**, not path:
+- Apps the agent starts inside the container are exposed by **hostname**:
   `PREVIEW_HOST_PATTERN=p{port}.beenex.org` makes `https://p3000.beenex.org` proxy
   1:1 to `127.0.0.1:3000`. No path rewriting, so absolute asset URLs, the app's own
   `/api/*`, client-side routing, and WebSockets/HMR all work unmodified.
-- **Every previewable port needs a Traefik router**, created by listing the hostname
-  in the Coolify FQDN field. `PREVIEW_PORTS` (entrypoint default:
-  `3000,3001,4200,5000,5173,7860,8080,8501`) must stay in sync with that list — it is
-  what the UI advertises as shareable, so a mismatch shows users links that 404.
+- **Any port works.** A Traefik `HostRegexp(^p[0-9]+\.beenex\.org$)` router — set as a
+  *custom label* on the Coolify app — routes every `pNNNN` hostname to the container.
+  This replaced an 8-port allowlist that required the agent to pick from a list; it
+  picked 8798 on the first real run, which is why the constraint had to go.
+- **The custom label is the fragile part.** Coolify regenerates the labels block when
+  the FQDN field changes, which would silently drop the regex router and leave only
+  the fixed `pNNNN` domains still listed in FQDN. If arbitrary ports stop resolving,
+  check `custom_labels` first. Labels apply at container *creation* — a restart is not
+  enough, a redeploy is.
 - The stack's own ports (proxy 8000, agent-server 18000, automation 18001) are always
   refused, and ports below 1024 are never proxied. Preview hostnames are **public** —
   anyone with the link reaches the app, matching how `grok.beenex.org` already behaves.
 - A separate hostname is also a separate origin, which is deliberate: the session API
-  key lives in `localStorage` on the canvas origin, and previews must not be able to
-  read it.
-
+  key lives in `localStorage` on the canvas origin, and previews must not read it.
+- The agent learns all this from `app_preview` in the `<RUNTIME_SERVICES>` block
+  (`scripts/runtime-services-info.mjs`), so it hands the user a public URL instead of
+  a localhost one.

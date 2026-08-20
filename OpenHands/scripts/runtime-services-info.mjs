@@ -51,9 +51,6 @@ import { pathToFileURL } from "node:url";
  * @param {string} [options.appPreview.urlTemplate] - e.g.
  *   "https://p{port}.beenex.org"; `{port}` is substituted with the port the
  *   agent's server listens on.
- * @param {number[]} [options.appPreview.ports] - Ports that actually have a
- *   public hostname. Servers started on anything else are unreachable from
- *   outside the container, so the agent needs the exact list, not a hint.
  * @param {number[]} [options.appPreview.reservedPorts] - Ports already taken by
  *   this stack. Called out explicitly because `python -m http.server` defaults
  *   to 8000, which collides with the ingress.
@@ -164,14 +161,11 @@ export function buildRuntimeServicesInfo(options) {
   if (appPreview?.urlTemplate) {
     services.app_preview = {
       description:
-        "Public URL for web servers you start. A server listening on PORT " +
-        "inside this container is reachable from the outside world at the " +
-        "url_template below, with {port} replaced by PORT. Only the ports in " +
-        "`ports` have a public hostname — a server on any other port works " +
-        "locally but no URL reaches it. Give the user this URL when you " +
-        "start a web app; it is shareable with anyone.",
+        "Public URL for web servers you start. A server listening on any " +
+        "PORT inside this container is reachable from the outside world at " +
+        "the url_template below, with {port} replaced by PORT. Give the user " +
+        "this URL when you start a web app; it is shareable with anyone.",
       url_template: appPreview.urlTemplate,
-      ports: appPreview.ports ?? [],
       reserved_ports: appPreview.reservedPorts ?? [],
       note_from_agent:
         "This URL is for the user's browser, not for you — curling it from " +
@@ -206,12 +200,6 @@ export function parseArgs(argv) {
         break;
       case "--preview-url-template":
         options.appPreview.urlTemplate = argv[++i] || undefined;
-        break;
-      case "--preview-ports":
-        options.appPreview.ports = (argv[++i] || "")
-          .split(",")
-          .map((value) => Number.parseInt(value.trim(), 10))
-          .filter(Number.isInteger);
         break;
       case "--preview-reserved-ports":
         options.appPreview.reservedPorts = (argv[++i] || "")

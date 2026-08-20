@@ -3,18 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 /**
  * Live-preview state, served by the ingress (`static-server.mjs`).
  *
- * `listening` and `routable` are deliberately separate. A dev server can be
- * running on a port the operator never published a hostname for — it works
- * inside the container but no link to it resolves — and the UI has to explain
- * that rather than hand out a URL that 404s.
+ * Every listening port is previewable: the proxy matches preview hostnames by
+ * pattern rather than per-port registration, so a running server always has a
+ * URL that resolves.
  */
 export interface PreviewPortsResponse {
   /** False when the deployment has no preview host pattern configured. */
   enabled: boolean;
   /** Ports with a server answering inside the workspace container, right now. */
   listening: number[];
-  /** Ports the operator has published a public hostname for. */
-  routable: number[];
   /** e.g. "https://p{port}.beenex.org"; null when disabled. */
   urlTemplate: string | null;
 }
@@ -44,7 +41,7 @@ async function fetchPreviewPorts(): Promise<PreviewPortsResponse> {
   // broken tab.
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    return { enabled: false, listening: [], routable: [], urlTemplate: null };
+    return { enabled: false, listening: [], urlTemplate: null };
   }
 
   return response.json();
