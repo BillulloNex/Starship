@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # agent-canvas all-in-one entrypoint
 #
-# Starts three services (plus an optional fourth):
+# Starts three services (plus optional Telegram and public-mode services):
 #   1. Agent Server   on port $AGENT_SERVER_PORT  (default 18000)
 #   2. Automation     on port $AUTOMATION_PORT     (default 18001)
 #   3. Static server  on port $PORT               (default 8000)
@@ -39,6 +39,8 @@
 #                          Override in production when the external URL differs.
 #   AUTOMATION_WORKSPACE_BASE – Directory for automation run workspaces
 #                          (default: ~/.openhands/workspaces)
+#   TELEGRAM_BOT_TOKEN     – Enables the private-chat Telegram bridge.
+#   TELEGRAM_ALLOWED_USER_IDS – Comma-separated Telegram user ID allowlist.
 #   Any agent-server or automation env vars are passed through.
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
@@ -329,7 +331,17 @@ wait_for_port "$AUTOMATION_PORT" "Automation Server" 60 &
 WAIT_PID2=$!
 wait "$WAIT_PID1" "$WAIT_PID2"
 
-# ── 4. Start static server (frontend + proxy) ────────────────────────────────
+# ── 4. Start optional Telegram bridge ───────────────────────────────────────
+if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
+  log "Starting Telegram mobile bridge..."
+  export GROKBOT_AGENT_SERVER_URL="${GROKBOT_AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
+  export GROKBOT_AGENT_SERVER_API_KEY="${GROKBOT_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
+  export TELEGRAM_STATE_PATH="${TELEGRAM_STATE_PATH:-${STATE_DIR}/telegram-bridge.json}"
+  node /opt/agent-canvas/telegram-bridge.mjs &
+  PIDS+=($!)
+fi
+
+# ── 5. Start static server (frontend + proxy) ────────────────────────────────
 log "Starting frontend + proxy on port $PORT..."
 
 # Describe the local runtime services so the frontend can populate the agent's
@@ -366,7 +378,7 @@ node /opt/agent-canvas/static-server.mjs \
 STATIC_PID=$!
 PIDS+=("$STATIC_PID")
 
-# ── 5. (Optional) Public-mode static server ─────────────────────────────────
+# ── 6. (Optional) Public-mode static server ─────────────────────────────────
 # When PUBLIC_MODE_PORT is set, start a second static-server instance that
 # serves the same frontend WITHOUT injecting the session key into the HTML
 # (--auth-required). This is used by auth-mode E2E tests to verify the
