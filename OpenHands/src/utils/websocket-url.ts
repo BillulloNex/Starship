@@ -4,14 +4,27 @@
  * @returns Base host (e.g., "localhost:3000") or window.location.host as fallback
  */
 function extractBaseHost(conversationUrl: string | null | undefined): string {
+  const browserHostname =
+    typeof window !== "undefined"
+      ? (window.location.hostname ?? window.location.host?.split(":")[0])
+      : "";
+
+  // If running on Cloudflare Pages (grok.beenex.org / grokbot.pages.dev),
+  // all backend WebSockets route to grok-api.beenex.org
+  if (
+    browserHostname === "grok.beenex.org" ||
+    browserHostname === "grokbot.pages.dev" ||
+    browserHostname.endsWith(".grokbot.pages.dev")
+  ) {
+    return "grok-api.beenex.org";
+  }
+
   if (conversationUrl && !conversationUrl.startsWith("/")) {
     try {
       const url = new URL(conversationUrl);
       // If the conversation URL points to localhost but we're accessing from external,
       // use the browser's hostname with the conversation URL's port
       const urlHostname = url.hostname;
-      const browserHostname =
-        window.location.hostname ?? window.location.host?.split(":")[0];
       if (
         browserHostname &&
         (urlHostname === "localhost" || urlHostname === "127.0.0.1") &&
@@ -22,10 +35,10 @@ function extractBaseHost(conversationUrl: string | null | undefined): string {
       }
       return url.host; // e.g., "localhost:3000"
     } catch {
-      return window.location.host;
+      return typeof window !== "undefined" ? window.location.host : "";
     }
   }
-  return window.location.host;
+  return typeof window !== "undefined" ? window.location.host : "";
 }
 
 /**

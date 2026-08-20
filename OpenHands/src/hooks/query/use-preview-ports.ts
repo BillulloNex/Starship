@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { getAgentServerBaseUrl } from "#/api/agent-server-config";
 
 /**
  * Live-preview state, served by the ingress (`static-server.mjs`).
@@ -27,7 +28,8 @@ export function buildPreviewUrl(
 }
 
 async function fetchPreviewPorts(): Promise<PreviewPortsResponse> {
-  const response = await fetch(PREVIEW_PORTS_ENDPOINT, {
+  const baseUrl = getAgentServerBaseUrl() ?? "";
+  const response = await fetch(`${baseUrl}${PREVIEW_PORTS_ENDPOINT}`, {
     headers: { Accept: "application/json" },
   });
 
