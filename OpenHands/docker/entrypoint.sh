@@ -360,8 +360,11 @@ PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
 # and the preview only works by luck.
 RSI_PREVIEW_ARGS=()
 if [ -n "$PREVIEW_HOST_PATTERN" ]; then
+  # Pick the first pattern that contains {port} for the single url template
+  PRIMARY_PORT_PATTERN="$(echo "$PREVIEW_HOST_PATTERN" | tr ',' '\n' | grep '{port}' | head -n 1)"
+  PRIMARY_PORT_PATTERN="${PRIMARY_PORT_PATTERN:-p{port}.beenex.space}"
   RSI_PREVIEW_ARGS=(
-    --preview-url-template "${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN}"
+    --preview-url-template "${PREVIEW_URL_SCHEME}://${PRIMARY_PORT_PATTERN}"
     --preview-reserved-ports "${PORT},${AGENT_SERVER_PORT},${AUTOMATION_PORT}"
   )
 fi
