@@ -25,6 +25,9 @@ COPY OpenHands/package.json OpenHands/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
+# Copy VERSION to guarantee every version bump invalidates Docker layer cache
+COPY VERSION ./VERSION
+
 # Copy everything needed for the build
 COPY OpenHands/ .
 
