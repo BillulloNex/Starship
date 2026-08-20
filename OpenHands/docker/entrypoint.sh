@@ -353,7 +353,9 @@ log "Starting frontend + proxy on port $PORT..."
 # from the sandbox-facing URLs the entrypoint already exports. static-server.mjs
 # appends it to /server_info as runtime_services and also injects the legacy
 # window global for older frontend bundles.
-PREVIEW_HOST_PATTERN="${PREVIEW_HOST_PATTERN:-{app}.beenex.space,p{port}.beenex.space,p{port}.beenex.org,{app}.beenex.org}"
+if [ -z "${PREVIEW_HOST_PATTERN:-}" ]; then
+  PREVIEW_HOST_PATTERN="{app}.beenex.space,p{port}.beenex.space,{app}.beenex.org,p{port}.beenex.org"
+fi
 PREVIEW_URL_SCHEME="${PREVIEW_URL_SCHEME:-https}"
 
 # Tell the agent about the public preview so it starts servers on a port that
