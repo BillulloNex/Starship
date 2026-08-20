@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { spawn, exec } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -164,9 +164,97 @@ export async function getAppByPort(port, registryPath = DEFAULT_REGISTRY_PATH) {
 }
 
 /**
- * Returns a list of all registered applications.
+ * Automatically scans directories (e.g. /projects, /workspace) for web applications,
+ * registering any discovered projects that are not yet in the registry.
  */
-export async function listApps(registryPath = DEFAULT_REGISTRY_PATH) {
+export async function discoverProjects(
+  baseDir = "/projects",
+  registryPath = DEFAULT_REGISTRY_PATH,
+) {
+  if (!existsSync(baseDir)) return [];
+  const registry = await loadRegistry(registryPath);
+  const registeredDirs = new Set(
+    Object.values(registry)
+      .map((a) => a.dir)
+      .filter(Boolean),
+  );
+
+  let entries = [];
+  try {
+    entries = await readdir(baseDir, { withFileTypes: true });
+  } catch (err) {
+    return [];
+  }
+
+  const discovered = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const projectDir = path.join(baseDir, entry.name);
+    const slug = normalizeAppName(entry.name);
+    if (!slug) continue;
+
+    if (registry[slug] || registeredDirs.has(projectDir)) continue;
+
+    const hasPkg = existsSync(path.join(projectDir, "package.json"));
+    const hasHtml = existsSync(path.join(projectDir, "index.html"));
+    const hasServer = existsSync(path.join(projectDir, "server.js"));
+    const hasAppPy =
+      existsSync(path.join(projectDir, "app.py")) ||
+      existsSync(path.join(projectDir, "main.py"));
+
+    if (hasPkg || hasHtml || hasServer || hasAppPy) {
+      let start_cmd = undefined;
+      if (hasPkg) {
+        start_cmd = "npm run dev";
+      } else if (hasServer) {
+        start_cmd = "node server.js";
+      } else if (hasHtml) {
+        start_cmd = "npx serve -l $PORT .";
+      } else if (hasAppPy) {
+        start_cmd = "python3 -m http.server $PORT";
+      }
+
+      try {
+        const port = await allocateNextPort({}, registryPath);
+        const record = await registerApp(
+          {
+            name: slug,
+            port,
+            title: entry.name
+              .replace(/[-_]+/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            dir: projectDir,
+            start_cmd,
+          },
+          registryPath,
+        );
+        discovered.push(record);
+      } catch (err) {
+        console.warn(
+          `[app-registry] Failed to auto-register project "${entry.name}":`,
+          err.message,
+        );
+      }
+    }
+  }
+
+  return discovered;
+}
+
+/**
+ * Returns a list of all registered applications, auto-discovering any new projects in /projects.
+ */
+export async function listApps(
+  registryPath = DEFAULT_REGISTRY_PATH,
+  scanDirs = ["/projects", "/workspace"],
+) {
+  for (const scanDir of scanDirs) {
+    if (existsSync(scanDir)) {
+      try {
+        await discoverProjects(scanDir, registryPath);
+      } catch {}
+    }
+  }
   const registry = await loadRegistry(registryPath);
   return Object.values(registry).sort((a, b) =>
     (b.updated_at || "").localeCompare(a.updated_at || ""),
