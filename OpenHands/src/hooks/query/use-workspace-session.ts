@@ -84,6 +84,7 @@ export function useWorkspaceSession(): {
     // this conversation, which won't fix itself on a second POST. The
     // user can re-trigger by reloading or switching conversation.
     retry: false,
+    meta: { disableToast: true },
   });
 
   return {

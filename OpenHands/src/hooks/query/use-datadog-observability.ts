@@ -24,6 +24,7 @@ export function useDatadogStatus() {
     queryFn: () => DatadogService.getStatus(),
     staleTime: 60_000,
     retry: 1,
+    meta: { disableToast: true },
   });
 }
 
@@ -39,6 +40,7 @@ export function useDatadogSummary(
     queryFn: () => DatadogService.getSummary(timeframe),
     refetchInterval,
     staleTime: 10_000,
+    meta: { disableToast: true },
   });
 }
 
@@ -56,6 +58,7 @@ export function useDatadogLogs(
     queryFn: () => DatadogService.getLogs(timeframe, { status, query }),
     refetchInterval,
     staleTime: 10_000,
+    meta: { disableToast: true },
   });
 }
 

@@ -17,5 +17,7 @@ export function useCodexUsage() {
     queryFn: () => CodexUsageService.getUsage(false),
     refetchInterval: 60000,
     staleTime: 30000,
+    retry: false,
+    meta: { disableToast: true },
   });
 }

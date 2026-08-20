@@ -11,5 +11,6 @@ export function useAutomationHealth() {
     queryFn: () => AutomationService.checkHealth(),
     staleTime: 30 * 1000, // 30 seconds
     retry: false, // Don't retry on failure - we want to show the error state immediately
+    meta: { disableToast: true },
   });
 }
