@@ -293,18 +293,18 @@ export function buildRuntimeServicesSystemSuffix(
     const reserved = appPreview.reserved_ports ?? [];
     lines.push(
       "",
-      "PUBLIC APP PREVIEW",
+      "PUBLIC APP PREVIEW & SUBDOMAINS",
       `Any web server you start on PORT is reachable publicly at ${appPreview.url_template}`,
-      "(replace {port} with your port). ALWAYS give the user this URL when you",
-      "start a web app — never a localhost URL, which they cannot open. It is",
-      "shareable with anyone. Do not curl it to check your work; test against",
-      "localhost:PORT instead.",
+      "(replace {port} with your port, or {app} with your registered app name).",
+      "ALWAYS give the user this URL when you start a web app — never a localhost URL,",
+      "which they cannot open. It is shareable with anyone. Do not curl it to check your work;",
+      "test against localhost:PORT instead.",
     );
     if (reserved.length > 0) {
       lines.push(
         `The only unusable ports are ${reserved.join(", ")} — this stack owns them.`,
         "Note `python -m http.server` defaults to 8000 and will fail to bind;",
-        "always pass an explicit port.",
+        "always pass an explicit port (or use `grokbot-app register <name> --port <port>`).",
       );
     }
   }

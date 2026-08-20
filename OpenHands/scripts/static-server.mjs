@@ -51,10 +51,20 @@ import {
   createPreviewHostMatcher,
   listListeningPorts,
   writePreviewUnavailable,
+  writeAppNotFound,
 } from "./preview-proxy.mjs";
+import {
+  listApps,
+  registerApp,
+  unregisterApp,
+  getApp,
+  DEFAULT_REGISTRY_PATH,
+} from "./app-registry.mjs";
 
 /** Where the frontend reads the live-preview state from. */
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
+/** Where apps are registered and listed. */
+const PREVIEW_APPS_PATH = "/api/preview/apps";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPA fallback helpers
@@ -106,6 +116,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     previewHostPattern: null,
     previewUrlScheme: "https",
     previewBlockedPorts: [...DEFAULT_BLOCKED_PORTS],
+    appsRegistryPath: DEFAULT_REGISTRY_PATH,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -122,6 +133,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       case "-d":
       case "--dir":
         config.dir = argv[++i];
+        break;
+      case "--apps-registry-path":
+        config.appsRegistryPath = argv[++i] || DEFAULT_REGISTRY_PATH;
         break;
       case "-r":
       case "--route": {
@@ -643,7 +657,10 @@ async function handlePreviewPortsRequest(
   blockedPorts,
   infrastructurePorts,
 ) {
-  const enabled = Boolean(config.previewHostPattern?.includes("{port}"));
+  const enabled = Boolean(
+    config.previewHostPattern?.includes("{port}") ||
+      config.previewHostPattern?.includes("{app}"),
+  );
   const listening = await listListeningPorts(
     blockedPorts,
     undefined,
@@ -663,6 +680,64 @@ async function handlePreviewPortsRequest(
     "Cache-Control": "no-store",
   });
   res.end(body);
+}
+
+async function handlePreviewAppsRequest(req, res, registryPath) {
+  applyCorsHeaders(req, res);
+  if (req.method === "GET") {
+    const apps = await listApps(registryPath);
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(JSON.stringify(apps));
+    return;
+  }
+
+  if (req.method === "POST") {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", async () => {
+      try {
+        const payload = JSON.parse(body || "{}");
+        const record = await registerApp(payload, registryPath);
+        res.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        res.end(JSON.stringify({ success: true, app: record }));
+      } catch (err) {
+        res.writeHead(400, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+    const name = parsedUrl.searchParams.get("name");
+    if (!name) {
+      res.writeHead(400, {
+        "Content-Type": "application/json; charset=utf-8",
+      });
+      res.end(JSON.stringify({ success: false, error: "Missing ?name=" }));
+      return;
+    }
+    const success = await unregisterApp(name, registryPath);
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+    });
+    res.end(JSON.stringify({ success, name }));
+    return;
+  }
+
+  res.writeHead(405);
+  res.end();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -689,22 +764,43 @@ export function startStaticServer(config) {
   const previewPortForHost = createPreviewHostMatcher(
     config.previewHostPattern,
     blockedPreviewPorts,
+    (appName) => getApp(appName, config.appsRegistryPath),
   );
   // Filled in just below, before the server accepts its first connection.
   let infrastructurePorts = new Set();
 
   const uninstallDiagnostics = proxy.installDiagnostics();
 
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     // Live app preview is matched on Host before anything else: a preview
     // hostname must never fall through to the canvas SPA, its API routes, or
     // the static handler, all of which are keyed on path alone.
-    const previewPort = previewPortForHost?.(req.headers.host) ?? null;
-    if (previewPort !== null) {
-      proxy.proxyHttp(req, res, `http://127.0.0.1:${previewPort}`, (errorRes) =>
-        writePreviewUnavailable(errorRes, previewPort),
-      );
-      return;
+    if (previewPortForHost) {
+      try {
+        const preview = await previewPortForHost(req.headers.host);
+        if (preview !== null) {
+          if (preview.port !== null && preview.port !== undefined) {
+            proxy.proxyHttp(
+              req,
+              res,
+              `http://127.0.0.1:${preview.port}`,
+              (errorRes) =>
+                writePreviewUnavailable(
+                  errorRes,
+                  preview.port,
+                  preview.appName,
+                ),
+            );
+            return;
+          }
+          if (preview.notFound && preview.appName) {
+            await writeAppNotFound(res, preview.appName);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Preview host match error:", err);
+      }
     }
 
     applyCorsHeaders(req, res);
@@ -731,6 +827,20 @@ export function startStaticServer(config) {
       });
       return;
     }
+
+    if (parsedUrl.pathname === PREVIEW_APPS_PATH) {
+      handlePreviewAppsRequest(req, res, config.appsRegistryPath).catch(
+        (err) => {
+          console.error("Preview apps error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
+      return;
+    }
+
     if (parsedUrl.pathname.startsWith("/api/observability/datadog")) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
       handleDatadogProxy(req, res, parsedUrl.pathname, query).catch((err) => {
@@ -799,19 +909,25 @@ export function startStaticServer(config) {
     });
   });
 
-  server.on("upgrade", (req, socket, head) => {
+  server.on("upgrade", async (req, socket, head) => {
     // Same Host-first ordering as the request handler — without this, a
     // previewed app's WebSocket (Vite HMR, most notably) would be matched
     // against the canvas route table and dropped.
-    const previewPort = previewPortForHost?.(req.headers.host) ?? null;
-    if (previewPort !== null) {
-      proxy.proxyWebSocket(
-        req,
-        socket,
-        head,
-        `http://127.0.0.1:${previewPort}`,
-      );
-      return;
+    if (previewPortForHost) {
+      try {
+        const preview = await previewPortForHost(req.headers.host);
+        if (preview?.port !== null && preview?.port !== undefined) {
+          proxy.proxyWebSocket(
+            req,
+            socket,
+            head,
+            `http://127.0.0.1:${preview.port}`,
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Preview upgrade host match error:", err);
+      }
     }
 
     const backend = route(req.url ?? "/");

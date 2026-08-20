@@ -8,9 +8,11 @@
  * ingress at 127.0.0.1:3000 — but it is not reachable from a browser, because
  * Coolify only publishes the ingress port.
  *
- * This module bridges that gap by mapping a *hostname* to an internal port:
+ * This module bridges that gap by mapping hostnames to internal ports:
  *
- *   https://p3000.beenex.org/anything  ->  http://127.0.0.1:3000/anything
+ *   https://teddybear.beenex.space/anything -> http://127.0.0.1:3000/anything
+ *   https://p3000.beenex.space/anything     -> http://127.0.0.1:3000/anything
+ *   https://p3000.beenex.org/anything       -> http://127.0.0.1:3000/anything
  *
  * Host-based (rather than path-based, e.g. /preview/3000/…) is deliberate.
  * Because the path is passed through untouched:
@@ -29,6 +31,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { getApp, listApps } from "./app-registry.mjs";
 
 /**
  * Ports belonging to the GrokBot stack itself. Preview hostnames are public —
@@ -68,47 +71,158 @@ function escapeRegExp(value) {
 }
 
 /**
- * Compile a host pattern like `p{port}.beenex.org` into a matcher.
- *
- * Returns null when no pattern is configured (host-based preview disabled) or
- * the pattern has no `{port}` placeholder — without the placeholder every
- * hostname would map to the same port, which is never what the operator meant.
+ * Compile host patterns like `{app}.beenex.space`, `p{port}.beenex.space`, `p{port}.beenex.org`
+ * into a multi-host matcher supporting both named apps and numeric ports.
  */
 export function createPreviewHostMatcher(
-  pattern,
+  patterns,
   blockedPorts = DEFAULT_BLOCKED_PORTS,
+  appLookup = getApp,
 ) {
-  if (!pattern?.includes("{port}")) return null;
+  if (!patterns) return null;
 
-  const [before, after] = pattern.split("{port}", 2);
-  const regex = new RegExp(
-    `^${escapeRegExp(before)}(\\d{1,5})${escapeRegExp(after)}$`,
-    "i",
-  );
+  // Split comma-separated patterns
+  const patternList = (Array.isArray(patterns) ? patterns : patterns.split(","))
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  return function portForHost(hostHeader) {
+  if (patternList.length === 0) return null;
+
+  const matchers = [];
+
+  for (const pattern of patternList) {
+    if (pattern.includes("{port}")) {
+      const [before, after] = pattern.split("{port}", 2);
+      const regex = new RegExp(
+        `^${escapeRegExp(before)}(\\d{1,5})${escapeRegExp(after)}$`,
+        "i",
+      );
+      matchers.push({ type: "port", regex });
+    } else if (pattern.includes("{app}")) {
+      const [before, after] = pattern.split("{app}", 2);
+      const regex = new RegExp(
+        `^${escapeRegExp(before)}([a-z0-9][a-z0-9-]{0,62})${escapeRegExp(after)}$`,
+        "i",
+      );
+      matchers.push({ type: "app", regex });
+    }
+  }
+
+  // Also support default generic pattern matching for beenex.space and beenex.org subdomains
+  const defaultPortRegex = /^p(\d{1,5})\.(?:beenex\.(?:space|org))$/i;
+  const defaultAppRegex = /^([a-z0-9][a-z0-9-]{0,62})\.(?:beenex\.(?:space|org))$/i;
+
+  async function resolveHost(hostHeader) {
     if (!hostHeader) return null;
-    // Strip any :port suffix — the browser sends `p3000.beenex.org:443` on
-    // non-default ports, and Traefik forwards the Host header verbatim.
     const hostname = hostHeader.split(":")[0].trim().toLowerCase();
-    const match = regex.exec(hostname);
-    if (!match) return null;
 
-    const port = Number.parseInt(match[1], 10);
-    return isPreviewablePort(port, blockedPorts) ? port : null;
-  };
+    // 1. Check custom port matchers
+    for (const matcher of matchers) {
+      if (matcher.type === "port") {
+        const match = matcher.regex.exec(hostname);
+        if (match) {
+          const port = Number.parseInt(match[1], 10);
+          if (isPreviewablePort(port, blockedPorts)) {
+            return { port, appName: null };
+          }
+        }
+      }
+    }
+
+    // 2. Check default numeric port regex (e.g. p3000.beenex.space or p3000.beenex.org)
+    const portMatch = defaultPortRegex.exec(hostname);
+    if (portMatch) {
+      const port = Number.parseInt(portMatch[1], 10);
+      if (isPreviewablePort(port, blockedPorts)) {
+        return { port, appName: null };
+      }
+    }
+
+    // 3. Check custom app name matchers
+    for (const matcher of matchers) {
+      if (matcher.type === "app") {
+        const match = matcher.regex.exec(hostname);
+        if (match) {
+          const appName = match[1].toLowerCase();
+          // Skip if it looks like grok or grok-api main service
+          if (appName === "grok" || appName === "grok-api") return null;
+
+          // If it starts with p + digits, treat as port
+          if (/^p\d+$/.test(appName)) {
+            const port = Number.parseInt(appName.slice(1), 10);
+            if (isPreviewablePort(port, blockedPorts)) {
+              return { port, appName: null };
+            }
+          }
+
+          if (appLookup) {
+            const app = await appLookup(appName);
+            if (app && isPreviewablePort(app.port, blockedPorts)) {
+              return { port: app.port, appName: app.name };
+            }
+            return { port: null, appName, notFound: true };
+          }
+        }
+      }
+    }
+
+    // 4. Check default app regex for beenex.space
+    if (hostname.endsWith(".beenex.space") || hostname.endsWith(".beenex.org")) {
+      const appMatch = defaultAppRegex.exec(hostname);
+      if (appMatch) {
+        const appName = appMatch[1].toLowerCase();
+        if (appName === "grok" || appName === "grok-api") return null;
+
+        if (/^p\d+$/.test(appName)) {
+          const port = Number.parseInt(appName.slice(1), 10);
+          if (isPreviewablePort(port, blockedPorts)) {
+            return { port, appName: null };
+          }
+        }
+
+        if (appLookup) {
+          const app = await appLookup(appName);
+          if (app && isPreviewablePort(app.port, blockedPorts)) {
+            return { port: app.port, appName: app.name };
+          }
+          return { port: null, appName, notFound: true };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Synchronous port-only helper for legacy callers
+  function portForHost(hostHeader) {
+    if (!hostHeader) return null;
+    const hostname = hostHeader.split(":")[0].trim().toLowerCase();
+
+    for (const matcher of matchers) {
+      if (matcher.type === "port") {
+        const match = matcher.regex.exec(hostname);
+        if (match) {
+          const port = Number.parseInt(match[1], 10);
+          return isPreviewablePort(port, blockedPorts) ? port : null;
+        }
+      }
+    }
+
+    const portMatch = defaultPortRegex.exec(hostname);
+    if (portMatch) {
+      const port = Number.parseInt(portMatch[1], 10);
+      return isPreviewablePort(port, blockedPorts) ? port : null;
+    }
+
+    return null;
+  }
+
+  resolveHost.portForHost = portForHost;
+  return resolveHost;
 }
 
 /**
  * Parse listening TCP ports out of a /proc/net/tcp-style table.
- *
- * Format (columns are space-separated, header row first):
- *   sl  local_address rem_address st ...
- *    0: 00000000:1F90 00000000:0000 0A ...
- *
- * `local_address` is HEX_IP:HEX_PORT, and `st` is the connection state.
- * Exported separately from the file read so it can be unit-tested without
- * a Linux /proc.
  */
 export function parseListeningPorts(procNetTcpContents) {
   const ports = new Set();
@@ -130,11 +244,6 @@ export function parseListeningPorts(procNetTcpContents) {
 
 /**
  * List ports with something listening on them inside this container.
- *
- * Reads /proc directly rather than shelling out to `ss`/`lsof` — neither is
- * guaranteed to be in the agent-server base image, and /proc is free.
- * Returns [] anywhere /proc/net is unavailable (macOS dev machines), which
- * degrades to "no ports detected" rather than failing the request.
  */
 export async function listListeningPorts(
   blockedPorts = DEFAULT_BLOCKED_PORTS,
@@ -163,13 +272,6 @@ export async function listListeningPorts(
 
 /**
  * Ports already listening before the agent could have started anything.
- *
- * The ingress is the last thing the entrypoint starts, so whatever is bound at
- * that moment belongs to the image itself (the agent-server's own auxiliary
- * services, for instance, which vary by base-image version and can't be
- * hardcoded). Subtracting this baseline is what lets the UI say "no app is
- * running yet" instead of pointing at an internal service and calling it the
- * user's app.
  */
 export async function captureInfrastructurePorts(
   blockedPorts = DEFAULT_BLOCKED_PORTS,
@@ -178,14 +280,14 @@ export async function captureInfrastructurePorts(
 }
 
 /**
- * Friendly stand-in for the raw "Bad Gateway" a dead upstream would produce.
- *
- * Preview URLs get shared with people who have no idea what a reverse proxy
- * is, and a dev server that has not been started yet (or has crashed) is the
- * single most likely thing they will hit.
+ * Friendly stand-in for when no dev server answered on the requested port.
  */
-export function writePreviewUnavailable(res, port) {
+export function writePreviewUnavailable(res, port, appName = null) {
   if (res.headersSent || res.destroyed) return;
+
+  const targetDesc = appName
+    ? `App <strong>${appName}</strong> (port <code>localhost:${port}</code>)`
+    : `Port <code>localhost:${port}</code>`;
 
   const body = `<!doctype html>
 <html lang="en">
@@ -197,34 +299,108 @@ export function writePreviewUnavailable(res, port) {
   :root { color-scheme: light dark; }
   body {
     margin: 0; min-height: 100vh; display: flex; align-items: center;
-    justify-content: center; font: 15px/1.6 ui-sans-serif, system-ui, sans-serif;
-    background: #0f0f10; color: #e8e8ea; text-align: center; padding: 24px;
+    justify-content: center; font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: #09090b; color: #f4f4f5; text-align: center; padding: 24px;
   }
-  .card { max-width: 32rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 .5rem; font-weight: 600; }
-  p { margin: 0 0 .75rem; color: #a1a1aa; }
-  code { background: #1c1c1f; padding: .15em .4em; border-radius: 4px; color: #e8e8ea; }
+  .card {
+    max-width: 32rem; background: #18181b; border: 1px solid #27272a;
+    border-radius: 16px; padding: 32px 28px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  }
+  .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.35rem; margin: 0 0 .75rem; font-weight: 600; letter-spacing: -0.02em; }
+  p { margin: 0 0 1rem; color: #a1a1aa; font-size: 0.95rem; }
+  code { background: #27272a; padding: .2em .45em; border-radius: 6px; color: #38bdf8; font-family: ui-monospace, monospace; font-size: 0.9em; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h1>Nothing is listening on port ${port}</h1>
-    <p>This preview points at <code>localhost:${port}</code> inside the GrokBot
-       workspace, but no server answered.</p>
-    <p>Start the app there, then reload this page.</p>
+    <div class="icon">🔌</div>
+    <h1>No Server Responded</h1>
+    <p>This preview points at ${targetDesc} inside the GrokBot workspace, but no server is currently listening.</p>
+    <p>Start your dev server, then reload this page.</p>
   </div>
 </body>
 </html>`;
 
-  // Deliberately 200, not 502. A CDN in front of the origin (Cloudflare here)
-  // replaces 5xx bodies with its own "error code: 502" page, which would throw
-  // away this explanation for exactly the audience it's written for — whoever
-  // the user shared the link with. The header carries the real state for
-  // anything reading this programmatically.
   res.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Preview-Status": `no-listener-on-${port}`,
+  });
+  res.end(body);
+}
+
+/**
+ * Friendly landing page when a named app is not found or has been stopped.
+ */
+export async function writeAppNotFound(res, appName) {
+  if (res.headersSent || res.destroyed) return;
+
+  let activeApps = [];
+  try {
+    activeApps = await listApps();
+  } catch {
+    // Non-critical fallback
+  }
+
+  const appItems =
+    activeApps.length > 0
+      ? activeApps
+          .map(
+            (app) => `
+        <li style="margin: 8px 0; list-style: none;">
+          <a href="https://${app.name}.beenex.space" style="color: #38bdf8; text-decoration: none; font-weight: 500;">
+            ✨ ${app.title || app.name} (<code>${app.name}.beenex.space</code>)
+          </a>
+        </li>`,
+          )
+          .join("")
+      : `<li style="color: #71717a; list-style: none;">No other apps currently registered</li>`;
+
+  const body = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>App "${appName}" Not Found</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center;
+    justify-content: center; font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: #09090b; color: #f4f4f5; text-align: center; padding: 24px;
+  }
+  .card {
+    max-width: 34rem; background: #18181b; border: 1px solid #27272a;
+    border-radius: 16px; padding: 36px 28px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  }
+  .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.35rem; margin: 0 0 .75rem; font-weight: 600; letter-spacing: -0.02em; }
+  p { margin: 0 0 1.25rem; color: #a1a1aa; font-size: 0.95rem; }
+  .app-list { background: #121215; border: 1px solid #27272a; border-radius: 12px; padding: 16px; margin: 16px 0; text-align: left; }
+  .list-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px; font-weight: 600; }
+  code { background: #27272a; padding: .2em .45em; border-radius: 6px; color: #fbbf24; font-family: ui-monospace, monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔍</div>
+    <h1>App "${appName}" Not Found</h1>
+    <p>No active application is registered with the subdomain <code>${appName}.beenex.space</code>.</p>
+    <div class="app-list">
+      <div class="list-title">Active Applications:</div>
+      <ul style="padding: 0; margin: 0;">
+        ${appItems}
+      </ul>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Preview-Status": `app-not-found-${appName}`,
   });
   res.end(body);
 }
