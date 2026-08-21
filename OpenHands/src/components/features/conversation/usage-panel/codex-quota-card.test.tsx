@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CodexQuotaCard } from "./codex-quota-card";
 import { useCodexUsage } from "#/hooks/query/use-codex-usage";
+import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 
 vi.mock("#/hooks/query/use-codex-usage");
+vi.mock("#/hooks/query/use-active-conversation");
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -11,6 +14,13 @@ vi.mock("react-i18next", () => ({
 describe("CodexQuotaCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useActiveConversation).mockReturnValue({
+      data: {
+        agent_kind: "acp",
+        acp_server: "codex",
+        llm_model: "gpt-4o",
+      },
+    } as any);
   });
 
   it("returns null when conversation is not Codex ACP", () => {

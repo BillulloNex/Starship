@@ -3,6 +3,7 @@ import React from "react";
 import { Sparkles, RefreshCw, AlertTriangle, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
+import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useClaudeUsage } from "#/hooks/query/use-claude-usage";
 import { ClaudeRateLimitWindow } from "#/api/claude-usage-service.types";
 import { cn } from "#/utils/utils";
@@ -95,9 +96,20 @@ function WindowMeter({ label, windowData }: WindowMeterProps) {
 
 export function ClaudeQuotaCard() {
   const { t } = useTranslation("openhands");
+  const { data: conversation } = useActiveConversation();
   const { data: quota, isLoading, isFetching, refetch } = useClaudeUsage();
 
-  if (!quota) {
+  const isCodexConversation =
+    (conversation?.agent_kind === "acp" &&
+      (conversation?.acp_server === "codex" ||
+        conversation?.tags?.acpserver === "codex")) ||
+    (typeof conversation?.llm_model === "string" &&
+      (conversation.llm_model.toLowerCase().includes("codex") ||
+        conversation.llm_model.toLowerCase().includes("gpt") ||
+        conversation.llm_model.toLowerCase().includes("o3") ||
+        conversation.llm_model.toLowerCase().includes("o4")));
+
+  if (!quota || isCodexConversation) {
     return null;
   }
 

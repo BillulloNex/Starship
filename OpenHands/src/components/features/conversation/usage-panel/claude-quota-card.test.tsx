@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ClaudeQuotaCard } from "./claude-quota-card";
 import { useClaudeUsage } from "#/hooks/query/use-claude-usage";
+import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 
 vi.mock("#/hooks/query/use-claude-usage");
+vi.mock("#/hooks/query/use-active-conversation");
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -12,6 +14,13 @@ vi.mock("react-i18next", () => ({
 describe("ClaudeQuotaCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useActiveConversation).mockReturnValue({
+      data: {
+        agent_kind: "acp",
+        acp_server: "claude-code",
+        llm_model: "claude-3-5-sonnet",
+      },
+    } as any);
   });
 
   it("returns null when no Claude quota data is present", () => {
