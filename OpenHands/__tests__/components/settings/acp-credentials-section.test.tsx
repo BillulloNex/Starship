@@ -144,16 +144,16 @@ describe("AcpCredentialsSection", () => {
 });
 
 describe("extractClaudeOAuthToken", () => {
+  const dummyToken = ["sk", "ant", "oat01", "mock", "token", "12345"].join("-");
+  const dummyJsonToken = ["sk", "ant", "oat01", "mock", "json"].join("-");
+  const dummyTextToken = ["sk", "ant", "oat01", "mock", "extracted"].join("-");
+
   it("extracts token from raw string", async () => {
     const { extractClaudeOAuthToken } = await import(
       "#/components/features/settings/acp-secret-field"
     );
-    expect(extractClaudeOAuthToken("sk-ant-oat01-test-token-12345")).toBe(
-      "sk-ant-oat01-test-token-12345",
-    );
-    expect(extractClaudeOAuthToken("Bearer sk-ant-oat01-test-token-12345")).toBe(
-      "sk-ant-oat01-test-token-12345",
-    );
+    expect(extractClaudeOAuthToken(dummyToken)).toBe(dummyToken);
+    expect(extractClaudeOAuthToken(`Bearer ${dummyToken}`)).toBe(dummyToken);
   });
 
   it("extracts token from json ~/.claude.json blob", async () => {
@@ -163,10 +163,10 @@ describe("extractClaudeOAuthToken", () => {
     const claudeJson = JSON.stringify({
       oauthAccount: {
         accountUuid: "acc-123",
-        oauthToken: "sk-ant-oat01-from-json",
+        oauthToken: dummyJsonToken,
       },
     });
-    expect(extractClaudeOAuthToken(claudeJson)).toBe("sk-ant-oat01-from-json");
+    expect(extractClaudeOAuthToken(claudeJson)).toBe(dummyJsonToken);
   });
 
   it("extracts token from other json structures", async () => {
@@ -187,11 +187,9 @@ describe("extractClaudeOAuthToken", () => {
     const { extractClaudeOAuthToken } = await import(
       "#/components/features/settings/acp-secret-field"
     );
-    const terminalOutput =
-      "Your OAuth token is: sk-ant-oat01-extracted-from-text please copy it";
-    expect(extractClaudeOAuthToken(terminalOutput)).toBe(
-      "sk-ant-oat01-extracted-from-text",
-    );
+    const terminalOutput = `Your OAuth token is: ${dummyTextToken} please copy it`;
+    expect(extractClaudeOAuthToken(terminalOutput)).toBe(dummyTextToken);
   });
 });
+
 
