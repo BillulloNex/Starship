@@ -37671,6 +37671,23 @@
     "uk": "Квота Codex",
     "ca": "Quota de Codex"
   },
+  "CONVERSATION$CLAUDE_QUOTA": {
+    "en": "Claude Code quota",
+    "ja": "Claude Code利用枠",
+    "zh-CN": "Claude Code配额",
+    "zh-TW": "Claude Code配額",
+    "ko-KR": "Claude Code 할당량",
+    "de": "Claude Code-Kontingent",
+    "no": "Claude Code-kvote",
+    "it": "Quota Claude Code",
+    "pt": "Cota do Claude Code",
+    "es": "Cuota de Claude Code",
+    "ar": "حصة Claude Code",
+    "fr": "Quota Claude Code",
+    "tr": "Claude Code kotası",
+    "uk": "Квота Claude Code",
+    "ca": "Quota de Claude Code"
+  },
   "CONVERSATION$SESSION_LIMIT_5H": {
     "en": "5-hour session limit",
     "ja": "5時間セッション制限",

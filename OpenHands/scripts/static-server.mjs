@@ -45,6 +45,7 @@ import {
 import { handleDatadogProxy } from "./datadog-proxy.mjs";
 import { handlePostHogProxy } from "./posthog-proxy.mjs";
 import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
+import { handleClaudeUsageProxy } from "./claude-usage-proxy.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
   captureInfrastructurePorts,
@@ -932,6 +933,20 @@ export function startStaticServer(config) {
       handleCodexUsageProxy(req, res, parsedUrl.pathname, query).catch(
         (err) => {
           console.error("Codex usage proxy error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
+      return;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/observability/claude")) {
+      const query = Object.fromEntries(parsedUrl.searchParams.entries());
+      handleClaudeUsageProxy(req, res, parsedUrl.pathname, query).catch(
+        (err) => {
+          console.error("Claude usage proxy error:", err);
           if (!res.headersSent) {
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: err.message }));

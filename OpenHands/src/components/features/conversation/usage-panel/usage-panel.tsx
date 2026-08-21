@@ -5,12 +5,14 @@ import { ConversationTabEmptyState } from "#/components/features/conversation/co
 import { useLiveConversationMetrics } from "#/hooks/use-live-conversation-metrics";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useCodexUsage } from "#/hooks/query/use-codex-usage";
+import { useClaudeUsage } from "#/hooks/query/use-claude-usage";
 import { CostSection } from "../metrics-modal/cost-section";
 import { UsageSection } from "../metrics-modal/usage-section";
 import { CompactContextButton } from "./compact-context-button";
 import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
 import { CodexQuotaCard } from "./codex-quota-card";
+import { ClaudeQuotaCard } from "./claude-quota-card";
 import { ClaudeUsageCard } from "./claude-usage-card";
 import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
 import { McpPerformanceSection } from "./mcp-performance-section";
@@ -29,8 +31,13 @@ export function UsagePanel() {
 
   const { usage } = metrics;
   const { data: codexQuota } = useCodexUsage();
+  const { data: claudeQuota } = useClaudeUsage();
   const hasMetrics =
-    metrics.cost !== null || usage !== null || codexQuota !== null || isAcp;
+    metrics.cost !== null ||
+    usage !== null ||
+    codexQuota !== null ||
+    claudeQuota !== null ||
+    isAcp;
 
   if (!hasMetrics) {
     return (
@@ -48,6 +55,8 @@ export function UsagePanel() {
       <ObservabilityLangfuseCard />
 
       <CodexQuotaCard />
+
+      <ClaudeQuotaCard />
 
       <ClaudeUsageCard />
 
