@@ -55,14 +55,14 @@ const POSTHOG_PAGEVIEW_CAPTURE_MODE = "history_change";
 
 // Unconfigured source builds use staging. Production release workflows pass
 // VITE_POSTHOG_API_KEY explicitly for both the app and library artifacts.
-const DEFAULT_POSTHOG_API_KEY: string =
+const _DEFAULT_POSTHOG_API_KEY: string =
   (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
   defaults.telemetry.posthogApiKey;
 
 // Default to OpenHands' reverse proxy to bypass ad blockers.
 // The proxy at z.openhands.dev routes to PostHog's US region.
 // Library consumers can override this with their own proxy or direct PostHog URL.
-const DEFAULT_POSTHOG_HOST =
+const _DEFAULT_POSTHOG_HOST =
   import.meta.env.VITE_POSTHOG_HOST || "https://z.openhands.dev";
 
 // UI host is needed for PostHog features like toolbar to work correctly

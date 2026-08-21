@@ -2,17 +2,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAgentServerBaseUrl } from "#/api/agent-server-config";
 
 export interface AppRecord {
+  type?: "dynamic" | "static";
+  provider?: "cloudflare_pages" | string;
   name: string;
-  port: number;
+  port?: number;
   title?: string;
   pid?: number;
   dir?: string;
   start_cmd?: string;
+  url?: string;
+  branch?: string;
   created_at?: string;
   updated_at?: string;
-  is_listening: boolean;
-  url_space: string;
-  url_org: string;
+  deployed_at?: string;
+  is_listening?: boolean;
+  url_space?: string;
+  url_org?: string;
+  url_port?: string;
 }
 
 export interface AppsResponse {
@@ -57,6 +63,52 @@ export function useApps(enabled = true) {
     refetchInterval: 3000,
     refetchOnWindowFocus: true,
     staleTime: 0,
+  });
+}
+
+export function useAppLogs(name: string, enabled = false) {
+  return useQuery({
+    queryKey: ["preview-app-logs", name],
+    queryFn: async () => {
+      const baseUrl = getAgentServerBaseUrl() ?? "";
+      const res = await fetch(
+        `${baseUrl}${PREVIEW_APPS_ENDPOINT}?action=logs&name=${encodeURIComponent(name)}&tail=100`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) {
+        throw new Error(`Failed to fetch logs for ${name}`);
+      }
+      return res.json() as Promise<{ success: boolean; name: string; log: string }>;
+    },
+    enabled: enabled && !!name,
+    refetchInterval: enabled ? 2000 : false,
+  });
+}
+
+export function useScanApps() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const baseUrl = getAgentServerBaseUrl() ?? "";
+      const res = await fetch(`${baseUrl}${PREVIEW_APPS_ENDPOINT}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "scan" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to scan workspace for apps");
+      }
+      return res.json() as Promise<{
+        success: boolean;
+        count: number;
+        discovered: AppRecord[];
+      }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["preview-apps"] });
+      queryClient.invalidateQueries({ queryKey: ["preview-ports"] });
+    },
   });
 }
 
@@ -135,10 +187,12 @@ export function useRegisterApp() {
   return useMutation({
     mutationFn: async (payload: {
       name: string;
-      port: number;
+      port?: number;
       title?: string;
       dir?: string;
       start_cmd?: string;
+      type?: "dynamic" | "static";
+      url?: string;
     }) => {
       const baseUrl = getAgentServerBaseUrl() ?? "";
       const res = await fetch(`${baseUrl}${PREVIEW_APPS_ENDPOINT}`, {

@@ -57,10 +57,14 @@ import {
 import {
   listApps,
   registerApp,
+  registerStaticApp,
   unregisterApp,
   getApp,
   startApp,
   stopApp,
+  scanAndDiscoverApps,
+  getAppLogs,
+  checkPortListening,
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
 
@@ -693,36 +697,80 @@ async function handlePreviewAppsRequest(
   infrastructurePorts = new Set(),
 ) {
   applyCorsHeaders(req, res);
+  const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+
   if (req.method === "GET") {
+    // 1. Check if requesting logs for an app: /api/preview/apps?action=logs&name=... or ?name=...&logs=true
+    const logsAction = parsedUrl.searchParams.get("action") === "logs" || parsedUrl.searchParams.get("logs") === "true";
+    const logAppName = parsedUrl.searchParams.get("name");
+    if (logsAction && logAppName) {
+      const tail = Number.parseInt(parsedUrl.searchParams.get("tail") || "100", 10);
+      try {
+        const logData = await getAppLogs(logAppName, tail, registryPath);
+        res.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(JSON.stringify({ success: true, ...logData }));
+      } catch (err) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+
     const rawApps = await listApps(registryPath);
-    let listening = [];
+    let procListening = [];
     try {
-      listening = await listListeningPorts(
+      procListening = await listListeningPorts(
         blockedPorts,
         undefined,
         infrastructurePorts,
       );
     } catch {}
 
-    const listeningSet = new Set(listening);
+    const listeningSet = new Set(procListening);
     const registeredPorts = new Set();
-    const apps = rawApps.map((app) => {
-      registeredPorts.add(app.port);
-      return {
-        ...app,
-        is_listening: listeningSet.has(app.port),
-        url_space: `https://${app.name}.beenex.space`,
-        url_org: `https://${app.name}.beenex.org`,
-      };
-    });
 
-    const unassignedPorts = listening.filter((p) => !registeredPorts.has(p));
+    // Check dynamic app ports in parallel with fast TCP probe
+    const apps = await Promise.all(
+      rawApps.map(async (app) => {
+        if (app.type === "static") {
+          return {
+            ...app,
+            is_listening: true, // Edge hosted
+            url_space: app.url,
+            url_org: app.url,
+          };
+        }
+
+        registeredPorts.add(app.port);
+        let isListening = listeningSet.has(app.port);
+        // Fallback TCP probe for macOS / non-Linux or edge socket situations
+        if (!isListening && app.port) {
+          isListening = await checkPortListening(app.port);
+          if (isListening) listeningSet.add(app.port);
+        }
+
+        return {
+          ...app,
+          type: "dynamic",
+          is_listening: isListening,
+          url_space: `https://${app.name}.beenex.space`,
+          url_org: `https://${app.name}.beenex.org`,
+          url_port: `https://p${app.port}.beenex.org`,
+        };
+      }),
+    );
+
+    const allListening = [...listeningSet].sort((a, b) => a - b);
+    const unassignedPorts = allListening.filter((p) => !registeredPorts.has(p));
 
     res.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end(JSON.stringify({ apps, listening, unassignedPorts }));
+    res.end(JSON.stringify({ apps, listening: allListening, unassignedPorts }));
     return;
   }
 
@@ -736,6 +784,15 @@ async function handlePreviewAppsRequest(
       try {
         const payload = JSON.parse(body || "{}");
         const { action, name } = payload;
+
+        if (action === "scan" || action === "discover") {
+          const discovered = await scanAndDiscoverApps(registryPath);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          res.end(JSON.stringify({ success: true, count: discovered.length, discovered }));
+          return;
+        }
 
         if (action === "start") {
           if (!name) throw new Error("Missing app name for start action");
@@ -757,7 +814,23 @@ async function handlePreviewAppsRequest(
           return;
         }
 
-        const record = await registerApp(payload, registryPath);
+        if (action === "logs") {
+          if (!name) throw new Error("Missing app name for logs action");
+          const logData = await getAppLogs(name, payload.tail || 100, registryPath);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          res.end(JSON.stringify({ success: true, ...logData }));
+          return;
+        }
+
+        let record;
+        if (payload.type === "static" || payload.provider === "cloudflare_pages" || payload.url) {
+          record = await registerStaticApp(payload, registryPath);
+        } else {
+          record = await registerApp(payload, registryPath, blockedPorts);
+        }
+
         res.writeHead(200, {
           "Content-Type": "application/json; charset=utf-8",
         });
@@ -773,7 +846,6 @@ async function handlePreviewAppsRequest(
   }
 
   if (req.method === "DELETE") {
-    const parsedUrl = new URL(req.url ?? "/", "http://localhost");
     const name = parsedUrl.searchParams.get("name");
     if (!name) {
       res.writeHead(400, {
@@ -782,11 +854,7 @@ async function handlePreviewAppsRequest(
       res.end(JSON.stringify({ success: false, error: "Missing ?name=" }));
       return;
     }
-    // Optionally stop port before unregistering
-    try {
-      await stopApp(name, registryPath);
-    } catch {}
-    const success = await unregisterApp(name, registryPath);
+    const success = await unregisterApp(name, registryPath, true);
     res.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
     });

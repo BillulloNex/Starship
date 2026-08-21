@@ -20,6 +20,8 @@ import {
   getApp,
   allocateNextPort,
   autoStartApps,
+  scanAndDiscoverApps,
+  getAppLogs,
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
 import { listListeningPorts } from "./preview-proxy.mjs";
@@ -257,6 +259,41 @@ async function main() {
         console.log(port);
       } catch (err) {
         console.error("Error allocating port:", err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "scan":
+    case "discover": {
+      try {
+        const discovered = await scanAndDiscoverApps(registryPath);
+        console.log(
+          JSON.stringify(
+            { success: true, count: discovered.length, discovered },
+            null,
+            2,
+          ),
+        );
+      } catch (err) {
+        console.error("Error scanning for apps:", err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "logs": {
+      const name = filteredArgs[0];
+      if (!name) {
+        console.error("Error: App name is required (e.g. grokbot-app logs mario-game)");
+        process.exit(1);
+      }
+      const tail = Number.parseInt(filteredArgs[1] || "100", 10);
+      try {
+        const data = await getAppLogs(name, tail, registryPath);
+        console.log(data.log);
+      } catch (err) {
+        console.error("Error fetching logs:", err.message);
         process.exit(1);
       }
       break;

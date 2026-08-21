@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string, jsx-a11y/label-has-associated-control */
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -12,10 +13,12 @@ import {
   Zap,
   Check,
   Copy,
+  ScanLine,
 } from "lucide-react";
 import {
   useApps,
   useRegisterApp,
+  useScanApps,
   type AppRecord,
 } from "#/hooks/query/use-apps";
 import { AppCard } from "#/components/features/apps/app-card";
@@ -25,21 +28,24 @@ import {
   displayErrorToast,
 } from "#/utils/custom-toast-handlers";
 
-type FilterTab = "all" | "running" | "stopped";
+type FilterTab = "all" | "edge" | "running" | "stopped";
 
 export default function AppsScreen() {
   const { t } = useTranslation("openhands");
   const navigate = useNavigate();
   const { data, isLoading, refetch, isFetching } = useApps();
+  const scanMutation = useScanApps();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [modalAppType, setModalAppType] = useState<"dynamic" | "static">("dynamic");
   const [modalPort, setModalPort] = useState<number | string>("");
   const [modalName, setModalName] = useState("");
   const [modalTitle, setModalTitle] = useState("");
   const [modalDir, setModalDir] = useState("");
   const [modalStartCmd, setModalStartCmd] = useState("");
+  const [modalUrl, setModalUrl] = useState("");
 
   const registerMutation = useRegisterApp();
 
@@ -49,20 +55,25 @@ export default function AppsScreen() {
     [data?.unassignedPorts],
   );
 
+  const edgeCount = useMemo(
+    () => apps.filter((a) => a.type === "static").length,
+    [apps],
+  );
   const runningCount = useMemo(
-    () => apps.filter((a) => a.is_listening).length,
+    () => apps.filter((a) => a.type !== "static" && a.is_listening).length,
     [apps],
   );
   const stoppedCount = useMemo(
-    () => apps.filter((a) => !a.is_listening).length,
+    () => apps.filter((a) => a.type !== "static" && !a.is_listening).length,
     [apps],
   );
 
   const filteredApps = useMemo(() => {
     return apps.filter((app) => {
       // Tab filter
-      if (filterTab === "running" && !app.is_listening) return false;
-      if (filterTab === "stopped" && app.is_listening) return false;
+      if (filterTab === "edge" && app.type !== "static") return false;
+      if (filterTab === "running" && (app.type === "static" || !app.is_listening)) return false;
+      if (filterTab === "stopped" && (app.type === "static" || app.is_listening)) return false;
 
       // Search filter
       if (!searchQuery.trim()) return true;
@@ -70,52 +81,87 @@ export default function AppsScreen() {
       return (
         app.name.toLowerCase().includes(query) ||
         (app.title && app.title.toLowerCase().includes(query)) ||
-        String(app.port).includes(query) ||
+        (app.port && String(app.port).includes(query)) ||
+        (app.url && app.url.toLowerCase().includes(query)) ||
         (app.dir && app.dir.toLowerCase().includes(query)) ||
         (app.start_cmd && app.start_cmd.toLowerCase().includes(query))
       );
     });
   }, [apps, filterTab, searchQuery]);
 
+  const handleScanWorkspace = async () => {
+    try {
+      const res = await scanMutation.mutateAsync();
+      if (res.count > 0) {
+        displaySuccessToast(`Discovered and registered ${res.count} new project(s)!`);
+      } else {
+        displaySuccessToast("Workspace scanned. All projects up to date.");
+      }
+    } catch (err: any) {
+      displayErrorToast(err?.message || "Failed to scan workspace");
+    }
+  };
+
   const handleOpenRegisterForPort = (port: number) => {
+    setModalAppType("dynamic");
     setModalPort(port);
     setModalName(`app-${port}`);
     setModalTitle(`Web App (Port ${port})`);
     setModalDir(`/projects`);
     setModalStartCmd("");
+    setModalUrl("");
     setIsRegisterModalOpen(true);
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalName.trim() || !modalPort) {
-      displayErrorToast("Please provide both an app name and a port.");
+    if (!modalName.trim()) {
+      displayErrorToast("Please provide an app name slug.");
+      return;
+    }
+
+    if (modalAppType === "dynamic" && !modalPort) {
+      displayErrorToast("Please specify a port for dynamic container apps.");
       return;
     }
 
     try {
-      await registerMutation.mutateAsync({
-        name: modalName.trim(),
-        port: Number(modalPort),
-        title: modalTitle.trim() || modalName.trim(),
-        dir: modalDir.trim() || undefined,
-        start_cmd: modalStartCmd.trim() || undefined,
-      });
-      displaySuccessToast(`App "${modalName}" registered successfully!`);
+      if (modalAppType === "static") {
+        await registerMutation.mutateAsync({
+          type: "static",
+          name: modalName.trim(),
+          title: modalTitle.trim() || modalName.trim(),
+          url: modalUrl.trim() || `https://${modalName.trim()}.pages.dev`,
+          dir: modalDir.trim() || undefined,
+        });
+        displaySuccessToast(`Static app "${modalName}" registered!`);
+      } else {
+        await registerMutation.mutateAsync({
+          type: "dynamic",
+          name: modalName.trim(),
+          port: Number(modalPort),
+          title: modalTitle.trim() || modalName.trim(),
+          dir: modalDir.trim() || undefined,
+          start_cmd: modalStartCmd.trim() || undefined,
+        });
+        displaySuccessToast(`Dynamic app "${modalName}" registered!`);
+      }
+
       setIsRegisterModalOpen(false);
       setModalName("");
       setModalPort("");
       setModalTitle("");
       setModalDir("");
       setModalStartCmd("");
+      setModalUrl("");
     } catch (err: any) {
       displayErrorToast(err?.message || "Failed to register app");
     }
   };
 
   const starterPrompts = [
-    "Make me a retro 80s arcade game and give me a shareable link",
-    "Build a neon mario platformer game with a persistent domain",
+    "Make me a retro 80s arcade game and deploy it with grokbot-deploy",
+    "Build a neon mario platformer game with a shareable Cloudflare Pages link",
     "Create a modern markdown note-taking web app and make it shareable",
     "Build an interactive dashboard with live charts and a public URL",
   ];
@@ -137,14 +183,29 @@ export default function AppsScreen() {
                 Web Apps & Shareable Links
               </h1>
               <p className="text-xs text-[var(--oh-muted)]">
-                Track, launch, and share applications hosted on{" "}
-                <span className="font-mono text-sky-400">*.beenex.space</span>
+                Track and share live container servers (
+                <span className="font-mono text-sky-400">p*.beenex.org</span>) &
+                permanent edge deployments (
+                <span className="font-mono text-orange-400">*.pages.dev</span>)
               </p>
             </div>
           </div>
 
           {/* Top Actions */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleScanWorkspace}
+              disabled={scanMutation.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-1.5 text-xs font-medium text-[var(--oh-text-secondary)] hover:bg-[var(--oh-surface-raised)] hover:text-foreground transition-colors cursor-pointer"
+              title="Scan workspace folders for newly created projects"
+            >
+              <ScanLine
+                className={cn("size-3.5", scanMutation.isPending && "animate-pulse")}
+              />
+              <span>{scanMutation.isPending ? "Scanning..." : "Scan Workspace"}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => refetch()}
@@ -160,11 +221,13 @@ export default function AppsScreen() {
             <button
               type="button"
               onClick={() => {
+                setModalAppType("dynamic");
                 setModalPort("");
                 setModalName("");
                 setModalTitle("");
                 setModalDir("/projects/");
                 setModalStartCmd("");
+                setModalUrl("");
                 setIsRegisterModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white px-3.5 py-1.5 text-xs font-semibold shadow-sm transition-colors cursor-pointer"
@@ -182,7 +245,7 @@ export default function AppsScreen() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--oh-text-tertiary)]" />
             <input
               type="text"
-              placeholder="Search apps by name, port, folder..."
+              placeholder="Search apps by name, port, domain, folder..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] pl-9 pr-4 py-2 text-xs text-foreground placeholder:text-[var(--oh-muted)] focus:border-sky-500 focus:outline-none transition-colors"
@@ -205,6 +268,19 @@ export default function AppsScreen() {
             </button>
             <button
               type="button"
+              onClick={() => setFilterTab("edge")}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5",
+                filterTab === "edge"
+                  ? "bg-[var(--oh-surface-raised)] text-foreground shadow-sm"
+                  : "text-[var(--oh-muted)] hover:text-foreground",
+              )}
+            >
+              <span className="size-1.5 rounded-full bg-orange-500" />
+              Pages Edge ({edgeCount})
+            </button>
+            <button
+              type="button"
               onClick={() => setFilterTab("running")}
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5",
@@ -214,7 +290,7 @@ export default function AppsScreen() {
               )}
             >
               <span className="size-1.5 rounded-full bg-emerald-500" />
-              Live ({runningCount})
+              Live Dev ({runningCount})
             </button>
             <button
               type="button"
@@ -256,7 +332,7 @@ export default function AppsScreen() {
                         <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="font-mono font-medium">:{port}</span>
                         <a
-                          href={`https://p${port}.beenex.space`}
+                          href={`https://p${port}.beenex.org`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-sky-400 hover:underline flex items-center gap-0.5 ml-1"
@@ -359,10 +435,38 @@ export default function AppsScreen() {
               </button>
             </div>
 
+            {/* Type selector */}
+            <div className="grid grid-cols-2 gap-2 bg-[var(--oh-surface)] p-1 rounded-lg border border-[var(--oh-border)]">
+              <button
+                type="button"
+                onClick={() => setModalAppType("dynamic")}
+                className={cn(
+                  "py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer",
+                  modalAppType === "dynamic"
+                    ? "bg-[var(--oh-surface-raised)] text-foreground shadow-xs"
+                    : "text-[var(--oh-muted)] hover:text-foreground",
+                )}
+              >
+                Container Port Server
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalAppType("static")}
+                className={cn(
+                  "py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer",
+                  modalAppType === "static"
+                    ? "bg-[var(--oh-surface-raised)] text-foreground shadow-xs"
+                    : "text-[var(--oh-muted)] hover:text-foreground",
+                )}
+              >
+                Cloudflare Pages Edge
+              </button>
+            </div>
+
             <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
               <div>
                 <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
-                  App Name Slug (Subdomain)
+                  App Name Slug
                 </label>
                 <div className="flex items-center rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2">
                   <input
@@ -374,24 +478,39 @@ export default function AppsScreen() {
                     className="w-full bg-transparent text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono"
                   />
                   <span className="text-[var(--oh-muted)] font-mono text-[11px] shrink-0 ml-1">
-                    .beenex.space
+                    {modalAppType === "static" ? ".pages.dev" : ".beenex.space"}
                   </span>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
-                  Port Number
-                </label>
-                <input
-                  type="number"
-                  required
-                  placeholder="e.g. 3000"
-                  value={modalPort}
-                  onChange={(e) => setModalPort(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2 text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono"
-                />
-              </div>
+              {modalAppType === "dynamic" ? (
+                <div>
+                  <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
+                    Port Number
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 3000"
+                    value={modalPort}
+                    onChange={(e) => setModalPort(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2 text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
+                    Direct Public URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder={`https://${modalName || "mario-game"}.pages.dev`}
+                    value={modalUrl}
+                    onChange={(e) => setModalUrl(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2 text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
@@ -419,18 +538,20 @@ export default function AppsScreen() {
                 />
               </div>
 
-              <div>
-                <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
-                  Start Command (Optional, for auto-restart on boot)
-                </label>
-                <input
-                  type="text"
-                  placeholder="npm run dev -- --port 3000 --host 0.0.0.0"
-                  value={modalStartCmd}
-                  onChange={(e) => setModalStartCmd(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2 text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono text-[11px]"
-                />
-              </div>
+              {modalAppType === "dynamic" && (
+                <div>
+                  <label className="block font-medium text-[var(--oh-text-secondary)] mb-1">
+                    Start Command (Optional, for auto-restart on boot)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="npm run dev -- --port 3000 --host 0.0.0.0"
+                    value={modalStartCmd}
+                    onChange={(e) => setModalStartCmd(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] px-3 py-2 text-foreground placeholder:text-[var(--oh-muted)] focus:outline-none font-mono text-[11px]"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--oh-border)]">
                 <button

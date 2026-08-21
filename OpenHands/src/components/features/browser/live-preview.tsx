@@ -38,7 +38,9 @@ export function LivePreview() {
   const registeredAppByPort = useMemo(() => {
     const map = new Map<number, AppRecord>();
     for (const app of appsData?.apps || []) {
-      map.set(app.port, app);
+      if (app.port) {
+        map.set(app.port, app);
+      }
     }
     return map;
   }, [appsData?.apps]);

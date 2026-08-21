@@ -10,7 +10,9 @@ import {
   listApps,
   normalizeAppName,
   registerApp,
+  registerStaticApp,
   unregisterApp,
+  buildStartCommand,
 } from "../../scripts/app-registry.mjs";
 
 describe("app-registry.mjs", () => {
@@ -56,6 +58,7 @@ describe("app-registry.mjs", () => {
       expect(record.name).toBe("teddybear");
       expect(record.port).toBe(3000);
       expect(record.title).toBe("The Humble Teddy");
+      expect(record.type).toBe("dynamic");
 
       const fetched = await getApp("teddybear", registryPath);
       expect(fetched).toEqual(record);
@@ -75,22 +78,45 @@ describe("app-registry.mjs", () => {
     });
   });
 
+  describe("registerStaticApp", () => {
+    it("registers a static Cloudflare Pages app", async () => {
+      const record = await registerStaticApp(
+        {
+          name: "space-invaders",
+          title: "Space Invaders 3D",
+          url: "https://space-invaders.pages.dev",
+          branch: "main",
+        },
+        registryPath,
+      );
+
+      expect(record.type).toBe("static");
+      expect(record.name).toBe("space-invaders");
+      expect(record.url).toBe("https://space-invaders.pages.dev");
+      expect(record.provider).toBe("cloudflare_pages");
+
+      const fetched = await getApp("space-invaders", registryPath);
+      expect(fetched?.type).toBe("static");
+      expect(fetched?.url).toBe("https://space-invaders.pages.dev");
+    });
+  });
+
   describe("listApps and unregisterApp", () => {
     it("lists registered apps and removes them", async () => {
       await registerApp({ name: "app-one", port: 3000 }, registryPath);
-      await registerApp({ name: "app-two", port: 3001 }, registryPath);
+      await registerStaticApp({ name: "app-static", url: "https://app-static.pages.dev" }, registryPath);
 
       const list = await listApps(registryPath);
       expect(list.length).toBe(2);
       expect(list.map((a) => a.name)).toContain("app-one");
-      expect(list.map((a) => a.name)).toContain("app-two");
+      expect(list.map((a) => a.name)).toContain("app-static");
 
-      const removed = await unregisterApp("app-one", registryPath);
+      const removed = await unregisterApp("app-one", registryPath, false);
       expect(removed).toBe(true);
 
       const listAfter = await listApps(registryPath);
       expect(listAfter.length).toBe(1);
-      expect(listAfter[0].name).toBe("app-two");
+      expect(listAfter[0].name).toBe("app-static");
     });
   });
 
@@ -112,24 +138,15 @@ describe("app-registry.mjs", () => {
     });
   });
 
-  describe("start_cmd and autoStartApps", () => {
-    it("persists dir and start_cmd", async () => {
-      const record = await registerApp(
-        {
-          name: "mario-game",
-          port: 3005,
-          dir: "/projects/mario-game",
-          start_cmd: "npm run dev",
-        },
-        registryPath,
-      );
+  describe("buildStartCommand", () => {
+    it("injects port parameter into npm run dev", () => {
+      const cmd = buildStartCommand("/dummy", 3005, "npm run dev");
+      expect(cmd).toBe("npm run dev -- --port 3005 --host 0.0.0.0");
+    });
 
-      expect(record.dir).toBe("/projects/mario-game");
-      expect(record.start_cmd).toBe("npm run dev");
-
-      const fetched = await getApp("mario-game", registryPath);
-      expect(fetched?.dir).toBe("/projects/mario-game");
-      expect(fetched?.start_cmd).toBe("npm run dev");
+    it("preserves parameterized commands with $PORT", () => {
+      const cmd = buildStartCommand("/dummy", 3005, "python3 -m http.server $PORT");
+      expect(cmd).toBe("python3 -m http.server $PORT");
     });
   });
 });

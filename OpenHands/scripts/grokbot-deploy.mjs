@@ -15,6 +15,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, basename } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
+import { registerStaticApp } from "./app-registry.mjs";
 
 export function sanitizeSlug(name) {
   if (!name) return `app-${Date.now().toString(36)}`;
@@ -127,6 +128,22 @@ export function deployToCloudflarePages(directory, options = {}) {
   console.log(`🌐 Live URL: ${publicUrl}`);
   console.log(`⚡ Hosted globally 24/7/365 on Cloudflare Pages edge network.`);
   console.log("================================================================");
+
+  // Automatically register static app in the GrokBot apps registry
+  try {
+    registerStaticApp({
+      name: slug,
+      title: rawName
+        .replace(/[-_]+/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
+      url: publicUrl,
+      dir: deployDir,
+      branch,
+    });
+  } catch (regErr) {
+    // Non-fatal if registry fails
+    console.warn(`[grokbot-deploy] Warning: Could not update local apps registry: ${regErr.message}`);
+  }
 
   return {
     success: true,
