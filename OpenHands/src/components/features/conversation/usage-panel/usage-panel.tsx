@@ -12,7 +12,6 @@ import { CompactContextButton } from "./compact-context-button";
 import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
 import { CodexQuotaCard } from "./codex-quota-card";
-import { ClaudeQuotaCard } from "./claude-quota-card";
 import { ClaudeUsageCard } from "./claude-usage-card";
 import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
 import { McpPerformanceSection } from "./mcp-performance-section";
@@ -55,8 +54,6 @@ export function UsagePanel() {
       <ObservabilityLangfuseCard />
 
       <CodexQuotaCard />
-
-      <ClaudeQuotaCard />
 
       <ClaudeUsageCard />
 

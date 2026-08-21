@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -11,16 +12,32 @@ vi.mock("#/hooks/use-live-conversation-metrics", () => ({
   useLiveConversationMetrics: vi.fn(),
 }));
 
+vi.mock("#/hooks/query/use-claude-usage", () => ({
+  useClaudeUsage: vi.fn().mockReturnValue({
+    data: null,
+    isLoading: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("#/utils/format-token-count", () => ({
   formatCompactTokenCount: (val: number) => `${val}`,
 }));
 
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useLiveConversationMetrics } from "#/hooks/use-live-conversation-metrics";
+import { useClaudeUsage } from "#/hooks/query/use-claude-usage";
 
 describe("ClaudeUsageCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useClaudeUsage).mockReturnValue({
+      data: null,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
   });
 
   it("does not render when conversation is not Claude-powered", () => {
@@ -40,7 +57,7 @@ describe("ClaudeUsageCard", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders when conversation is Claude ACP server", () => {
+  it("renders when conversation is Claude ACP server with 5-hour session meter", () => {
     vi.mocked(useActiveConversation).mockReturnValue({
       data: {
         agent_kind: "acp",
@@ -63,8 +80,9 @@ describe("ClaudeUsageCard", () => {
     render(<ClaudeUsageCard />);
 
     expect(screen.getByTestId("claude-usage-card")).toBeInTheDocument();
-    expect(screen.getByText("Claude Code Status")).toBeInTheDocument();
+    expect(screen.getByText("Claude Code quota")).toBeInTheDocument();
     expect(screen.getByText("Claude Subscription")).toBeInTheDocument();
+    expect(screen.getByText("5-hour session limit")).toBeInTheDocument();
     expect(screen.getByText("Prompt Cache")).toBeInTheDocument();
     expect(screen.getByText("Tokens Generated")).toBeInTheDocument();
   });
@@ -91,6 +109,6 @@ describe("ClaudeUsageCard", () => {
     render(<ClaudeUsageCard />);
 
     expect(screen.getByTestId("claude-usage-card")).toBeInTheDocument();
-    expect(screen.getByText("Claude Model")).toBeInTheDocument();
+    expect(screen.getByText("Claude Pro")).toBeInTheDocument();
   });
 });

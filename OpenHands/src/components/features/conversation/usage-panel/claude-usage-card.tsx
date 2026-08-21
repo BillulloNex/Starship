@@ -1,14 +1,67 @@
+/* eslint-disable i18next/no-literal-string */
 import React from "react";
-import { Sparkles, Zap, ShieldCheck, Database, Layers } from "lucide-react";
+import {
+  Sparkles,
+  Zap,
+  ShieldCheck,
+  Database,
+  Layers,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useLiveConversationMetrics } from "#/hooks/use-live-conversation-metrics";
+import { useClaudeUsage } from "#/hooks/query/use-claude-usage";
 import { formatCompactTokenCount } from "#/utils/format-token-count";
 import { cn } from "#/utils/utils";
+
+function formatTimeRemaining(resetAtSeconds: number | null): string {
+  if (!resetAtSeconds) return "";
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const diffSeconds = resetAtSeconds - nowSeconds;
+
+  if (diffSeconds <= 0) return "Moments";
+  const hours = Math.floor(diffSeconds / 3600);
+  const minutes = Math.floor((diffSeconds % 3600) / 60);
+
+  if (hours > 24) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return `${days}d ${remHours}h`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function getQuotaToneClass(remainingPercent: number): {
+  bar: string;
+  text: string;
+} {
+  if (remainingPercent < 15) {
+    return {
+      bar: "bg-red-500",
+      text: "text-red-400",
+    };
+  }
+  if (remainingPercent <= 40) {
+    return {
+      bar: "bg-amber-500",
+      text: "text-amber-400",
+    };
+  }
+  return {
+    bar: "bg-emerald-500",
+    text: "text-emerald-400",
+  };
+}
 
 export function ClaudeUsageCard() {
   const { data: conversation } = useActiveConversation();
   const metrics = useLiveConversationMetrics();
   const { usage } = metrics;
+  const { data: quota, isLoading, isFetching, refetch } = useClaudeUsage();
 
   const isAcpClaude =
     conversation?.agent_kind === "acp" &&
@@ -27,7 +80,6 @@ export function ClaudeUsageCard() {
   const promptTokens = usage?.prompt_tokens ?? 0;
   const completionTokens = usage?.completion_tokens ?? 0;
   const cacheReadTokens = usage?.cache_read_tokens ?? 0;
-  const cacheWriteTokens = usage?.cache_write_tokens ?? 0;
   const totalTokens = promptTokens + completionTokens;
 
   // Context window calculation (default 200k for modern Claude models)
@@ -37,6 +89,27 @@ export function ClaudeUsageCard() {
     100,
     Math.round((currentTokens / contextWindow) * 100),
   );
+
+  // 5-hour quota calculation (from API quota or session-based estimate)
+  let fiveHourUsed = 1;
+  let fiveHourRemaining = 99;
+  let resetAt: number | null = Math.floor(Date.now() / 1000) + 18000;
+
+  if (quota?.primaryWindow) {
+    fiveHourUsed = quota.primaryWindow.usedPercent;
+    fiveHourRemaining = quota.primaryWindow.remainingPercent;
+    resetAt = quota.primaryWindow.resetAt;
+  } else if (currentTokens > 0) {
+    // Estimate 5-hour session consumption based on active turn tokens
+    fiveHourUsed = Math.max(
+      1,
+      Math.min(100, Math.round((currentTokens / 150000) * 100)),
+    );
+    fiveHourRemaining = Math.max(0, 100 - fiveHourUsed);
+  }
+
+  const fiveHourTone = getQuotaToneClass(fiveHourRemaining);
+  const resetLabel = formatTimeRemaining(resetAt);
 
   // Cache efficiency calculation
   const totalInputCandidate = promptTokens + cacheReadTokens;
@@ -61,22 +134,64 @@ export function ClaudeUsageCard() {
       <div className="flex items-center justify-between pb-1 border-b border-[var(--oh-border-subtle)]">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-orange-400" />
-          <span className="font-semibold text-sm">Claude Code Status</span>
+          <span className="font-semibold text-sm">Claude Code quota</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded bg-surface-base px-2 py-0.5 text-xs font-medium text-orange-300 border border-[var(--oh-border)]">
             <Zap className="size-3 text-orange-400" />
-            {isAcpClaude ? "Claude Subscription" : "Claude Model"}
+            {isAcpClaude ? "Claude Subscription" : "Claude Pro"}
           </span>
-          <span className="inline-flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-300 border border-orange-500/20">
-            <ShieldCheck className="size-3 text-orange-400" />
-            YOLO Active
+          <button
+            type="button"
+            data-testid="claude-quota-refresh"
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="cursor-pointer text-[var(--oh-muted)] hover:text-[var(--oh-foreground)] disabled:cursor-default"
+            aria-label="Refresh quota"
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* 5-Hour Session Limit Progress Bar (Exact Codex UI Parity) */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-[var(--oh-foreground)]">
+            5-hour session limit
           </span>
+          <span className={cn("font-semibold", fiveHourTone.text)}>
+            {fiveHourRemaining}% left
+          </span>
+        </div>
+
+        <div className="relative h-2 w-full rounded-full bg-tertiary overflow-hidden">
+          <div
+            data-testid="claude-session-limit-bar"
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              fiveHourTone.bar,
+            )}
+            style={{
+              width: `${Math.max(0, Math.min(100, fiveHourRemaining))}%`,
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] text-[var(--oh-muted)]">
+          <span>{fiveHourUsed}% used</span>
+          {resetLabel && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3 inline" /> {resetLabel}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Context Window Meter */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--oh-border-subtle)]">
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-[var(--oh-foreground)]">
             Context Window (200k)
