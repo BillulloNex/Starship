@@ -142,3 +142,56 @@ describe("AcpCredentialsSection", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("extractClaudeOAuthToken", () => {
+  it("extracts token from raw string", async () => {
+    const { extractClaudeOAuthToken } = await import(
+      "#/components/features/settings/acp-secret-field"
+    );
+    expect(extractClaudeOAuthToken("sk-ant-oat01-test-token-12345")).toBe(
+      "sk-ant-oat01-test-token-12345",
+    );
+    expect(extractClaudeOAuthToken("Bearer sk-ant-oat01-test-token-12345")).toBe(
+      "sk-ant-oat01-test-token-12345",
+    );
+  });
+
+  it("extracts token from json ~/.claude.json blob", async () => {
+    const { extractClaudeOAuthToken } = await import(
+      "#/components/features/settings/acp-secret-field"
+    );
+    const claudeJson = JSON.stringify({
+      oauthAccount: {
+        accountUuid: "acc-123",
+        oauthToken: "sk-ant-oat01-from-json",
+      },
+    });
+    expect(extractClaudeOAuthToken(claudeJson)).toBe("sk-ant-oat01-from-json");
+  });
+
+  it("extracts token from other json structures", async () => {
+    const { extractClaudeOAuthToken } = await import(
+      "#/components/features/settings/acp-secret-field"
+    );
+    expect(
+      extractClaudeOAuthToken(JSON.stringify({ accessToken: "token-abc" })),
+    ).toBe("token-abc");
+    expect(
+      extractClaudeOAuthToken(
+        JSON.stringify({ tokens: { access_token: "token-def" } }),
+      ),
+    ).toBe("token-def");
+  });
+
+  it("extracts token embedded in text", async () => {
+    const { extractClaudeOAuthToken } = await import(
+      "#/components/features/settings/acp-secret-field"
+    );
+    const terminalOutput =
+      "Your OAuth token is: sk-ant-oat01-extracted-from-text please copy it";
+    expect(extractClaudeOAuthToken(terminalOutput)).toBe(
+      "sk-ant-oat01-extracted-from-text",
+    );
+  });
+});
+

@@ -1,0 +1,1 @@
+Right now the application flow is: enter the api key. which works for one person, but i wanna entertain an idea of can we make it a user login to use system? can just be username & pw

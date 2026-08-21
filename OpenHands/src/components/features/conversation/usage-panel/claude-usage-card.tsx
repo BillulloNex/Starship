@@ -64,6 +64,10 @@ export function ClaudeUsageCard() {
           <span className="font-semibold text-sm">Claude Code Status</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded bg-surface-base px-2 py-0.5 text-xs font-medium text-orange-300 border border-[var(--oh-border)]">
+            <Zap className="size-3 text-orange-400" />
+            {isAcpClaude ? "Claude Subscription" : "Claude Model"}
+          </span>
           <span className="inline-flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-300 border border-orange-500/20">
             <ShieldCheck className="size-3 text-orange-400" />
             YOLO Active
