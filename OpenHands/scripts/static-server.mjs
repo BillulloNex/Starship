@@ -400,6 +400,11 @@ function makeConfigInjectionScript(
     "VITE_POSTHOG_HOST",
     "POSTHOG_HOST",
     "VITE_POSTHOG_UI_HOST",
+    "VITE_RAINDROP_WRITE_KEY",
+    "RAINDROP_WRITE_KEY",
+    "VITE_RAINDROP_PROJECT_ID",
+    "RAINDROP_PROJECT_ID",
+    "VITE_RAINDROP_BASE_URL",
   ];
   for (const key of obsKeys) {
     if (process.env[key]) obsConfig[key] = process.env[key];

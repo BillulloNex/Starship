@@ -25,6 +25,14 @@ function isLangwatchEnabled(): boolean {
   return Boolean(import.meta.env.VITE_LANGWATCH_API_KEY);
 }
 
+function isRaindropEnabled(): boolean {
+  return Boolean(
+    import.meta.env.VITE_RAINDROP_WRITE_KEY ||
+      import.meta.env.RAINDROP_WRITE_KEY,
+  );
+}
+
+
 export interface ObservabilityHeaderProps {
   timeframe: string;
   setTimeframe: (tf: string) => void;
@@ -96,6 +104,12 @@ export function ObservabilityHeader({
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-900/40 text-teal-300 border border-teal-700/40">
                   <span className="size-1.5 rounded-full bg-teal-400" />
                   Langwatch
+                </span>
+              )}
+              {isRaindropEnabled() && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-900/40 text-indigo-300 border border-indigo-700/40">
+                  <span className="size-1.5 rounded-full bg-indigo-400" />
+                  Raindrop
                 </span>
               )}
             </div>
@@ -204,6 +218,17 @@ export function ObservabilityHeader({
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-teal-950/40 hover:bg-teal-900/50 text-teal-300 border border-teal-800/40 text-xs font-medium transition-colors"
           >
             <span>Langwatch</span>
+            <ExternalLink className="size-3" />
+          </a>
+        )}
+        {isRaindropEnabled() && (
+          <a
+            href="https://app.raindrop.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border border-indigo-800/40 text-xs font-medium transition-colors"
+          >
+            <span>Raindrop</span>
             <ExternalLink className="size-3" />
           </a>
         )}

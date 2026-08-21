@@ -53,3 +53,14 @@ export const LANGWATCH_BASE_URL = getConfig(
 // ─── PostHog AI ───────────────────────────────────────────────────────────
 const posthogVal = getConfig("VITE_POSTHOG_AI_ENABLED");
 export const POSTHOG_AI_ENABLED = posthogVal === "true" || posthogVal === "1";
+
+// ─── Raindrop ─────────────────────────────────────────────────────────────
+export const RAINDROP_WRITE_KEY =
+  getConfig("VITE_RAINDROP_WRITE_KEY") || getConfig("RAINDROP_WRITE_KEY");
+export const RAINDROP_PROJECT_ID =
+  getConfig("VITE_RAINDROP_PROJECT_ID") || getConfig("RAINDROP_PROJECT_ID");
+export const RAINDROP_BASE_URL = getConfig(
+  "VITE_RAINDROP_BASE_URL",
+  "https://api.raindrop.ai/v1/",
+);
+
