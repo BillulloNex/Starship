@@ -128,8 +128,8 @@ import "./backends/opik-backend";
 import "./backends/langwatch-backend";
 import "./backends/raindrop-backend";
 
-
 // Force Vite to treat this module as having side effects by logging
+
 // at module evaluation time. This prevents tree-shaking.
 console.debug(
   `[observability] ${getBackends().length} backends registered:`,

@@ -140,8 +140,9 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
       "build overnight",
       "ralph mode",
     ],
-    category: "workflow",
+    category: "automations",
     content: RALPH_LOOP_CONTENT,
+
   },
   {
     name: "deploy-to-cloudflare-pages",

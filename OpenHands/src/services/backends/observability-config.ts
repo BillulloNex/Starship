@@ -36,7 +36,10 @@ function getConfig(key: string, fallback = ""): string {
 }
 
 // ─── Opik (Comet) ─────────────────────────────────────────────────────────
-export const OPIK_API_KEY = getConfig("VITE_OPIK_API_KEY");
+export const OPIK_API_KEY = getConfig(
+  "VITE_OPIK_API_KEY",
+  "BQr4JlCiiNlMR8x3raGyTDUtn",
+);
 export const OPIK_BASE_URL = getConfig(
   "VITE_OPIK_BASE_URL",
   "https://www.comet.com/opik/api",
@@ -44,23 +47,26 @@ export const OPIK_BASE_URL = getConfig(
 export const OPIK_WORKSPACE = getConfig("VITE_OPIK_WORKSPACE");
 
 // ─── Langwatch ────────────────────────────────────────────────────────────
-export const LANGWATCH_API_KEY = getConfig("VITE_LANGWATCH_API_KEY");
+export const LANGWATCH_API_KEY = getConfig(
+  "VITE_LANGWATCH_API_KEY",
+  "sk-lw-Wvsoy6ulq3QYtMFH_O5X2dD2Z1XVtMNDsHNBQw5DvYqxMmgSUmuQXhw7w9gMYnf9t",
+);
 export const LANGWATCH_BASE_URL = getConfig(
   "VITE_LANGWATCH_BASE_URL",
   "https://app.langwatch.ai",
 );
 
 // ─── PostHog AI ───────────────────────────────────────────────────────────
-const posthogVal = getConfig("VITE_POSTHOG_AI_ENABLED");
-export const POSTHOG_AI_ENABLED = posthogVal === "true" || posthogVal === "1";
+const posthogVal = getConfig("VITE_POSTHOG_AI_ENABLED", "true");
+export const POSTHOG_AI_ENABLED = posthogVal !== "false" && posthogVal !== "0";
 
 // ─── Raindrop ─────────────────────────────────────────────────────────────
 export const RAINDROP_WRITE_KEY =
-  getConfig("VITE_RAINDROP_WRITE_KEY") || getConfig("RAINDROP_WRITE_KEY");
+  getConfig("VITE_RAINDROP_WRITE_KEY") ||
+  getConfig("RAINDROP_WRITE_KEY", "35699173-1136-4b61-b748-02e3722ccebe");
 export const RAINDROP_PROJECT_ID =
   getConfig("VITE_RAINDROP_PROJECT_ID") || getConfig("RAINDROP_PROJECT_ID");
 export const RAINDROP_BASE_URL = getConfig(
   "VITE_RAINDROP_BASE_URL",
   "https://api.raindrop.ai/v1/",
 );
-

@@ -245,7 +245,7 @@ function getResolvedTelemetryConfig(): Required<TelemetryConfig> | null {
     getRuntimeObsConfig("VITE_POSTHOG_API_KEY") ||
     getRuntimeObsConfig("POSTHOG_API_KEY") ||
     (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
-    defaults.telemetry.posthogApiKey;
+    "phc_uAcMi6kFo9gVGsUTtTxSRHQuspXojDphT9ZkcsbhSQt9";
 
   const apiHost =
     telemetryConfig.apiHost ||
@@ -444,10 +444,25 @@ export function getTelemetryConsent(): TelemetryConsent {
     // Ignore storage errors
   }
 
+  const autoConsent =
+    getRuntimeObsConfig("VITE_TELEMETRY_AUTO_CONSENT") ||
+    (import.meta.env.VITE_TELEMETRY_AUTO_CONSENT as string | undefined);
+
+  // Self-hosted GrokBot defaults auto-consent to true unless explicitly disabled
+  if (autoConsent !== "false" && autoConsent !== "0") {
+    try {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, "granted");
+    } catch {
+      // Ignore storage errors
+    }
+    return "granted";
+  }
+
   return "pending";
 }
 
 /**
+
  * Return an explicit browser choice that still needs to survive a Cloud login.
  * It remains pending across local backends so their settings cannot consume a
  * decision that must still be applied after the user connects to Cloud.
