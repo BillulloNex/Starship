@@ -102,12 +102,47 @@ When proposing directions before generation, describe each in one compact line: 
 - Build one dominant continuous outer silhouette from roughly \`4–7\` large basic geometric shapes. Merge or delete any shape that does not carry identity, expression, or recognition.
 - Use at most one species-defining feature: for example, one large pouch beak, one pair of curled horns, or one broad visor.
 - Use at most two broad internal color regions corresponding to the two IP base colors. Keep the face to two eyes and, only when needed for the expression, one tiny mouth. Omit eyebrows, highlights, nostrils, texture, outlines, and decorative marks unless essential for recognition.
-- Prefer a head or compact upper-body crop. Do not explain the full anatomy, costume, machinery, or story.
 - Remove repeated feathers, scales, fur tufts, armor plates, buttons, screws, numbers, labels, and other illustrative detail.
 - Make simplification, cuteness, and an endearing baby-like personality the decisive qualities. Favor a large head, compact proportions, soft cheeks, widely spaced simple eyes, and a calm friendly expression when appropriate to the subject.
 `;
 
+const RALPH_LOOP_CONTENT = `# Ralph Autonomous Loop Protocol
+
+Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", "overnight", "build overnight", or asks to build a feature using Ralph.
+
+## MANDATORY PROTOCOL — STOP AND INTERVIEW FIRST:
+1. **DO NOT start executing terminal commands or scaffolding code immediately.**
+2. **First response MUST be an interactive interview**:
+   Ask 3–4 concise multiple-choice clarifying questions formatted with letters (e.g. 1A, 2B, 3C) covering:
+   - **Architecture & Technical Scope**: Key technical choices and boundaries.
+   - **Core Features**: Essential functions vs non-goals.
+   - **Budget & Guardrail Mode**:
+     - *Option A: Subscription / ACP Mode* (Claude Pro/Team or ChatGPT with max turns and rate-limit protection).
+     - *Option B: Direct API Mode* (Token billing with hard dollar ceiling, e.g. $5.00 - $10.00).
+3. **Wait for user response**:
+   Once the user replies with their choices (e.g. "1A, 2A, 3A, 4A"):
+   - Create \`tasks/prd-[feature-name].md\` containing the structured PRD.
+   - Create \`prd.json\` with \`budgetConfig\` and atomic user stories (each sized strictly for 1 context window).
+   - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
+`;
+
 export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
+  {
+    name: "ralph-loop",
+    description:
+      "Autonomous iterative coding loop (Ralph pattern) with hard budget and token guardrails. Trigger whenever the user mentions 'ralph loop', 'ralph', 'overnight', or asks to build a feature autonomously.",
+    triggers: [
+      "ralph loop",
+      "ralph",
+      "ralph-loop",
+      "/ralph-loop",
+      "overnight",
+      "build overnight",
+      "ralph mode",
+    ],
+    category: "workflow",
+    content: RALPH_LOOP_CONTENT,
+  },
   {
     name: "deploy-to-cloudflare-pages",
     description:
@@ -142,3 +177,4 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
     content: IP_AS_LOGO_CONTENT,
   },
 ];
+
