@@ -1,0 +1,43 @@
+{
+  "project": "Grokbot",
+  "branchName": "ralph/feature-example",
+  "description": "Example feature demonstrating the Ralph autonomous loop with budget guardrails",
+  "budgetConfig": {
+    "authMode": "subscription",
+    "maxTurns": 30,
+    "maxIterations": 15,
+    "maxConsecutiveFailures": 2,
+    "cooldownSeconds": 15,
+    "maxTotalSpendUsd": 10.00,
+    "maxSpendPerStoryUsd": 0.80,
+    "maxDurationMinutes": 240,
+    "onRateLimit": "graceful_exit"
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Define types and state store",
+      "description": "As a developer, I need state management for the new feature.",
+      "acceptanceCriteria": [
+        "Create TypeScript interfaces and Zustand store",
+        "npm --prefix OpenHands run build passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add UI component and toggle button",
+      "description": "As a user, I want a toggle button in the header.",
+      "acceptanceCriteria": [
+        "Render toggle in header with tooltips",
+        "npm --prefix OpenHands run build passes",
+        "Verify on preview port"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

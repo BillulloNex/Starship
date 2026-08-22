@@ -105,3 +105,27 @@ When a change touches both frontend and backend code:
 - The agent learns all this from `app_preview` in the `<RUNTIME_SERVICES>` block
   (`scripts/runtime-services-info.mjs`), so it hands the user a public URL instead of
   a localhost one.
+
+## Autonomous Ralph Loop & Budget Guardrails
+
+Grokbot supports unattended, iterative execution via the **Ralph loop** pattern (`scripts/ralph-runner.mjs`).
+
+### Workflow & Skills:
+1. **Plan & Interview**: Use the `generate-prd` skill to create `tasks/prd-[feature].md`.
+2. **Compile to Manifest**: Use the `prd-to-json` skill to create `prd.json` with budget controls.
+3. **Launch Loop**: Run `./scripts/ralph-loop.sh [options]`.
+
+### Execution Modes & Guardrails:
+- **Subscription / ACP Mode** (Claude Pro/Team, ChatGPT):
+  - `--mode subscription --max-turns 25 --cooldown 15`
+  - Hard agent turn caps, burst pacing, and automated 429 / usage limit detection with graceful shutdown.
+- **API Billing Mode** (Direct Token Billing):
+  - `--mode api --max-budget 10.00 --max-per-story 0.80`
+  - Hard dollar ceiling enforced deterministically at the runner level.
+
+### Iteration Protocol:
+- Each loop runs with fresh context.
+- Passes quality checks (`npm --prefix OpenHands run build` & `lint`).
+- Automatically bumps the Grokbot patch version (`node scripts/bump-version.mjs patch`) and commits `feat: [US-XXX] - [Title]`.
+- Appends learnings to `progress.txt` and archives past features upon branch changes (`archive/YYYY-MM-DD-feature/`).
+
