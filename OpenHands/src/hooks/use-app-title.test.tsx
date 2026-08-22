@@ -39,7 +39,7 @@ describe("useAppTitle", () => {
   it("returns the OSS app title outside conversations", async () => {
     const { result } = renderAppTitleHook();
 
-    await waitFor(() => expect(result.current).toBe("OpenHands"));
+    await waitFor(() => expect(result.current).toBe("GrokBot"));
   });
 
   it("returns the conversation title with the OSS app name", async () => {
@@ -52,7 +52,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("My Conversation | OpenHands"),
+      expect(result.current).toBe("My Conversation | GrokBot"),
     );
   });
 
@@ -63,17 +63,17 @@ describe("useAppTitle", () => {
 
     const { result } = renderAppTitleHook();
 
-    await waitFor(() => expect(result.current).toBe("OpenHands"));
+    await waitFor(() => expect(result.current).toBe("GrokBot"));
   });
 
   it.each([
-    [ExecutionStatus.RUNNING, "🟢 My Conversation | OpenHands"],
-    [ExecutionStatus.FINISHED, "My Conversation | OpenHands"],
-    [ExecutionStatus.IDLE, "My Conversation | OpenHands"],
-    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "My Conversation | OpenHands"],
-    [ExecutionStatus.PAUSED, "⚪ My Conversation | OpenHands"],
-    [ExecutionStatus.ERROR, "🔴 My Conversation | OpenHands"],
-    [ExecutionStatus.STUCK, "🔴 My Conversation | OpenHands"],
+    [ExecutionStatus.RUNNING, "🟢 My Conversation | GrokBot"],
+    [ExecutionStatus.FINISHED, "My Conversation | GrokBot"],
+    [ExecutionStatus.IDLE, "My Conversation | GrokBot"],
+    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "My Conversation | GrokBot"],
+    [ExecutionStatus.PAUSED, "⚪ My Conversation | GrokBot"],
+    [ExecutionStatus.ERROR, "🔴 My Conversation | GrokBot"],
+    [ExecutionStatus.STUCK, "🔴 My Conversation | GrokBot"],
   ])(
     "formats the title correctly for execution status %s",
     async (status, expectedTitle) => {
@@ -103,7 +103,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("🟢 My Conversation | OpenHands"),
+      expect(result.current).toBe("🟢 My Conversation | GrokBot"),
     );
   });
 
@@ -117,7 +117,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("My Conversation | OpenHands"),
+      expect(result.current).toBe("My Conversation | GrokBot"),
     );
   });
 });
