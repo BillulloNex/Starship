@@ -65,6 +65,32 @@ def _init_llmobs():
 
         lv = getattr(litellm, "__version__", "unknown")
 
+        # ── Register Kimi K3 (Moonshot AI) pricing for cost tracking ──
+        # Official API prices: $3/M input, $15/M output.
+        # Self-hosted on Modal so actual cost differs, but this gives
+        # directional visibility in observability dashboards.
+        try:
+            litellm.register_model({
+                "openai/kimi-k3": {
+                    "max_tokens": 1048576,
+                    "max_input_tokens": 1048576,
+                    "max_output_tokens": 65536,
+                    "input_cost_per_token": 0.000003,    # $3.00 / 1M
+                    "output_cost_per_token": 0.000015,   # $15.00 / 1M
+                    "litellm_provider": "openai",
+                },
+            })
+            print(
+                "[grokbot-sitecustomize] Kimi K3 pricing registered: "
+                "$3/M input, $15/M output",
+                file=sys.stderr, flush=True,
+            )
+        except Exception as e:
+            print(
+                f"[grokbot-sitecustomize] Kimi K3 pricing registration failed: {e}",
+                file=sys.stderr, flush=True,
+            )
+
         def _create_llmobs_span(kwargs, response_obj):
             """Create an LLMObs span from a completed litellm call."""
             try:
