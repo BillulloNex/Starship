@@ -161,19 +161,17 @@ USER root
 COPY --from=frontend-build /usr/local /usr/local
 RUN node --version && npm --version && npx --version
 
-# Install system deps required by automation's transitive dependencies and Playwright
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# Install system deps required by automation and headless Chromium
+ENV CHROME_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
-      apt-get install -y --no-install-recommends libpq-dev curl && \
+      apt-get install -y --no-install-recommends libpq-dev curl chromium && \
       rm -rf /var/lib/apt/lists/*; \
     fi
-
-# Pre-install Playwright Chromium & dependencies
-RUN mkdir -p /ms-playwright && \
-    npx -y playwright install --with-deps chromium && \
-    chmod -R 777 /ms-playwright
 
 # Install automation server via pip (version pinned from config/defaults.json).
 RUN --mount=type=cache,target=/root/.cache/pip \
