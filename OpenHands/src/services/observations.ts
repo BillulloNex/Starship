@@ -39,6 +39,13 @@ export function handleObservationMessage(message: ObservationMessage) {
         : undefined,
     });
 
+    syncBrowserStoreFromMcp(
+      toolName,
+      pendingCall?.input,
+      message.content,
+      message.extras,
+    );
+
     if (message.cause) activeMcpToolCalls.delete(message.cause);
     if (message.id) activeMcpToolCalls.delete(message.id);
   }
@@ -122,6 +129,71 @@ export function handleObservationMessage(message: ObservationMessage) {
         break;
       default:
         break;
+    }
+  }
+}
+
+function syncBrowserStoreFromMcp(
+  toolName: string,
+  input: unknown,
+  output?: string,
+  extras?: Record<string, unknown>,
+) {
+  const normalizedTool = toolName.toLowerCase();
+  const isBrowserTool =
+    normalizedTool.includes("playwright") ||
+    normalizedTool.includes("browser") ||
+    normalizedTool.includes("navigate") ||
+    normalizedTool.includes("screenshot");
+
+  if (!isBrowserTool) return;
+
+  // Extract URL from input arguments
+  if (
+    input &&
+    typeof input === "object" &&
+    "url" in input &&
+    typeof (input as { url?: unknown }).url === "string"
+  ) {
+    useBrowserStore.getState().setUrl((input as { url: string }).url);
+  }
+
+  // Extract screenshot if directly in extras
+  if (extras?.screenshot && typeof extras.screenshot === "string") {
+    useBrowserStore.getState().setScreenshotSrc(extras.screenshot);
+    return;
+  }
+
+  // Extract screenshot if returned in MCP output
+  if (output && typeof output === "string") {
+    if (
+      output.includes("data:image/png;base64,") ||
+      output.includes("data:image/jpeg;base64,")
+    ) {
+      const match = output.match(
+        /data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/,
+      );
+      if (match) {
+        useBrowserStore.getState().setScreenshotSrc(match[0]);
+        return;
+      }
+    }
+
+    try {
+      const parsed = JSON.parse(output);
+      if (Array.isArray(parsed?.content)) {
+        for (const item of parsed.content) {
+          if (item?.type === "image" && typeof item?.data === "string") {
+            const mime = item.mimeType || "image/png";
+            useBrowserStore
+              .getState()
+              .setScreenshotSrc(`data:${mime};base64,${item.data}`);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Non-JSON output, skip parse
     }
   }
 }

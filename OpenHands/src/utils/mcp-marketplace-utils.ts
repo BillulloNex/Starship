@@ -1,4 +1,5 @@
 import { MCPServerConfig } from "#/types/mcp-server";
+import { GROKBOT_BUILTIN_INTEGRATIONS } from "#/constants/grokbot-builtin-integrations";
 import type {
   MCPAuthenticationConfig,
   MCPOAuthClientAuthMethod,
@@ -110,7 +111,16 @@ export function getMcpOAuthAuthenticationConfig(
 export function getMcpMarketplaceCatalog(
   catalog: MarketplaceEntry[],
 ): MarketplaceEntry[] {
-  return catalog.filter(isMcpInstallableEntry);
+  const merged = [
+    ...GROKBOT_BUILTIN_INTEGRATIONS,
+    ...catalog.filter(
+      (entry) =>
+        !GROKBOT_BUILTIN_INTEGRATIONS.some(
+          (builtin) => builtin.id === entry.id,
+        ),
+    ),
+  ];
+  return merged.filter(isMcpInstallableEntry);
 }
 
 /**

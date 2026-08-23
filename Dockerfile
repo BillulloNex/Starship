@@ -164,13 +164,19 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && 
     ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
     node --version && npm --version && npx --version
 
-# Install system deps required by automation's transitive dependencies
-# (asyncpg needs libpq, which the agent-server base image may not include).
+# Install system deps required by automation's transitive dependencies and Playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
       apt-get install -y --no-install-recommends libpq-dev curl && \
       rm -rf /var/lib/apt/lists/*; \
     fi
+
+# Pre-install Playwright Chromium & MCP server
+RUN npm install -g @modelcontextprotocol/server-playwright && \
+    npx -y playwright install --with-deps chromium && \
+    chmod -R 777 /ms-playwright
 
 # Install automation server via pip (version pinned from config/defaults.json).
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -196,6 +202,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/agent-canvas/bash_events \
              /home/openhands/.openhands/automation \
+             /home/openhands/.openhands/chrome-profile \
              /home/openhands/.claude \
              /home/openhands/.codex \
              /projects && \

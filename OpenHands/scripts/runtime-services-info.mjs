@@ -102,7 +102,7 @@ export function buildRuntimeServicesInfo(options) {
     agent_server: {
       description:
         "The OpenHands Agent Server this agent is running inside. " +
-        "Tool calls (terminal, file_editor, browser, etc.) execute here.",
+        "Tool calls (terminal, file_editor, browser, Playwright MCP, etc.) execute here.",
       url_from_agent: agentServerUrlResolved,
     },
   };
