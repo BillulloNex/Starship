@@ -158,11 +158,8 @@ USER root
 # need node/npm/npx in the production image so the agent-server can spawn them.
 # Reuse the pinned Node build stage instead of installing from an external APT
 # repository or relying on the agent-server base image to provide Node.js.
-COPY --from=frontend-build /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend-build /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
-    ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
-    node --version && npm --version && npx --version
+COPY --from=frontend-build /usr/local /usr/local
+RUN node --version && npm --version && npx --version
 
 # Install system deps required by automation's transitive dependencies and Playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -173,8 +170,8 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
       rm -rf /var/lib/apt/lists/*; \
     fi
 
-# Pre-install Playwright Chromium & MCP server
-RUN npm install -g @modelcontextprotocol/server-playwright && \
+# Pre-install Playwright Chromium & dependencies
+RUN mkdir -p /ms-playwright && \
     npx -y playwright install --with-deps chromium && \
     chmod -R 777 /ms-playwright
 
