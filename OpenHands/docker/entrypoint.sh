@@ -70,6 +70,18 @@ export OH_BASH_EVENTS_DIR="${OH_BASH_EVENTS_DIR:-${OPENHANDS_DIR}/${CONFIG_BASH_
 export GROKBOT_APPS_REGISTRY_PATH="${GROKBOT_APPS_REGISTRY_PATH:-/projects/.grokbot/apps.json}"
 mkdir -p "$(dirname "$GROKBOT_APPS_REGISTRY_PATH")" 2>/dev/null || true
 
+# ── Browser session persistence ──────────────────────────────────────────────
+# Point all browser engines (Playwright, Puppeteer, chrome-devtools-mcp) at the
+# chrome-profile directory inside the persisted volume so login sessions,
+# cookies, and localStorage survive container redeploys.
+CHROME_PROFILE_DIR="${OPENHANDS_DIR}/chrome-profile"
+mkdir -p "$CHROME_PROFILE_DIR" 2>/dev/null || true
+export BROWSER_CHROMIUM_PERSISTENT_CONTEXT_DIR="${BROWSER_CHROMIUM_PERSISTENT_CONTEXT_DIR:-${CHROME_PROFILE_DIR}}"
+export BROWSER_USER_DATA_DIR="${BROWSER_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
+export CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
+export PUPPETEER_USER_DATA_DIR="${PUPPETEER_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
+log "Browser session persistence: $CHROME_PROFILE_DIR"
+
 # OH_SECRET_KEY is required for settings/secrets encryption. Without it the
 # agent-server refuses to return encrypted secrets → conversation creation
 # fails with a 503.  Auto-generate and persist (just like the session API key)

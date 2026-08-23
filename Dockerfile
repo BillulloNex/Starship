@@ -25,6 +25,24 @@ COPY OpenHands/package.json OpenHands/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
+# Patch Browser MCP catalog entry to use persistent chrome-profile directory.
+# Without this, @browsermcp/mcp uses a temp profile that dies with the container.
+RUN node -e " \
+  const fs = require('fs'); \
+  const p = 'node_modules/@openhands/extensions/integrations/catalog/browser-mcp.json'; \
+  if (fs.existsSync(p)) { \
+    const j = JSON.parse(fs.readFileSync(p, 'utf-8')); \
+    const conn = j.connectionOptions?.[0]; \
+    if (conn?.transport?.args) { \
+      conn.transport.args.push('--user-data-dir', '/home/openhands/.openhands/chrome-profile'); \
+    } \
+    fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\\n'); \
+    console.log('Patched browser-mcp.json with persistent --user-data-dir'); \
+  } else { \
+    console.log('browser-mcp.json not found, skipping patch'); \
+  } \
+"
+
 # Copy VERSION to guarantee every version bump invalidates Docker layer cache
 COPY VERSION ./VERSION
 
@@ -165,7 +183,9 @@ RUN node --version && npm --version && npx --version
 ENV CHROME_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    BROWSER_CHROMIUM_PERSISTENT_CONTEXT_DIR=/home/openhands/.openhands/chrome-profile \
+    BROWSER_USER_DATA_DIR=/home/openhands/.openhands/chrome-profile
 
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
