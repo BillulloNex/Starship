@@ -104,11 +104,19 @@ export function GenericEventMessageWrapper({
     details
   );
 
-  // Markdown file-editor cards carry a clipped preview; expand them by
-  // default so the artifact is visible without an extra chevron click.
+  const isImageGenerationToolCall =
+    isACPToolCallEvent(event) &&
+    (event.title?.toLowerCase().includes("image generation") ||
+      (event.raw_output !== null &&
+        typeof event.raw_output === "object" &&
+        "result" in (event.raw_output as Record<string, unknown>)));
+
+  // Markdown file-editor cards and image generation cards carry visual content;
+  // expand them by default so the image/artifact is immediately visible without an extra chevron click.
   const initiallyExpanded =
     !isSkillReadyEvent(event) &&
-    isMarkdownFileEditorEvent(event, correspondingAction);
+    (isMarkdownFileEditorEvent(event, correspondingAction) ||
+      isImageGenerationToolCall);
 
   return (
     <div>

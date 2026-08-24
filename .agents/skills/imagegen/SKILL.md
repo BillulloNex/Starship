@@ -42,6 +42,11 @@ Built-in save-path policy:
 - Never leave a project-referenced asset only at the default `$CODEX_HOME/*` path.
 - Do not overwrite an existing asset unless the user explicitly asked for replacement; otherwise create a sibling versioned filename such as `hero-v2.png` or `item-icon-edited.png`.
 
+Final assistant response requirements:
+- Always copy or move the generated image into the workspace repository (e.g. `./assets/`, `./public/images/`, or a user-specified path).
+- In your final response message to the user, ALWAYS embed the image using markdown: `![Description](relative/path/to/image.png)`.
+- Never end your turn with only text saying "I generated the image above" — embed the image directly in your final message so it displays prominently in the chat.
+
 Shared prompt guidance for both modes lives in `references/prompting.md` and `references/sample-prompts.md`.
 
 Fallback-only docs/resources for CLI mode:
