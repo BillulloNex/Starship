@@ -19,8 +19,7 @@ interface FileQuickRowProps {
  * Horizontal "quick access" row of files at the top of the file viewer.
  * Important entrypoints (index.html, README.md, package.json, …) appear
  * first. A file-tree toggle on the leading edge shows or hides the full
- * tree on the left — there is no overflow dropdown, so anything that doesn't fit
- * here is reachable by opening the tree.
+ * tree on the left.
  */
 export function FileQuickRow({
   paths,
@@ -31,7 +30,14 @@ export function FileQuickRow({
 }: FileQuickRowProps) {
   const { t } = useTranslation("openhands");
 
-  const sortedByPriority = useMemo(() => sortFilesByPriority(paths), [paths]);
+  const regularFiles = useMemo(
+    () => paths.filter((p) => !p.endsWith("/")),
+    [paths],
+  );
+  const sortedByPriority = useMemo(
+    () => sortFilesByPriority(regularFiles),
+    [regularFiles],
+  );
 
   return (
     <div

@@ -33,28 +33,26 @@ const EXCLUDED_DIRS = [
   "target",
 ];
 
-// Build a `find` invocation that lists files relative to the workspace root.
+// Build a `find` invocation that lists files and directories relative to the workspace root.
 function buildListCommand(): string {
   const pruneExpr = EXCLUDED_DIRS.map((dir) => `-name '${dir}' -prune`).join(
     " -o ",
   );
-  return `find . \\( ${pruneExpr} \\) -o -type f -print 2>/dev/null | sort | head -n ${MAX_FILES}`;
+  return `find . \\( ${pruneExpr} \\) -o -type d -exec printf '%s/\\n' {} + -o -type f -print 2>/dev/null | sort | head -n ${MAX_FILES}`;
 }
 
 function normalizePath(path: string): string {
   // Strip a leading "./" so paths render cleanly in the UI.
-  return path.startsWith("./") ? path.slice(2) : path;
+  let p = path.startsWith("./") ? path.slice(2) : path;
+  if (p === "." || p === "./" || p === "/") return "";
+  return p;
 }
 
 /**
- * Local-backend listing: enumerate every regular file beneath the active
+ * Local-backend listing: enumerate regular files and directories beneath the active
  * conversation's working directory via `find` over the agent-server's
  * `/api/bash/execute_bash_command`, excluding common heavy/build directories.
- * Returns paths relative to the working dir (e.g. `src/index.html`).
- *
- * Local only: the cloud API exposes no bash-exec / file-listing endpoint,
- * and the old cross-origin `/api/cloud-proxy` hop these calls relied on was
- * removed from the agent-server. See `useWorkspaceFiles` for the cloud path.
+ * Returns paths relative to the working dir (e.g. `src/index.html` or `src/components/`).
  */
 function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
   const { data: conversation } = useActiveConversation();
@@ -92,7 +90,8 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .map(normalizePath);
+        .map(normalizePath)
+        .filter(Boolean);
 
       // Defensive: keep results unique and bounded.
       return Array.from(new Set(lines)).slice(0, MAX_FILES);
@@ -109,14 +108,7 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
 
 /**
  * Cloud-backend listing: derive the file list from the conversation's git
- * changes — the same data source the diff view uses (and the only
- * runtime-workspace transport the cloud API proxies, alongside git diff and
- * single-file read). `git status` reports created/modified/untracked files,
- * which covers the common Agent Canvas case (a fresh or agent-authored
- * workspace). It intentionally does NOT enumerate unchanged tracked files —
- * the cloud API has no full-workspace listing endpoint — so a conversation
- * attached to a large existing repo shows changed files rather than the whole
- * tree. Deleted files are dropped since they can't be opened.
+ * changes — the same data source the diff view uses.
  */
 function useCloudWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
   const gitChanges = useUnifiedGetGitChanges();
@@ -136,12 +128,7 @@ function useCloudWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
 }
 
 /**
- * Lists the files shown in the Files tab for the active conversation.
- *
- * Local backends enumerate the full workspace tree via bash `find`. Cloud
- * backends derive the list from git changes (see `useCloudWorkspaceFiles`
- * for the rationale and its limitation), because the cloud API exposes no
- * bash-exec or file-listing endpoint.
+ * Lists the files and directories shown in the Files tab for the active conversation.
  */
 export function useWorkspaceFiles(): WorkspaceFilesResult {
   const { backend } = useActiveBackend();

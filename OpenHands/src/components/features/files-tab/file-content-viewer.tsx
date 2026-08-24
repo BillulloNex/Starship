@@ -8,6 +8,7 @@ import {
 } from "#/stores/use-workspace-mutation-counter";
 import { MarkdownRenderer } from "#/components/features/markdown/markdown-renderer";
 import { isMarkdownFilePath } from "#/utils/is-markdown-file-path";
+import { FileCodeEditor } from "./file-code-editor";
 import { HighlightedSourceView } from "./highlighted-source-view";
 import type { ViewMode } from "./view-mode";
 
@@ -103,6 +104,14 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
 
   const { kind, text, staticUrl, mimeType } = query.data;
   const bustedStaticUrl = withWorkspaceCacheBuster(staticUrl, mutationCounter);
+
+  // ----- Edit mode: editable Monaco code editor with save functionality. -----
+  if (viewMode === "edit") {
+    if (kind === "text" && text !== null) {
+      return <FileCodeEditor path={path} initialContent={text} />;
+    }
+    return <UnpreviewableFallback path={path} />;
+  }
 
   // ----- Plain mode: raw source bytes, syntax-highlighted when we can
   // recognize the grammar (falls through to a `<pre>` otherwise). This

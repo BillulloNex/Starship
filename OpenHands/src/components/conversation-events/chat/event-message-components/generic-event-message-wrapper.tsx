@@ -105,6 +105,7 @@ export function GenericEventMessageWrapper({
   );
 
   const isImageGenerationToolCall =
+    !isSkillReadyEvent(event) &&
     isACPToolCallEvent(event) &&
     (event.title?.toLowerCase().includes("image generation") ||
       (event.raw_output !== null &&

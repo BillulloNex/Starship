@@ -124,7 +124,8 @@ function FilesTab() {
   // so users see something useful immediately.
   useEffect(() => {
     if (selectedPath || paths.length === 0) return;
-    const [first] = sortFilesByPriority(paths);
+    const regularFiles = paths.filter((p) => !p.endsWith("/"));
+    const [first] = sortFilesByPriority(regularFiles);
     if (first) setSelectedPath(first, conversationId);
   }, [paths, selectedPath, conversationId, setSelectedPath]);
 
@@ -147,7 +148,7 @@ function FilesTab() {
       className="h-full w-full flex flex-col items-stretch"
       data-testid="files-tab"
     >
-      {/* Top toolbar: diff/files + rich/plain toggles (left-aligned) plus
+      {/* Top toolbar: diff/files + rich/plain/edit toggles (left-aligned) plus
           the refresh button on the right. */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[var(--oh-border)]">
         <SegmentedToggle<"on" | "off" | "commits">
@@ -184,6 +185,7 @@ function FilesTab() {
             options={[
               { value: "rich", label: t(I18nKey.FILES$RICH) },
               { value: "plain", label: t(I18nKey.FILES$PLAIN) },
+              { value: "edit", label: "Edit" },
             ]}
             onChange={setFilesTabContentViewMode}
           />
@@ -253,13 +255,17 @@ function FilesTab() {
               <div className="flex h-full min-h-0 flex-1">
                 {isTreeVisible && (
                   <aside
-                    className="w-56 shrink-0 border-r border-[var(--oh-border)] overflow-y-auto custom-scrollbar-always"
+                    className="w-64 shrink-0 border-r border-[var(--oh-border)] overflow-hidden"
                     data-testid="files-tab-tree"
                   >
                     <FileTreeView
                       paths={paths}
                       selectedPath={selectedPath}
                       onSelectFile={handleSelectFile}
+                      onEditFile={(path) => {
+                        handleSelectFile(path);
+                        setFilesTabContentViewMode("edit");
+                      }}
                     />
                   </aside>
                 )}

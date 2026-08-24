@@ -1,17 +1,27 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
 import { FileTreeView } from "#/components/features/files-tab/file-tree-view";
 
-// FileTreeView composes the recursive TreeNode (extracted into its own file).
-// The route-level files-tab test treats the tree as a black box, so these
-// cover the tree's own user-facing behavior: empty state, directory
-// expand/collapse, and file selection.
+function renderWithQueryClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
+
 describe("FileTreeView", () => {
   it("shows the empty-state message and no tree when there are no files", () => {
     // Arrange + Act
-    render(
+    renderWithQueryClient(
       <FileTreeView paths={[]} selectedPath={null} onSelectFile={vi.fn()} />,
     );
 
@@ -23,7 +33,7 @@ describe("FileTreeView", () => {
   it("keeps a directory collapsed until clicked, then reveals its children", async () => {
     // Arrange
     const user = userEvent.setup();
-    render(
+    renderWithQueryClient(
       <FileTreeView
         paths={["src/main.ts"]}
         selectedPath={null}
@@ -50,7 +60,7 @@ describe("FileTreeView", () => {
     // Arrange
     const user = userEvent.setup();
     const onSelectFile = vi.fn();
-    render(
+    renderWithQueryClient(
       <FileTreeView
         paths={["README.md"]}
         selectedPath={null}
@@ -64,5 +74,22 @@ describe("FileTreeView", () => {
     // Assert
     expect(onSelectFile).toHaveBeenCalledTimes(1);
     expect(onSelectFile).toHaveBeenCalledWith("README.md");
+  });
+
+  it("filters file tree based on search query", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <FileTreeView
+        paths={["src/index.ts", "docs/guide.md"]}
+        selectedPath={null}
+        onSelectFile={vi.fn()}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText("Search files...");
+    await user.type(searchInput, "guide");
+
+    expect(screen.getByTestId("file-tree-dir-docs")).toBeInTheDocument();
+    expect(screen.queryByTestId("file-tree-dir-src")).not.toBeInTheDocument();
   });
 });

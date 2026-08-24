@@ -49,6 +49,7 @@ export function PluginFilesSection({
           <FileTreeView
             paths={files}
             selectedPath={effectivePath}
+            readOnly
             onSelectFile={(path) =>
               setSelectedPath((prev) => (prev === path ? null : path))
             }
