@@ -31,4 +31,20 @@ describe("toWorkspaceRelativePath", () => {
       "canvas.md",
     );
   });
+
+  it("handles full sandbox container paths with project hash or home prefixes", () => {
+    expect(
+      toWorkspaceRelativePath(
+        "/home/openhands/workspace/project/c40017ff3612407db2a9537113a57c2a/ghost-peekaboo-a1.png",
+      ),
+    ).toBe("ghost-peekaboo-a1.png");
+    expect(
+      toWorkspaceRelativePath(
+        "/workspace/project/c40017ff3612407db2a9537113a57c2a/assets/ghost.png",
+      ),
+    ).toBe("assets/ghost.png");
+    expect(
+      toWorkspaceRelativePath("/home/openhands/workspace/docs/guide.md"),
+    ).toBe("docs/guide.md");
+  });
 });

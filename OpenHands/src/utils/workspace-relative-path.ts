@@ -28,9 +28,31 @@ export function toWorkspaceRelativePath(
     return trimmedPath.replace(/^\.\//, "");
   }
 
-  const roots = [workingDir, DEFAULT_WORKING_DIR].filter(
-    (value): value is string => Boolean(value?.trim()),
+  // 1. Explicit workingDir matching (when provided by caller)
+  if (workingDir && workingDir.trim()) {
+    const normalizedWorkingDir = normalizeWorkspaceRoot(workingDir);
+    if (trimmedPath === normalizedWorkingDir) {
+      return "";
+    }
+    if (trimmedPath.startsWith(`${normalizedWorkingDir}/`)) {
+      return trimmedPath.slice(normalizedWorkingDir.length + 1);
+    }
+  }
+
+  // 2. Dynamic conversation hex project directories (e.g. /workspace/project/<hex32>/file.ext)
+  const hexProjectMatch = trimmedPath.match(
+    /^(?:\/home\/openhands)?\/workspace\/project\/[a-f0-9]{32}\/(.+)$/i,
   );
+  if (hexProjectMatch) {
+    return hexProjectMatch[1];
+  }
+
+  // 3. General sandbox project/workspace fallback roots
+  const roots = [
+    DEFAULT_WORKING_DIR,
+    `/${DEFAULT_WORKING_DIR}`,
+    `/home/openhands/${DEFAULT_WORKING_DIR}`,
+  ].filter((value): value is string => Boolean(value?.trim()));
 
   for (const root of roots) {
     const normalizedRoot = normalizeWorkspaceRoot(root);
@@ -40,6 +62,13 @@ export function toWorkspaceRelativePath(
     if (trimmedPath.startsWith(`${normalizedRoot}/`)) {
       return trimmedPath.slice(normalizedRoot.length + 1);
     }
+  }
+
+  const sandboxWorkspaceMatch = trimmedPath.match(
+    /^(?:\/home\/openhands)?\/workspace\/(.+)$/,
+  );
+  if (sandboxWorkspaceMatch) {
+    return sandboxWorkspaceMatch[1];
   }
 
   return trimmedPath.replace(/^\/+/, "");
