@@ -80,7 +80,7 @@ export const MARKDOWN_SANITIZE_SCHEMA: Schema = {
   ],
   protocols: {
     ...defaultSchema.protocols,
-    src: ["http", "https"],
+    src: ["http", "https", "data"],
     href: ["http", "https", "mailto", "tel"],
   },
 };
@@ -150,6 +150,15 @@ export function MarkdownRenderer({
     th,
     td,
     blockquote,
+    img: ({ src, alt, ...props }) => (
+      <img
+        src={src}
+        alt={alt ?? "image"}
+        className="max-w-full h-auto rounded-lg my-2 border border-neutral-700/50 shadow-md object-contain"
+        loading="lazy"
+        {...props}
+      />
+    ),
     ...(includeStandard && {
       a: anchor,
       p: paragraph,

@@ -81,6 +81,58 @@ const stringifyPayload = (value: unknown): string => {
   }
 };
 
+interface ImageGenerationPayload {
+  status?: string;
+  revisedPrompt?: string | null;
+  result?: string;
+  savedPath?: string | null;
+}
+
+function extractImageGenerationData(event: ACPToolCallEvent): {
+  imageData: string;
+  mimeType: string;
+  prompt?: string;
+  savedPath?: string;
+} | null {
+  // 1. Check raw_output payload (e.g. from Codex ACP imageGeneration)
+  if (event.raw_output && typeof event.raw_output === "object") {
+    const raw = event.raw_output as ImageGenerationPayload;
+    if (typeof raw.result === "string" && raw.result.trim().length > 50) {
+      const trimmed = raw.result.trim();
+      if (trimmed.startsWith("data:") || /^[A-Za-z0-9+/=\s]+$/.test(trimmed.slice(0, 100))) {
+        return {
+          imageData: trimmed.replace(/\s+/g, ""),
+          mimeType: "image/png",
+          prompt: raw.revisedPrompt || undefined,
+          savedPath: raw.savedPath || undefined,
+        };
+      }
+    }
+  }
+
+  // 2. Check event.content blocks
+  if (Array.isArray(event.content) && event.content.length > 0) {
+    for (const block of event.content) {
+      if (block && typeof block === "object") {
+        const item =
+          "content" in block && typeof block.content === "object" && block.content !== null
+            ? (block.content as Record<string, unknown>)
+            : (block as Record<string, unknown>);
+        if (item.type === "image" && typeof item.data === "string" && item.data.length > 50) {
+          const mime = typeof item.mimeType === "string" ? item.mimeType : "image/png";
+          return {
+            imageData: item.data.trim().replace(/\s+/g, ""),
+            mimeType: mime,
+            savedPath: typeof item.uri === "string" ? item.uri : undefined,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 const truncate = (content: string): string =>
   content.length > MAX_CONTENT_LENGTH
     ? `${content.slice(0, MAX_CONTENT_LENGTH)}...`
@@ -98,6 +150,24 @@ const truncate = (content: string): string =>
  * "(no output)" fallback copy used by the bash observation renderer.
  */
 export const getACPToolCallContent = (event: ACPToolCallEvent): string => {
+  // Check if this is an image generation tool call output
+  const imgData = extractImageGenerationData(event);
+  if (imgData && imgData.imageData) {
+    const dataUri = imgData.imageData.startsWith("data:")
+      ? imgData.imageData
+      : `data:${imgData.mimeType};base64,${imgData.imageData}`;
+
+    let imgContent = "";
+    if (imgData.prompt) {
+      imgContent += `**Prompt:**\n> ${imgData.prompt}\n\n`;
+    }
+    imgContent += `![Generated Image](${dataUri})\n\n`;
+    if (imgData.savedPath) {
+      imgContent += `*Saved to: \`${imgData.savedPath}\`*\n`;
+    }
+    return imgContent.trim();
+  }
+
   const toolKind = event.tool_kind;
   const rawInput = event.raw_input;
   const rawOutput = event.raw_output;

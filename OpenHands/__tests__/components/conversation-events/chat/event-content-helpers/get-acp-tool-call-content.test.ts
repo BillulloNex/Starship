@@ -116,6 +116,26 @@ describe("getACPToolCallContent", () => {
     expect(content).toContain('"status": 200');
     expect(content).toContain('"body": "ok"');
   });
+
+  it("renders image generation outputs as inline markdown image previews", () => {
+    const base64Image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const content = getACPToolCallContent(
+      makeEvent({
+        title: "Image generation",
+        tool_kind: "other",
+        raw_output: {
+          status: "completed",
+          revisedPrompt: "A beautiful cat",
+          result: base64Image,
+          savedPath: "/workspace/cat.png",
+        },
+      }),
+    );
+
+    expect(content).toContain("**Prompt:**\n> A beautiful cat");
+    expect(content).toContain(`![Generated Image](data:image/png;base64,${base64Image})`);
+    expect(content).toContain("*Saved to: `/workspace/cat.png`*");
+  });
 });
 
 describe("stripRedundantTitlePrefix", () => {
