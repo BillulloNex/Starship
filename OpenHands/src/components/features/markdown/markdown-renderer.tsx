@@ -1,4 +1,4 @@
-import Markdown, { Components } from "react-markdown";
+import Markdown, { Components, defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
@@ -14,6 +14,18 @@ import { table, th, td } from "./table";
 import { blockquote } from "./blockquote";
 import { hr } from "./horizontal-rule";
 import { remarkGithubAlerts } from "./remark-github-alerts";
+
+/**
+ * Custom URL transformer for react-markdown.
+ * Allows safe data:image/ URIs (for ACP image generation previews)
+ * while preserving standard defaultUrlTransform protections for everything else.
+ */
+export const customUrlTransform = (url: string): string => {
+  if (url.startsWith("data:image/")) {
+    return url;
+  }
+  return defaultUrlTransform(url);
+};
 
 // Build a sanitize schema that extends rehype-sanitize's defaults with a
 // few markdown-friendly additions. The defaults strip `<script>`, event
@@ -188,6 +200,7 @@ export function MarkdownRenderer({
     <div data-testid="markdown-renderer">
       <Markdown
         components={components}
+        urlTransform={customUrlTransform}
         remarkPlugins={[remarkGithubAlerts, remarkGfm, remarkBreaks]}
         rehypePlugins={rehypePlugins}
       >

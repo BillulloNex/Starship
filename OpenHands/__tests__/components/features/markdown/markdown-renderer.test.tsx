@@ -61,6 +61,15 @@ describe("MarkdownRenderer", () => {
     expect(container.querySelector("summary")?.textContent).toBe("Show more");
   });
 
+  it("renders data:image/png;base64 images correctly", () => {
+    const md = "![Generated Image](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)";
+    const { container } = render(<MarkdownRenderer>{md}</MarkdownRenderer>);
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toContain("data:image/png;base64,iVBOR");
+    expect(img?.getAttribute("alt")).toBe("Generated Image");
+  });
+
   it("strips <script> tags via rehype-sanitize", () => {
     const md = "Hello<script>window.__pwn = true;</script> world";
     const { container } = render(<MarkdownRenderer>{md}</MarkdownRenderer>);
