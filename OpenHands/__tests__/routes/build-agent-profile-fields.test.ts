@@ -66,6 +66,23 @@ describe("buildAgentProfileFields — ACP", () => {
     }
   });
 
+  it("maps non-native backend ACP servers (e.g. antigravity) to acp_server: custom with explicit command", () => {
+    const fields = buildAgentProfileFields({
+      ...baseAcp,
+      selectedPreset: "antigravity",
+      isDefaultProviderCommand: true,
+      commandTokens: ["agy-acp"],
+      acpModel: "claude-opus-4-6-thinking",
+    });
+    expect(fields).toEqual({
+      agent_kind: "acp",
+      acp_server: "custom",
+      acp_model: "claude-opus-4-6-thinking",
+      acp_command: "agy-acp",
+      acp_args: null,
+    });
+  });
+
   it("normalizes a blank model to null", () => {
     const fields = buildAgentProfileFields({ ...baseAcp, acpModel: "   " });
     if (fields.agent_kind === "acp") {

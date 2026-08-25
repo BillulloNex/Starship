@@ -123,9 +123,20 @@ export function SetupAcpSecretsStep({
       // step never renders for "openhands" (the modal shows SetupLlmStep
       // there), so the guard just narrows the type for `acp_server`.
       if (providerKey !== "openhands") {
+        const isNativeSdkServer = [
+          "claude-code",
+          "codex",
+          "gemini-cli",
+        ].includes(providerKey);
+        const provider = getAcpProvider(providerKey);
         await applyAgentProfile({
           agent_kind: "acp",
-          acp_server: providerKey as never,
+          acp_server: (isNativeSdkServer ? providerKey : "custom") as never,
+          acp_command: isNativeSdkServer
+            ? null
+            : provider?.default_command
+              ? provider.default_command.join(" ")
+              : "agy-acp",
           acp_model: getAcpPreferredDefaultModel(providerKey) ?? undefined,
         });
       }

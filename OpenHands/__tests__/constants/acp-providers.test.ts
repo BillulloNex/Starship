@@ -111,9 +111,16 @@ describe("ACP provider registry", () => {
     // EVERY default-model surface must agree on this, including this diff
     // builder's fallback.
     for (const provider of ACP_PROVIDERS) {
+      const expectedServer = [
+        "claude-code",
+        "codex",
+        "gemini-cli",
+      ].includes(provider.key)
+        ? provider.key
+        : "custom";
       expect(buildAcpAgentSettingsDiff(provider.key)).toMatchObject({
         agent_kind: "acp",
-        acp_server: provider.key,
+        acp_server: expectedServer,
         acp_model: getAcpPreferredDefaultModel(provider.key),
       });
     }

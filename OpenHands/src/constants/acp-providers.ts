@@ -536,14 +536,6 @@ export function labelForAcpModel(
  * caller can skip the save (the UI shouldn't surface unknown options,
  * but the defensive path keeps a buggy preset list from corrupting
  * settings).
- *
- * Pass ``allowUnknownServer: true`` to opt into pass-through for keys
- * that aren't in {@link ACP_PROVIDERS} or ``ACP_CUSTOM_PRESET_KEY``.
- * The Settings → Agent page uses this when the user opens settings
- * that already carry an ``acp_server`` value canvas's registry
- * doesn't know about (e.g. set out-of-band via the API for a provider
- * we haven't mirrored yet) and saves without changing the command —
- * otherwise the original key would be silently demoted to ``"custom"``.
  */
 export function buildAcpAgentSettingsDiff(
   providerKey: string,
@@ -567,6 +559,19 @@ export function buildAcpAgentSettingsDiff(
     return null;
   }
 
+  // The Python agent-server's Pydantic validation enum strictly enforces
+  // ``Literal['claude-code', 'codex', 'gemini-cli', 'custom']``. Any other
+  // ACP provider key maps to ``"custom"`` so the backend accepts the payload.
+  const isNativeSdkServer = [
+    "claude-code",
+    "codex",
+    "gemini-cli",
+  ].includes(providerKey);
+  const backendServer =
+    options.allowUnknownServer || isNativeSdkServer
+      ? providerKey
+      : ACP_CUSTOM_PRESET_KEY;
+
   // Undefined model → the *preferred* default (Vertex-safe for Gemini), not
   // the raw registry default — see getAcpPreferredDefaultModel.
   const model =
@@ -580,11 +585,19 @@ export function buildAcpAgentSettingsDiff(
   // payload from a textarea that already shows the merged command
   // (Settings → Agent) round-trip correctly — the merged tokens land in
   // ``acp_command`` here, so no args are lost.
+  const defaultCommand = provider?.default_command ?? [];
+  const command =
+    isNativeSdkServer || options.allowUnknownServer
+      ? (options.command ?? [])
+      : options.command && options.command.length > 0
+        ? options.command
+        : defaultCommand;
+
   return {
     agent_kind: "acp",
-    acp_server: providerKey,
-    acp_command: options.command ?? [],
+    acp_server: backendServer,
+    acp_command: command,
     acp_args: [],
-    acp_model: model ?? null,
+    acp_model: model,
   };
 }

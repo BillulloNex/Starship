@@ -197,7 +197,7 @@ describe("ChooseAgentStep", () => {
   it.each([
     ["codex", "codex"],
     ["gemini-cli", "gemini-cli"],
-    ["antigravity", "antigravity"],
+    ["antigravity", "custom"],
   ])("persists acp_server=%s for the matching tile", async (id, expected) => {
     const save = vi.spyOn(SettingsService, "saveSettings");
     renderStep(id as OnboardingAgentId);
@@ -220,7 +220,7 @@ describe("ChooseAgentStep", () => {
     // Vertex projects (software-agent-sdk#3532).
     expect(
       (call.agent_settings_diff as Record<string, unknown>).acp_model,
-    ).toBe(getAcpPreferredDefaultModel(expected));
+    ).toBe(getAcpPreferredDefaultModel(id));
   });
 
   it("rebuilds the diff cleanly when the user flips between ACP providers", async () => {

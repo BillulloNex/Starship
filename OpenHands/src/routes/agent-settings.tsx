@@ -155,11 +155,16 @@ export function buildAgentProfileFields(
     toolConcurrency,
   } = input;
   if (isAcp) {
+    const isNativeSdkServer = [
+      "claude-code",
+      "codex",
+      "gemini-cli",
+    ].includes(selectedPreset);
     const isBuiltinDefault =
-      isDefaultProviderCommand && selectedPreset !== ACP_CUSTOM_PRESET_KEY;
+      isDefaultProviderCommand && isNativeSdkServer;
     return {
       agent_kind: "acp",
-      acp_server: selectedPreset,
+      acp_server: isNativeSdkServer ? selectedPreset : ACP_CUSTOM_PRESET_KEY,
       acp_model: acpModel.trim() || null,
       acp_command: isBuiltinDefault
         ? null
