@@ -22,10 +22,48 @@ export interface AntigravityOAuthConfig {
 }
 
 export function setupKeyringAndAuth(): void {
-	const authRaw =
+	console.error("[agy-acp] setupKeyringAndAuth starting...");
+	console.error("[agy-acp] Available env keys:", Object.keys(process.env).sort());
+
+	let authRaw =
 		process.env.ANTIGRAVITY_AUTH_JSON || process.env.GEMINI_OAUTH_JSON;
 
+	if (!authRaw) {
+		// Scan all env vars for OAuth JSON
+		for (const [k, v] of Object.entries(process.env)) {
+			if (v && v.trim().startsWith("{") && v.includes("refresh_token")) {
+				authRaw = v;
+				console.error(`[agy-acp] Found OAuth credentials in env var: ${k}`);
+				break;
+			}
+		}
+	}
+
+	if (!authRaw) {
+		// Check candidate files on disk
+		const candidateFiles = [
+			path.join(os.homedir(), ".gemini", "oauth_creds.json"),
+			path.join(os.homedir(), ".gemini", "antigravity-cli", "oauth_creds.json"),
+			"/home/openhands/.gemini/oauth_creds.json",
+			"/home/openhands/.gemini/antigravity-cli/oauth_creds.json",
+			"/root/.gemini/oauth_creds.json",
+		];
+		for (const cf of candidateFiles) {
+			try {
+				if (fs.existsSync(cf)) {
+					const content = fs.readFileSync(cf, "utf8");
+					if (content.trim().startsWith("{") && content.includes("refresh_token")) {
+						authRaw = content;
+						console.error(`[agy-acp] Found OAuth credentials on disk: ${cf}`);
+						break;
+					}
+				}
+			} catch {}
+		}
+	}
+
 	if (!authRaw || !authRaw.trim().startsWith("{")) {
+		console.error("[agy-acp] No OAuth credentials found in env or disk!");
 		return;
 	}
 
@@ -33,7 +71,7 @@ export function setupKeyringAndAuth(): void {
 	try {
 		parsed = JSON.parse(authRaw.trim());
 	} catch (e) {
-		console.error("[agy-acp] failed to parse ANTIGRAVITY_AUTH_JSON:", e);
+		console.error("[agy-acp] failed to parse auth JSON:", e);
 		return;
 	}
 
@@ -144,6 +182,7 @@ export function setupKeyringAndAuth(): void {
 							process.env[match[1]] = match[2];
 						}
 					}
+					console.error(`[agy-acp] DBUS_SESSION_BUS_ADDRESS=${process.env.DBUS_SESSION_BUS_ADDRESS}`);
 				} catch (err) {
 					console.error("[agy-acp] dbus-launch error:", err);
 				}
@@ -171,8 +210,8 @@ try:
         for user in [svc, "", "consumer", "default"]:
             try:
                 collection.create_item(svc, {"service": svc, "username": user}, payload.encode("utf-8"), replace=True)
-            except Exception:
-                pass
+            except Exception as item_err:
+                print(f"item_err: {item_err}", file=sys.stderr)
     print("PYTHON_KEYRING_SUCCESS")
 except Exception as e:
     print(f"PYTHON_KEYRING_ERR: {e}", file=sys.stderr)
@@ -182,25 +221,23 @@ except Exception as e:
 				encoding: "utf8",
 			});
 
-			if (pyRes.stdout && pyRes.stdout.includes("PYTHON_KEYRING_SUCCESS")) {
-				console.error("[agy-acp] Injected token into D-Bus Secret Storage via Python");
-			} else {
-				// Fallback to secret-tool CLI
-				const serviceCombos = [
-					["antigravity", "antigravity"],
-					["antigravity", ""],
-					["antigravity", "consumer"],
-					["gemini", "gemini"],
-					["gemini", ""],
-				];
-				for (const [service, user] of serviceCombos) {
-					try {
-						child_process.execSync(
-							`echo -n "${keyringPayloadStr}" | secret-tool store --label="${service}" service "${service}" username "${user}" 2>/dev/null || true`,
-							{ env: process.env, shell: "/bin/bash" },
-						);
-					} catch {}
-				}
+			console.error(`[agy-acp] python keyring output: stdout=${pyRes.stdout?.trim()}, stderr=${pyRes.stderr?.trim()}`);
+
+			// Fallback / supplement with secret-tool CLI
+			const serviceCombos = [
+				["antigravity", "antigravity"],
+				["antigravity", ""],
+				["antigravity", "consumer"],
+				["gemini", "gemini"],
+				["gemini", ""],
+			];
+			for (const [service, user] of serviceCombos) {
+				try {
+					child_process.execSync(
+						`echo -n "${keyringPayloadStr}" | secret-tool store --label="${service}" service "${service}" username "${user}" 2>/dev/null || true`,
+						{ env: process.env, shell: "/bin/bash" },
+					);
+				} catch {}
 			}
 		} catch (err) {
 			console.error("[agy-acp] Keyring setup error:", err);
