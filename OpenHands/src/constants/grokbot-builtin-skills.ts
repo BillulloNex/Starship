@@ -128,17 +128,17 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
 
 const AUTH_HANDOFF_CONTENT = `# Auth Handoff — Interactive VNC Browser for Authenticated Websites
 
-When you encounter a website that requires authentication (SSO login, Microsoft sign-in, Google OAuth, MFA/2FA), you CANNOT complete the login flow yourself. Use the **auth handoff protocol** instead.
+When you encounter a website that requires authentication (SSO login, Microsoft sign-in, Google OAuth, MFA/2FA), follow this two-phase approach.
 
-## Detection
+## Phase 1 — Try Programmatic Login First
 
-Recognise an auth wall when ANY of these are true:
-- Page contains "Sign in", "Log in", "Pick an account", or similar
-- HTTP response is 401 or 403
-- URL redirects to a known SSO provider (login.microsoftonline.com, accounts.google.com, auth0, okta, etc.)
-- Page shows a username/password form (especially when MFA/2FA is likely)
+If the user has provided login credentials (email, password, etc.):
+1. Use your browser tools (\`browser_navigate\`, \`browser_type\`, \`browser_click\`) to fill in the login form
+2. Submit the credentials and check the result
+3. If login succeeds → continue with the authenticated session. Done!
+4. If login fails or you hit an MFA/2FA prompt, CAPTCHA, or "Pick an account" screen → proceed to Phase 2
 
-## Protocol — FOLLOW THESE STEPS EXACTLY
+## Phase 2 — VNC Handoff (for MFA/2FA or when programmatic login fails)
 
 ### Step 1 — Start Interactive Browser
 Run the VNC browser on-demand:
@@ -149,10 +149,10 @@ This starts Xvfb + Chromium + VNC + noVNC on port 6080. The Chromium instance us
 
 ### Step 2 — Guide the User
 Tell the user:
-> I've hit a login page. I've started an interactive browser session for you.
+> I've hit an MFA/verification step I can't complete automatically. I've started an interactive browser session for you.
 > **To complete the login:**
 > 1. Switch to the **Interactive** tab in the Browser panel (the hand icon ✋)
-> 2. Complete the sign-in / MFA flow in the live browser
+> 2. Complete the verification / MFA flow in the live browser
 > 3. Once you're logged in, come back here and tell me to continue
 
 Then **STOP and WAIT**. Do NOT proceed until the user confirms.
@@ -163,10 +163,15 @@ After the user confirms:
 2. Resume using your standard browser tools — the cookies are now in the persistent Chrome profile
 3. Verify you have access by navigating to the target URL
 
+## Detection — Recognise an auth wall when ANY of these are true:
+- Page contains "Sign in", "Log in", "Pick an account", or similar
+- HTTP response is 401 or 403
+- URL redirects to a known SSO provider (login.microsoftonline.com, accounts.google.com, auth0, okta, etc.)
+
 ## CRITICAL RULES
-- **NEVER fill in passwords yourself.** Always hand off to the user.
-- **NEVER install puppeteer, selenium, or playwright manually.** Use \\\`start-vnc-browser\\\` instead.
-- **NEVER try to automate SSO/MFA flows headlessly.** They will fail.
+- **If the user provides credentials, USE THEM** to attempt login programmatically first.
+- **NEVER install puppeteer, selenium, or playwright manually.** Use your built-in browser tools or \\\`start-vnc-browser\\\` instead.
+- **Only hand off to the user when you genuinely can't proceed** (MFA, CAPTCHA, device verification, etc.)
 - Cookies persist across conversations via /home/openhands/.openhands/chrome-profile.
 - The VNC stack is on-demand only. Start it when needed, stop it when done.
 `;
