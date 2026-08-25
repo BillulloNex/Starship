@@ -62,6 +62,7 @@ Grokbot has a **split deployment**: the frontend and backend deploy separately.
   2. Coolify will automatically start building within ~5 seconds.
   3. Use `list_deployments` or `deployment(action: "get")` (read-only monitoring) to watch the build until status is `finished`.
   4. Verify production health via `curl -s http://grok.beenex.org/health`.
+- **MANDATORY: Always monitor deployments to completion.** Never tell the user "once the build finishes…" or "check Coolify yourself." The agent MUST poll `deployment(action: "get", uuid: "<id>")` every 2–3 minutes until status is `finished` or `failed`, then report the result. If the build fails, read the logs and diagnose immediately. The definition of "deployed" is a `finished` status AND a passing health check — not "I pushed, it should work."
 
 ### Combined changes (frontend + backend)
 
