@@ -2,6 +2,7 @@
 // Entry point for the agy ACP server.
 
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import pkg from "./package.json";
 import { runAcp } from "./src/acp/server";

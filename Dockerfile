@@ -212,9 +212,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
     fi
 
-# Install Bun for Antigravity ACP server
+# Install Bun and Antigravity CLI (agy)
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
-RUN bun --version
+RUN bun --version && \
+    curl -fsSL https://antigravity.google/cli/install.sh | bash -s -- --dir /usr/local/bin && \
+    chmod +x /usr/local/bin/agy && \
+    /usr/local/bin/agy --version || true
 
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
