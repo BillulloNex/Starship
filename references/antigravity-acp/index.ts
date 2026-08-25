@@ -9,6 +9,8 @@ import { runAcp } from "./src/acp/server";
 import { downloadedAgyPath } from "./src/agy/binary";
 import { ensureAgy } from "./src/agy/installer";
 
+import { setupKeyringAndAuth } from "./src/agy/keyring";
+
 async function main(): Promise<void> {
 	if (process.argv.includes("--version") || process.argv.includes("-v")) {
 		process.stdout.write(`${pkg.version}\n`);
@@ -27,19 +29,11 @@ async function main(): Promise<void> {
 
 	// Materialize subscription auth or ADC credentials from environment variables if provided
 	try {
-		const home = os.homedir();
-		const authJson =
-			process.env.ANTIGRAVITY_AUTH_JSON || process.env.GEMINI_OAUTH_JSON;
-		if (authJson && authJson.trim().startsWith("{")) {
-			const geminiDir = path.join(home, ".gemini");
-			fs.mkdirSync(geminiDir, { recursive: true });
-			fs.writeFileSync(path.join(geminiDir, "oauth_creds.json"), authJson.trim(), {
-				mode: 0o600,
-			});
-		}
+		setupKeyringAndAuth();
 
 		const adcJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 		if (adcJson && adcJson.trim().startsWith("{")) {
+			const home = os.homedir();
 			const gcloudDir = path.join(home, ".config", "gcloud");
 			fs.mkdirSync(gcloudDir, { recursive: true });
 			const adcPath = path.join(gcloudDir, "application_default_credentials.json");

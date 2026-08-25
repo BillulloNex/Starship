@@ -64,6 +64,7 @@ export function spawnAgy(
 ): Bun.Subprocess<"ignore", "ignore", "pipe"> {
 	return Bun.spawn([binary, ...args], {
 		cwd,
+		env: process.env,
 		stdin: "ignore",
 		stdout: "ignore",
 		stderr: "pipe",

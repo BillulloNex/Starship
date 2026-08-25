@@ -189,7 +189,7 @@ ENV CHROME_PATH=/usr/bin/chromium \
 
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
-      apt-get install -y --no-install-recommends libpq-dev curl chromium xvfb x11vnc fluxbox xdotool python3-websockify novnc && \
+      apt-get install -y --no-install-recommends libpq-dev curl chromium xvfb x11vnc fluxbox xdotool python3-websockify novnc dbus-x11 gnome-keyring libsecret-1-0 libsecret-tools python3-secretstorage && \
       ln -sf /usr/share/novnc /opt/novnc && \
       rm -rf /var/lib/apt/lists/*; \
     fi
