@@ -21,9 +21,8 @@ export interface AntigravityOAuthConfig {
 	auth_method?: string;
 }
 
-export function setupKeyringAndAuth(): void {
+export async function setupKeyringAndAuth(): Promise<void> {
 	console.error("[agy-acp] setupKeyringAndAuth starting...");
-	console.error("[agy-acp] Available env keys:", Object.keys(process.env).sort());
 
 	let authRaw =
 		process.env.ANTIGRAVITY_AUTH_JSON || process.env.GEMINI_OAUTH_JSON;
@@ -36,6 +35,33 @@ export function setupKeyringAndAuth(): void {
 				console.error(`[agy-acp] Found OAuth credentials in env var: ${k}`);
 				break;
 			}
+		}
+	}
+
+	if (!authRaw) {
+		// Try fetching secret from agent-server local HTTP API
+		const ports = [18000, 8000];
+		for (const p of ports) {
+			for (const secretName of ["ANTIGRAVITY_AUTH_JSON", "GEMINI_OAUTH_JSON"]) {
+				try {
+					const res = await fetch(`http://127.0.0.1:${p}/api/settings/secrets/${secretName}`, {
+						headers: { Accept: "application/json" },
+					});
+					if (res.ok) {
+						const body = await res.json();
+						const val =
+							typeof body === "string"
+								? body
+								: body?.value || body?.secret || body?.token || "";
+						if (val && typeof val === "string" && val.trim().startsWith("{")) {
+							authRaw = val.trim();
+							console.error(`[agy-acp] Successfully fetched ${secretName} from agent-server API on port ${p}`);
+							break;
+						}
+					}
+				} catch {}
+			}
+			if (authRaw) break;
 		}
 	}
 
@@ -63,7 +89,7 @@ export function setupKeyringAndAuth(): void {
 	}
 
 	if (!authRaw || !authRaw.trim().startsWith("{")) {
-		console.error("[agy-acp] No OAuth credentials found in env or disk!");
+		console.error("[agy-acp] No OAuth credentials found in env, API, or disk!");
 		return;
 	}
 

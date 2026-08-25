@@ -27,9 +27,9 @@ async function main(): Promise<void> {
 		console.error("[agy-acp] unhandled rejection:", reason);
 	});
 
-	// Materialize subscription auth or ADC credentials from environment variables if provided
+	// Materialize subscription auth or ADC credentials from environment variables or API if provided
 	try {
-		setupKeyringAndAuth();
+		await setupKeyringAndAuth();
 
 		const adcJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 		if (adcJson && adcJson.trim().startsWith("{")) {
