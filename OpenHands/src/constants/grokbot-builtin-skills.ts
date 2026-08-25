@@ -126,54 +126,55 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
-const AUTH_HANDOFF_CONTENT = `# Auth Handoff — Interactive VNC Browser for Authenticated Websites
+const AUTH_HANDOFF_CONTENT = `# Auth Handoff — MANDATORY for All Authenticated Websites
 
-When you encounter a website that requires authentication (SSO login, Microsoft sign-in, Google OAuth, MFA/2FA), follow this two-phase approach.
+## ⛔ BANNED ACTIONS — NEVER DO THESE:
+- NEVER run \\\`pip install playwright\\\`, \\\`pip install selenium\\\`, \\\`pip install puppeteer-core\\\`, or \\\`npm install puppeteer\\\`
+- NEVER run \\\`chromium --headless\\\` or \\\`chromium --dump-dom\\\` to scrape authenticated pages
+- NEVER write custom Python/Node scripts to automate browser login
+- NEVER lecture the user about password security, credential rotation, or suggest they change their password. If they share credentials, use them silently without commentary.
 
-## Phase 1 — Try Programmatic Login First
+## Why These Are Banned
+Your built-in browser tools (\\\`browser_navigate\\\`, \\\`browser_type\\\`, \\\`browser_click\\\`, etc.) already provide a full browser automation stack. You do NOT need to install anything.
 
-If the user has provided login credentials (email, password, etc.):
-1. Use your browser tools (\`browser_navigate\`, \`browser_type\`, \`browser_click\`) to fill in the login form
-2. Submit the credentials and check the result
-3. If login succeeds → continue with the authenticated session. Done!
-4. If login fails or you hit an MFA/2FA prompt, CAPTCHA, or "Pick an account" screen → proceed to Phase 2
+More importantly: **SSO providers like Microsoft, Google, and Okta actively block headless browsers.** They fingerprint the browser environment and return fake "incorrect password" errors even when the credentials are correct. \\\`chromium --headless\\\` will ALWAYS fail against Microsoft SSO. This is not a credential problem — it is bot detection.
 
-## Phase 2 — VNC Handoff (for MFA/2FA or when programmatic login fails)
+## The Correct Approach — Two Phases
 
-### Step 1 — Start Interactive Browser
-Run the VNC browser on-demand:
-\\\`\\\`\\\`bash
-start-vnc-browser start "<auth-url>"
-\\\`\\\`\\\`
-This starts Xvfb + Chromium + VNC + noVNC on port 6080. The Chromium instance uses the same persistent cookie profile as your browser tools.
+### Phase 1: Direct Login (non-SSO sites only)
+If the site has its OWN login form (not redirecting to Microsoft/Google/Okta):
+1. Use \\\`browser_navigate\\\` to go to the login page
+2. Use \\\`browser_type\\\` to fill email/password fields
+3. Use \\\`browser_click\\\` to submit
+4. If login succeeds → continue. Done!
 
-### Step 2 — Guide the User
-Tell the user:
-> I've hit an MFA/verification step I can't complete automatically. I've started an interactive browser session for you.
-> **To complete the login:**
-> 1. Switch to the **Interactive** tab in the Browser panel (the hand icon ✋)
-> 2. Complete the verification / MFA flow in the live browser
-> 3. Once you're logged in, come back here and tell me to continue
+### Phase 2: VNC Browser (SSO sites, MFA, or when Phase 1 fails)
+**Use this IMMEDIATELY when you see ANY of these:**
+- URL contains \\\`login.microsoftonline.com\\\`, \\\`accounts.google.com\\\`, \\\`*.okta.com\\\`, \\\`auth0.com\\\`
+- Page shows "Pick an account", "Sign in with Microsoft/Google", SSO redirect
+- Phase 1 login returned "incorrect password" but user insists credentials are correct
+- Any MFA/2FA prompt, CAPTCHA, or device verification
 
-Then **STOP and WAIT**. Do NOT proceed until the user confirms.
+**Steps:**
+1. Run: \\\`start-vnc-browser start "<login-url>"\\\`
+   This launches a HEADED Chromium with a real display — SSO providers treat it as a normal browser.
 
-### Step 3 — Resume
-After the user confirms:
-1. Stop the VNC browser: \\\`start-vnc-browser stop\\\`
-2. Resume using your standard browser tools — the cookies are now in the persistent Chrome profile
-3. Verify you have access by navigating to the target URL
+2. If the user provided credentials, you CAN type them into the VNC browser:
+   \\\`start-vnc-browser open "<login-url>"\\\`
+   Then use \\\`xdotool\\\` via the terminal to type into the VNC browser's fields.
+   But if MFA/2FA kicks in, tell the user:
+   > Switch to the **Interactive** tab in the Browser panel (✋ icon) to complete the verification step, then tell me to continue.
 
-## Detection — Recognise an auth wall when ANY of these are true:
-- Page contains "Sign in", "Log in", "Pick an account", or similar
-- HTTP response is 401 or 403
-- URL redirects to a known SSO provider (login.microsoftonline.com, accounts.google.com, auth0, okta, etc.)
+3. After login is complete, stop the VNC browser:
+   \\\`start-vnc-browser stop\\\`
 
-## CRITICAL RULES
-- **If the user provides credentials, USE THEM** to attempt login programmatically first.
-- **NEVER install puppeteer, selenium, or playwright manually.** Use your built-in browser tools or \\\`start-vnc-browser\\\` instead.
-- **Only hand off to the user when you genuinely can't proceed** (MFA, CAPTCHA, device verification, etc.)
-- Cookies persist across conversations via /home/openhands/.openhands/chrome-profile.
-- The VNC stack is on-demand only. Start it when needed, stop it when done.
+4. Resume with your regular browser tools — cookies are shared via the persistent Chrome profile at /home/openhands/.openhands/chrome-profile.
+
+## Key Facts
+- The VNC browser and your browser tools share the SAME cookie profile. Login in one = logged in for the other.
+- Cookies persist across conversations. Once logged in, future sessions may not need re-authentication.
+- The VNC browser is on-demand. Start it only when needed, stop it when done.
+- The user can see the VNC browser in the **Interactive** tab of the Browser panel.
 `;
 
 export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
