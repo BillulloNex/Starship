@@ -55,7 +55,20 @@ function rowToStep(r: RawRow): StepRow {
 }
 
 export function conversationDbPath(dir: string, id: string): string {
-	return path.join(dir, `${id}.db`);
+	const direct = path.join(dir, `${id}.db`);
+	if (fs.existsSync(direct)) return direct;
+
+	const home = os.homedir();
+	const candidates = [
+		path.join(home, ".gemini", "antigravity-cli", "conversations", `${id}.db`),
+		path.join(home, ".gemini", "antigravity", "conversations", `${id}.db`),
+		path.join(home, ".gemini", "conversations", `${id}.db`),
+		path.join(home, ".config", "antigravity", "conversations", `${id}.db`),
+	];
+	for (const c of candidates) {
+		if (fs.existsSync(c)) return c;
+	}
+	return direct;
 }
 
 /** A live identity for a conversation DB file, used to validate caches. */

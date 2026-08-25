@@ -3,17 +3,27 @@
 
 import * as fs from "node:fs";
 
+import * as os from "node:os";
+import * as path from "node:path";
+
 /** Snapshot the set of conversation ids (`*.db` stems) currently on disk. */
 export function conversationSnapshot(dir: string): Set<string> {
+	const home = os.homedir();
+	const dirs = [
+		dir,
+		path.join(home, ".gemini", "antigravity-cli", "conversations"),
+		path.join(home, ".gemini", "antigravity", "conversations"),
+		path.join(home, ".gemini", "conversations"),
+		path.join(home, ".config", "antigravity", "conversations"),
+	];
 	const out = new Set<string>();
-	let entries: string[];
-	try {
-		entries = fs.readdirSync(dir);
-	} catch {
-		return out;
-	}
-	for (const f of entries) {
-		if (f.endsWith(".db")) out.add(f.slice(0, -3));
+	for (const d of dirs) {
+		try {
+			const entries = fs.readdirSync(d);
+			for (const f of entries) {
+				if (f.endsWith(".db")) out.add(f.slice(0, -3));
+			}
+		} catch {}
 	}
 	return out;
 }
