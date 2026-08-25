@@ -126,7 +126,73 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
+const AUTH_HANDOFF_CONTENT = `# Auth Handoff — Interactive VNC Browser for Authenticated Websites
+
+When you encounter a website that requires authentication (SSO login, Microsoft sign-in, Google OAuth, MFA/2FA), you CANNOT complete the login flow yourself. Use the **auth handoff protocol** instead.
+
+## Detection
+
+Recognise an auth wall when ANY of these are true:
+- Page contains "Sign in", "Log in", "Pick an account", or similar
+- HTTP response is 401 or 403
+- URL redirects to a known SSO provider (login.microsoftonline.com, accounts.google.com, auth0, okta, etc.)
+- Page shows a username/password form (especially when MFA/2FA is likely)
+
+## Protocol — FOLLOW THESE STEPS EXACTLY
+
+### Step 1 — Start Interactive Browser
+Run the VNC browser on-demand:
+\\\`\\\`\\\`bash
+start-vnc-browser start "<auth-url>"
+\\\`\\\`\\\`
+This starts Xvfb + Chromium + VNC + noVNC on port 6080. The Chromium instance uses the same persistent cookie profile as your browser tools.
+
+### Step 2 — Guide the User
+Tell the user:
+> I've hit a login page. I've started an interactive browser session for you.
+> **To complete the login:**
+> 1. Switch to the **Interactive** tab in the Browser panel (the hand icon ✋)
+> 2. Complete the sign-in / MFA flow in the live browser
+> 3. Once you're logged in, come back here and tell me to continue
+
+Then **STOP and WAIT**. Do NOT proceed until the user confirms.
+
+### Step 3 — Resume
+After the user confirms:
+1. Stop the VNC browser: \\\`start-vnc-browser stop\\\`
+2. Resume using your standard browser tools — the cookies are now in the persistent Chrome profile
+3. Verify you have access by navigating to the target URL
+
+## CRITICAL RULES
+- **NEVER fill in passwords yourself.** Always hand off to the user.
+- **NEVER install puppeteer, selenium, or playwright manually.** Use \\\`start-vnc-browser\\\` instead.
+- **NEVER try to automate SSO/MFA flows headlessly.** They will fail.
+- Cookies persist across conversations via /home/openhands/.openhands/chrome-profile.
+- The VNC stack is on-demand only. Start it when needed, stop it when done.
+`;
+
 export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
+  {
+    name: "auth-handoff",
+    description:
+      "Handle websites requiring authentication (SSO, MFA, OAuth) by starting an interactive VNC browser and guiding the user through login. ALWAYS use this instead of installing puppeteer/selenium manually.",
+    triggers: [
+      "login",
+      "sign in",
+      "authenticate",
+      "SSO",
+      "MFA",
+      "library",
+      "EBSCO",
+      "access denied",
+      "authentication required",
+      "sign-in",
+      "log in",
+      "403",
+    ],
+    category: "browser",
+    content: AUTH_HANDOFF_CONTENT,
+  },
   {
     name: "ralph-loop",
     description:
@@ -178,4 +244,3 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
     content: IP_AS_LOGO_CONTENT,
   },
 ];
-
