@@ -51,7 +51,7 @@ describe("ACP provider registry", () => {
       if (provider.key === "antigravity") {
         expect(provider.display_name).toBe("Google Antigravity");
         expect(provider.default_command).toEqual(["agy-acp"]);
-        expect(provider.default_model).toBe("gemini-3.6-flash-medium");
+        expect(provider.default_model).toBe("claude-opus-4-6-thinking");
         expect(provider.icon).toBe("antigravity");
         expect(provider.description_key).toBeTruthy();
         continue;

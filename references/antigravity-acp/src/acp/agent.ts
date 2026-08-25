@@ -52,8 +52,9 @@ interface ConfigResult {
 }
 
 const DEFAULT_MODELS = [
-	"gemini-3.6-flash-medium",
 	"claude-opus-4-6-thinking",
+	"gemini-3.7-flash",
+	"gemini-3.1-pro",
 ];
 
 export class AgyAcpAgent {

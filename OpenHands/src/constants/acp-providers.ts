@@ -170,13 +170,13 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
     display_name = "Google Antigravity";
     default_command = ["agy-acp"];
     available_models = [
-      { id: "gemini-3.6-flash-medium", label: "Gemini 3.6 Flash (Medium)" },
       { id: "claude-opus-4-6-thinking", label: "Claude Opus 4.6 (Thinking)" },
-      { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)" },
+      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash" },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
       { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
     ];
-    default_model = "gemini-3.6-flash-medium";
+    default_model = "claude-opus-4-6-thinking";
   }
 
   if (
