@@ -13,10 +13,11 @@ import {
 } from "#/constants/acp-providers";
 
 describe("getAcpProviderDisplayName", () => {
-  it("resolves the three built-in registry keys to their human names", () => {
+  it("resolves the built-in registry keys to their human names", () => {
     expect(getAcpProviderDisplayName("claude-code")).toBe("Claude Code");
     expect(getAcpProviderDisplayName("codex")).toBe("Codex");
     expect(getAcpProviderDisplayName("gemini-cli")).toBe("Gemini CLI");
+    expect(getAcpProviderDisplayName("antigravity")).toBe("Google Antigravity");
   });
 
   it("returns null for the Custom-command preset so callers can fall back to the generic 'ACP' label", () => {
@@ -47,6 +48,14 @@ describe("ACP provider registry", () => {
     // Python SDK stays the single source of truth. Only the UI-only overlay
     // (icon + description_key) is layered on locally.
     for (const provider of ACP_PROVIDERS) {
+      if (provider.key === "antigravity") {
+        expect(provider.display_name).toBe("Google Antigravity");
+        expect(provider.default_command).toEqual(["agy-acp"]);
+        expect(provider.default_model).toBe("gemini-3.6-flash-medium");
+        expect(provider.icon).toBe("antigravity");
+        expect(provider.description_key).toBeTruthy();
+        continue;
+      }
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
       const expectedCommand =
@@ -154,6 +163,15 @@ describe("getAcpProviderSecrets — containerized credentials", () => {
       "GOOGLE_GENAI_USE_VERTEXAI",
       "GEMINI_API_KEY",
       "GEMINI_BASE_URL",
+    ]);
+  });
+
+  it("collects the Vertex SA JSON + GEMINI_API_KEY + GCP project for Antigravity", () => {
+    const names = getAcpProviderSecrets("antigravity").map((f) => f.name);
+    expect(names).toEqual([
+      "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+      "GEMINI_API_KEY",
+      "GOOGLE_CLOUD_PROJECT",
     ]);
   });
 

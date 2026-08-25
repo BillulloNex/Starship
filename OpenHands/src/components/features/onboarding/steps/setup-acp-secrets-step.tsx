@@ -125,7 +125,7 @@ export function SetupAcpSecretsStep({
       if (providerKey !== "openhands") {
         await applyAgentProfile({
           agent_kind: "acp",
-          acp_server: providerKey,
+          acp_server: providerKey as never,
           acp_model: getAcpPreferredDefaultModel(providerKey) ?? undefined,
         });
       }

@@ -5,6 +5,7 @@ export type ACPProviderIcon =
   | "claude-code"
   | "codex"
   | "gemini"
+  | "antigravity"
   | "cli-generic";
 
 export const ACP_PROVIDER_FALLBACK_ICON: ACPProviderIcon = "cli-generic";
@@ -142,6 +143,10 @@ const ACP_PROVIDER_UI: Record<
     icon: "gemini",
     description_key: I18nKey.ONBOARDING$AGENT_GEMINI_CLI_DESCRIPTION,
   },
+  antigravity: {
+    icon: "antigravity",
+    description_key: I18nKey.ONBOARDING$AGENT_ANTIGRAVITY_DESCRIPTION,
+  },
 };
 
 // Built-in ACP providers Canvas surfaces, built by enriching each upstream
@@ -152,7 +157,28 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   ACP_PROVIDER_UI,
 ).map(([key, ui]) => {
   const info = getClientAcpProvider(key);
-  const default_command = info ? [...info.default_command] : [];
+  let default_command = info ? [...info.default_command] : [];
+  let display_name = info?.display_name ?? key;
+  let available_models =
+    info?.available_models?.map((model) => ({
+      id: model.id,
+      label: model.label,
+    })) ?? [];
+  let default_model = info?.default_model ?? undefined;
+
+  if (key === "antigravity") {
+    display_name = "Google Antigravity";
+    default_command = ["agy-acp"];
+    available_models = [
+      { id: "gemini-3.6-flash-medium", label: "Gemini 3.6 Flash (Medium)" },
+      { id: "claude-opus-4-6-thinking", label: "Claude Opus 4.6 (Thinking)" },
+      { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)" },
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    ];
+    default_model = "gemini-3.6-flash-medium";
+  }
+
   if (
     key === "claude-code" &&
     default_command.length > 0 &&
@@ -160,18 +186,13 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   ) {
     default_command.push("--dangerously-skip-permissions");
   }
-  const available_models =
-    info?.available_models?.map((model) => ({
-      id: model.id,
-      label: model.label,
-    })) ?? [];
 
   return {
     key,
-    display_name: info?.display_name ?? key,
+    display_name,
     default_command,
     available_models,
-    default_model: info?.default_model ?? undefined,
+    default_model,
     description_key: ui.description_key,
     icon: ui.icon,
   };
@@ -264,6 +285,26 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
     {
       name: "GOOGLE_GENAI_USE_VERTEXAI",
       hint_key: I18nKey.ONBOARDING$ACP_SECRET_VERTEXAI_FLAG_HINT,
+    },
+  ],
+  antigravity: [
+    {
+      name: "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+      secret: true,
+      multiline: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_FILE_BLOB_HINT,
+      hint_values: {
+        file: "~/.config/gcloud/application_default_credentials.json",
+      },
+    },
+    {
+      name: "GEMINI_API_KEY",
+      secret: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
+    },
+    {
+      name: "GOOGLE_CLOUD_PROJECT",
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_GCP_PROJECT_HINT,
     },
   ],
 };
@@ -371,6 +412,9 @@ export function getAcpProviderSecrets(
   key: string | null | undefined,
 ): ACPProviderSecretField[] {
   if (!key) return [];
+  if (key === "antigravity") {
+    return [...(ACP_RESERVED_CREDENTIALS.antigravity ?? [])];
+  }
   const info = getClientAcpProvider(key);
   if (!info) return [];
   // Subscription / Vertex credentials first — they're the primary auth path for

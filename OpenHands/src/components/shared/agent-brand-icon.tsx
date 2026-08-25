@@ -1,6 +1,8 @@
 import OpenHandsLogo from "#/assets/branding/openhands-logo.svg?react";
 import TerminalIcon from "#/icons/terminal.svg?react";
 import {
+  ANTIGRAVITY_MARK_PATH,
+  ANTIGRAVITY_VIEWBOX,
   CLAUDE_CODE_MARK_PATH,
   CLAUDE_CODE_VIEWBOX,
   CODEX_MARK_PATH,
@@ -14,7 +16,7 @@ import { cn } from "#/utils/utils";
 /**
  * Icons the conversation chip + onboarding tiles can render. Strictly broader
  * than {@link ACPProviderIcon} — that type covers ACP CLI subprocesses only
- * (Claude Code, Codex, Gemini, generic terminal fallback), whereas this type
+ * (Claude Code, Codex, Gemini, Antigravity, generic terminal fallback), whereas this type
  * additionally includes the native OpenHands harness.
  */
 export type AgentBrandIconKind = "openhands" | ACPProviderIcon;
@@ -103,6 +105,21 @@ export function AgentBrandIcon({
         aria-hidden
       >
         <path fill="currentColor" d={GEMINI_MARK_PATH} />
+      </svg>
+    );
+  }
+  if (kind === "antigravity") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={ANTIGRAVITY_VIEWBOX}
+        width={size}
+        height={size}
+        className={cn("shrink-0", className)}
+        data-testid={testId ?? "agent-brand-icon-antigravity"}
+        aria-hidden
+      >
+        <path fill="currentColor" d={ANTIGRAVITY_MARK_PATH} />
       </svg>
     );
   }

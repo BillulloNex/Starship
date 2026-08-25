@@ -1,0 +1,44 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile All Binaries
+        run: bun run build:all
+
+      - name: Extract Release Notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          awk -v ver="[$VERSION]" 'index($0, "## " ver) == 1 {flag=1; next} /^## \[/ {flag=0} flag' CHANGELOG.md > release_notes.md
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: |
+            dist/agy-acp-darwin-arm64
+            dist/agy-acp-darwin-x64
+            dist/agy-acp-linux-arm64
+            dist/agy-acp-linux-x64
+            dist/agy-acp-windows-arm64.exe
+            dist/agy-acp-windows-x64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

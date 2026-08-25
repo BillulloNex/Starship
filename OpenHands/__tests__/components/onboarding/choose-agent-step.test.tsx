@@ -40,23 +40,27 @@ describe("ChooseAgentStep", () => {
     vi.spyOn(SettingsService, "saveSettings").mockResolvedValue(true);
   });
 
-  it("renders all four agent options with OpenHands marked selected by default", () => {
+  it("renders all five agent options with OpenHands marked selected by default", () => {
     renderStep();
 
     const openhands = screen.getByTestId("onboarding-agent-option-openhands");
     const claude = screen.getByTestId("onboarding-agent-option-claude-code");
     const codex = screen.getByTestId("onboarding-agent-option-codex");
     const gemini = screen.getByTestId("onboarding-agent-option-gemini-cli");
+    const antigravity = screen.getByTestId(
+      "onboarding-agent-option-antigravity",
+    );
 
     expect(openhands).toHaveAttribute("aria-checked", "true");
-    // All four options are clickable — ACP is no longer "coming soon".
+    // All options are clickable — ACP is no longer "coming soon".
     expect(openhands).not.toBeDisabled();
     expect(claude).not.toBeDisabled();
     expect(codex).not.toBeDisabled();
     expect(gemini).not.toBeDisabled();
+    expect(antigravity).not.toBeDisabled();
 
     // Neither the legacy "coming soon" banner nor the per-option badges
-    // should render now that all four agent kinds work end-to-end.
+    // should render now that all five agent kinds work end-to-end.
     expect(
       screen.queryByTestId("onboarding-agent-coming-soon"),
     ).not.toBeInTheDocument();
@@ -79,6 +83,18 @@ describe("ChooseAgentStep", () => {
     expect(
       within(gemini).queryByTestId("onboarding-agent-icon-codex"),
     ).not.toBeInTheDocument();
+  });
+
+  it("renders the registry-selected Antigravity icon on the Antigravity tile", () => {
+    renderStep();
+
+    const antigravity = screen.getByTestId(
+      "onboarding-agent-option-antigravity",
+    );
+
+    expect(
+      within(antigravity).getByTestId("onboarding-agent-icon-antigravity"),
+    ).toBeInTheDocument();
   });
 
   it("falls back to the generic CLI icon for a registry provider without an icon", () => {
@@ -125,6 +141,9 @@ describe("ChooseAgentStep", () => {
 
     await user.click(screen.getByTestId("onboarding-agent-option-gemini-cli"));
     expect(onSelect).toHaveBeenLastCalledWith("gemini-cli");
+
+    await user.click(screen.getByTestId("onboarding-agent-option-antigravity"));
+    expect(onSelect).toHaveBeenLastCalledWith("antigravity");
 
     await user.click(screen.getByTestId("onboarding-agent-option-openhands"));
     expect(onSelect).toHaveBeenLastCalledWith("openhands");
@@ -178,6 +197,7 @@ describe("ChooseAgentStep", () => {
   it.each([
     ["codex", "codex"],
     ["gemini-cli", "gemini-cli"],
+    ["antigravity", "antigravity"],
   ])("persists acp_server=%s for the matching tile", async (id, expected) => {
     const save = vi.spyOn(SettingsService, "saveSettings");
     renderStep(id as OnboardingAgentId);

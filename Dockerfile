@@ -212,6 +212,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
     fi
 
+# Install Bun for Antigravity ACP server
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+RUN bun --version
+
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
@@ -221,12 +225,22 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/chrome-profile \
              /home/openhands/.claude \
              /home/openhands/.codex \
+             /home/openhands/.gemini \
+             /home/openhands/.agy-acp \
              /tmp/vnc-browser/logs \
              /projects && \
-    chown -R openhands:openhands /home/openhands/.openhands /home/openhands/.claude /home/openhands/.codex /projects /tmp/vnc-browser
+    chown -R openhands:openhands /home/openhands /projects /tmp/vnc-browser
+
+# Copy Antigravity ACP server and create launcher
+COPY references/antigravity-acp /opt/agent-canvas/antigravity-acp
+RUN cd /opt/agent-canvas/antigravity-acp && bun install && \
+    printf '%s\n' '#!/bin/sh' 'exec bun run /opt/agent-canvas/antigravity-acp/index.ts "$@"' > /usr/local/bin/agy-acp && \
+    chmod +x /usr/local/bin/agy-acp && \
+    chown -R openhands:openhands /opt/agent-canvas/antigravity-acp
 
 # Copy the frontend build output.
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
+
 
 # Copy the static-server scripts and their production runtime deps.
 COPY OpenHands/scripts/static-server.mjs /opt/agent-canvas/static-server.mjs

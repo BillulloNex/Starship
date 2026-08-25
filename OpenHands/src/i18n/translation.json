@@ -30956,6 +30956,23 @@
     "tr": "Google'ın Gemini CLI aracısı.",
     "uk": "Агент Gemini CLI від Google."
   },
+  "ONBOARDING$AGENT_ANTIGRAVITY_DESCRIPTION": {
+    "en": "Google Antigravity ACP agent.",
+    "ja": "Google Antigravity ACP エージェント。",
+    "zh-CN": "Google Antigravity ACP 智能体。",
+    "zh-TW": "Google Antigravity ACP 代理。",
+    "ko-KR": "Google Antigravity ACP 에이전트입니다.",
+    "no": "Google Antigravity ACP-agent.",
+    "ar": "وكيل Google Antigravity ACP.",
+    "de": "Google Antigravity ACP-Agent.",
+    "fr": "L'agent Google Antigravity ACP.",
+    "it": "L'agente Google Antigravity ACP.",
+    "pt": "O agente Google Antigravity ACP.",
+    "es": "El agente Google Antigravity ACP.",
+    "ca": "L'agent Google Antigravity ACP.",
+    "tr": "Google Antigravity ACP aracı.",
+    "uk": "Агент Google Antigravity ACP."
+  },
   "ONBOARDING$BACKEND_TITLE": {
     "en": "Check your backend",
     "ja": "バックエンドを確認",
