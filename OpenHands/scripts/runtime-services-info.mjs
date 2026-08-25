@@ -173,31 +173,70 @@ export function buildRuntimeServicesInfo(options) {
     };
   }
 
-  // Shared interactive browser. On-demand VNC browser stack that lets the user
-  // interact with a headed Chromium instance sharing the same persistent cookie
-  // profile as the agent's browser tools. Used for auth handoffs (SSO, MFA).
+  // ── Browser routing guide ──────────────────────────────────────────────────
+  // Injected into EVERY conversation so the agent always knows which browser
+  // tool to reach for. This is the #1 fix for models ignoring VNC in favour
+  // of headless tools that cannot handle MFA / CAPTCHA / SSO.
   if (appPreview?.urlTemplate) {
+    services.browser_routing_guide = {
+      CRITICAL:
+        "READ THIS BEFORE USING ANY BROWSER TOOL. " +
+        "You have TWO browser modes. Using the wrong one wastes time and fails.",
+      decision_tree: {
+        step_1:
+          "For routine browsing (reading pages, clicking links, filling " +
+          "simple forms with NO login): use your built-in browser tools " +
+          "(browser_navigate, browser_click, browser_type, etc.).",
+        step_2:
+          "The MOMENT you encounter ANY of these, STOP using built-in " +
+          "browser tools and switch to the VNC interactive browser: " +
+          "(a) a login / sign-in page, " +
+          "(b) SSO redirects (login.microsoftonline.com, accounts.google.com, " +
+          "okta.com, auth0.com, login.salesforce.com, sso.*, idp.*), " +
+          "(c) MFA / 2FA / OTP / device verification prompts, " +
+          "(d) CAPTCHA or bot-detection challenges, " +
+          "(e) 'Pick an account' or consent screens, " +
+          "(f) OAuth authorization flows, " +
+          "(g) any page that returns 401/403 or says 'Access Denied', " +
+          "(h) any login attempt that fails or loops, " +
+          "(i) the user asks you to 'log in' or 'sign in' to anything.",
+        step_3:
+          "NEVER install puppeteer, selenium, or playwright manually. " +
+          "NEVER run chromium --headless for login pages. " +
+          "NEVER write custom Python/Node scripts to automate SSO. " +
+          "These ALL fail because SSO providers detect and block them.",
+      },
+      vnc_command: "start-vnc-browser start \"<url>\"",
+      vnc_stop: "start-vnc-browser stop",
+    };
+
     services.shared_browser = {
       description:
-        "On-demand interactive browser for authentication handoffs. When you " +
-        "encounter a website requiring login (SSO, MFA, OAuth), start the VNC " +
-        "browser with `start-vnc-browser start <url>`. The user can then " +
-        "interact with the browser via the 'Interactive' tab in the Browser " +
-        "panel to complete login. After login, stop the VNC browser with " +
-        "`start-vnc-browser stop` and resume using your regular browser tools — " +
-        "the cookies from the user's login are shared via the persistent " +
-        "Chrome profile at /home/openhands/.openhands/chrome-profile.",
+        "MANDATORY tool for any website requiring authentication. This is " +
+        "a headed Chromium browser with a real GUI that the user can see " +
+        "and interact with via the 'Interactive' tab in the Browser panel. " +
+        "It shares the same persistent cookie profile as your built-in " +
+        "browser tools, so after the user logs in here, your headless " +
+        "browser tools inherit the authenticated session automatically.",
       start_command: "start-vnc-browser start [url]",
       stop_command: "start-vnc-browser stop",
       status_command: "start-vnc-browser status",
       vnc_port: 6080,
       user_url: appPreview.urlTemplate.replace("{port}", "6080"),
+      procedure: [
+        "1. Run: start-vnc-browser start \"<login-url>\"",
+        "2. Tell the user to switch to the Interactive tab in the Browser panel",
+        "3. If you have credentials, type them with: DISPLAY=:99 xdotool type \"text\"",
+        "4. If MFA/CAPTCHA appears, tell the user to complete it in the Interactive tab",
+        "5. After login succeeds, run: start-vnc-browser stop",
+        "6. Resume with your regular built-in browser tools — cookies are now shared",
+      ],
+      persistent_profile: "/home/openhands/.openhands/chrome-profile",
       note_from_agent:
-        "The VNC browser is NOT always running — start it only when needed " +
-        "for auth, and stop it when done. Never fill in passwords yourself; " +
-        "always hand off to the user. After the user logs in and you stop the " +
-        "VNC browser, your regular browser tools will have the authenticated " +
-        "session cookies automatically.",
+        "The VNC browser is on-demand — start it ONLY when needed for auth, " +
+        "stop it when done. After the user logs in and you stop the VNC " +
+        "browser, your regular browser tools will have the authenticated " +
+        "session cookies automatically. Cookies persist across conversations.",
     };
   }
 

@@ -4,20 +4,46 @@ description: >
   Handle websites requiring authentication (SSO, MFA, OAuth) by first
   attempting programmatic login with provided credentials, then falling
   back to an interactive VNC browser session for MFA/2FA.
-  Triggers on: login, sign in, authenticate, SSO, MFA, library search,
-  EBSCO, authentication required, 403, access denied.
+  triggers on: login, sign in, signin, log in, authenticate, SSO, MFA,
+  2FA, OTP, CAPTCHA, OAuth, library search, EBSCO, authentication required,
+  403, 401, unauthorized, forbidden, access denied, password, credential,
+  microsoftonline, okta, auth0, pick an account, verify your identity.
 triggers:
   type: keyword
   keywords:
     - login
     - sign in
+    - sign-in
+    - signin
+    - log in
+    - log-in
     - authenticate
+    - authentication
     - SSO
     - MFA
+    - 2FA
+    - two-factor
+    - OTP
+    - CAPTCHA
+    - OAuth
     - authentication required
     - access denied
+    - 403
+    - 401
+    - unauthorized
+    - forbidden
+    - password
+    - credential
+    - credentials
     - library
     - EBSCO
+    - microsoftonline
+    - okta
+    - auth0
+    - accounts.google
+    - pick an account
+    - verify your identity
+    - device verification
 ---
 
 # Auth Handoff Skill
