@@ -90,3 +90,56 @@ The `Comfy BackOffice` project contains the following co-located services:
 3. **`qm`** (Service) — ComfySpace QM multiplayer agent (`qm.beenex.org`)
 4. **`coder`** (Service) — Self-hosted Coder AI development sandbox environment (`coder.beenex.org`)
 5. **`twenty-crm`** (Service) — Twenty CRM platform with PostgreSQL & Redis (`twenty-q8z4rxfatsg7auhnbcxph6ig.beenex.org`)
+
+---
+
+## 9. Persistent Storage & Browser Auth Persistence
+
+Coolify manages two persistent volumes for Grokbot. These survive container restarts, redeployments, and server reboots — data is only lost if volumes are manually deleted.
+
+| Volume Name | Container Path | Host Path | What it stores |
+|---|---|---|---|
+| `grokbot-openhands-state` | `/home/openhands/.openhands` | `/data/grokbot/openhands` | Settings, secrets, conversations, automation DB, **Chrome profile** |
+| `grokbot-storage` | `/projects` | `/data/grokbot/projects` | User code the agent reads/edits |
+
+### Browser Auth Persistence
+
+The agent's Chrome profile lives at `/home/openhands/.openhands/chrome-profile` inside the `grokbot-openhands-state` volume. All browser engines (built-in browser tools, VNC Chromium, Playwright MCP, Chrome DevTools MCP) share this single profile directory via environment variables set in the Dockerfile and entrypoint:
+
+```
+BROWSER_CHROMIUM_PERSISTENT_CONTEXT_DIR=/home/openhands/.openhands/chrome-profile
+BROWSER_USER_DATA_DIR=/home/openhands/.openhands/chrome-profile
+CHROME_USER_DATA_DIR=/home/openhands/.openhands/chrome-profile
+PUPPETEER_USER_DATA_DIR=/home/openhands/.openhands/chrome-profile
+```
+
+**What this means in practice:**
+
+| Scenario | Auth persists? | Why |
+|---|---|---|
+| New chat (same container) | ✅ Yes | Same volume, same `chrome-profile/` |
+| New deployment (Coolify rebuild) | ✅ Yes | Coolify remounts the same named volume |
+| Server reboot | ✅ Yes | Host directory `/data/grokbot/openhands` survives reboots |
+| Manual volume delete | ❌ No | Only if someone deletes `/data/grokbot/openhands` on the host |
+
+Once a user completes SSO/MFA login (e.g. Microsoft, Google, Okta), the session cookies are saved in the Chrome profile and carry over to all future conversations automatically — until the cookies expire server-side.
+
+### Coolify Setup for Persistent Storage
+
+To configure these volumes in Coolify:
+
+1. Go to **Applications → grokbot → Storages**
+2. Add two persistent storage entries:
+
+   | Mount Path | Host Path |
+   |---|---|
+   | `/home/openhands/.openhands` | `/data/grokbot/openhands` |
+   | `/projects` | `/data/grokbot/projects` |
+
+3. Make sure the host directories exist on the server:
+   ```bash
+   sudo mkdir -p /data/grokbot/openhands /data/grokbot/projects
+   ```
+4. Redeploy the application for the mounts to take effect.
+
+> **Note:** The Dockerfile declares `VOLUME ["/home/openhands/.openhands", "/projects"]` which tells Docker these paths should be volumes, but Coolify's named persistent storage entries override anonymous volumes and bind to specific host paths for durability.
