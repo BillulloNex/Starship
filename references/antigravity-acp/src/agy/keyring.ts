@@ -11,6 +11,7 @@ export interface AntigravityOAuthConfig {
 	expiry?: string;
 	scope?: string;
 	id_token?: string;
+	client_id?: string;
 	token?: {
 		access_token?: string;
 		token_type?: string;
@@ -65,6 +66,17 @@ export function setupKeyringAndAuth(): void {
 		"go-keyring-base64:" +
 		Buffer.from(JSON.stringify(keyringPayloadObj)).toString("base64");
 
+	const clientId =
+		parsed.client_id ||
+		"1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
+
+	const adcObj = {
+		type: "authorized_user",
+		client_id: clientId,
+		client_secret: "",
+		refresh_token: refreshToken,
+	};
+
 	// 1. Materialize to all standard filesystem paths
 	const homes = [
 		os.homedir(),
@@ -93,9 +105,31 @@ export function setupKeyringAndAuth(): void {
 				});
 			} catch {}
 		}
+
+		// Also materialize ADC
+		const adcPaths = [
+			path.join(h, ".config", "gcloud", "application_default_credentials.json"),
+			path.join(h, ".gcloud", "application_default_credentials.json"),
+		];
+		for (const p of adcPaths) {
+			try {
+				fs.mkdirSync(path.dirname(p), { recursive: true });
+				fs.writeFileSync(p, JSON.stringify(adcObj, null, 2), {
+					mode: 0o600,
+				});
+			} catch {}
+		}
 	}
 
-	// 2. On Linux, ensure D-Bus and Secret Service daemon (gnome-keyring) are running and populate them
+	const mainAdc = path.join(
+		os.homedir(),
+		".config",
+		"gcloud",
+		"application_default_credentials.json",
+	);
+	process.env.GOOGLE_APPLICATION_CREDENTIALS = mainAdc;
+
+	// 2. On Linux, ensure D-Bus and Secret Service daemon are running and populate them
 	if (process.platform === "linux") {
 		try {
 			// Start D-Bus session bus if missing
@@ -115,39 +149,59 @@ export function setupKeyringAndAuth(): void {
 				}
 			}
 
-			// Start gnome-keyring-daemon if secret-tool is available
+			// Start gnome-keyring-daemon
 			try {
 				child_process.execSync(
 					'echo "" | gnome-keyring-daemon --daemonize --unlock --components=secrets 2>/dev/null || true',
-					{ stdio: "ignore" },
+					{ stdio: "ignore", env: process.env },
 				);
 			} catch {}
 
-			// Inject into Secret Service keyring via secret-tool
-			const serviceCombos = [
-				["antigravity", "antigravity"],
-				["antigravity", ""],
-				["antigravity", "consumer"],
-				["gemini", "gemini"],
-				["gemini", ""],
-				["gemini", "antigravity"],
-			];
+			// Inject using Python secretstorage or secret-tool
+			const pyScript = `
+import sys, os
+try:
+    import secretstorage
+    bus = secretstorage.dbus_init()
+    collection = secretstorage.get_default_collection(bus)
+    if collection.is_locked():
+        collection.unlock()
+    payload = os.environ.get("KEYRING_PAYLOAD", "")
+    for svc in ["antigravity", "gemini"]:
+        for user in [svc, "", "consumer", "default"]:
+            try:
+                collection.create_item(svc, {"service": svc, "username": user}, payload.encode("utf-8"), replace=True)
+            except Exception:
+                pass
+    print("PYTHON_KEYRING_SUCCESS")
+except Exception as e:
+    print(f"PYTHON_KEYRING_ERR: {e}", file=sys.stderr)
+`;
+			const pyRes = child_process.spawnSync("python3", ["-c", pyScript], {
+				env: { ...process.env, KEYRING_PAYLOAD: keyringPayloadStr },
+				encoding: "utf8",
+			});
 
-			for (const [service, user] of serviceCombos) {
-				try {
-					const proc = child_process.spawn(
-						"secret-tool",
-						["store", `--label=${service}`, "service", service, "username", user],
-						{
-							stdio: ["pipe", "ignore", "ignore"],
-							env: process.env,
-						},
-					);
-					proc.stdin.write(keyringPayloadStr);
-					proc.stdin.end();
-				} catch {}
+			if (pyRes.stdout && pyRes.stdout.includes("PYTHON_KEYRING_SUCCESS")) {
+				console.error("[agy-acp] Injected token into D-Bus Secret Storage via Python");
+			} else {
+				// Fallback to secret-tool CLI
+				const serviceCombos = [
+					["antigravity", "antigravity"],
+					["antigravity", ""],
+					["antigravity", "consumer"],
+					["gemini", "gemini"],
+					["gemini", ""],
+				];
+				for (const [service, user] of serviceCombos) {
+					try {
+						child_process.execSync(
+							`echo -n "${keyringPayloadStr}" | secret-tool store --label="${service}" service "${service}" username "${user}" 2>/dev/null || true`,
+							{ env: process.env, shell: "/bin/bash" },
+						);
+					} catch {}
+				}
 			}
-			console.error("[agy-acp] Injected Antigravity OAuth subscription into Secret Service keyring");
 		} catch (err) {
 			console.error("[agy-acp] Keyring setup error:", err);
 		}

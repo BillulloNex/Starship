@@ -41,6 +41,11 @@ if [ "$(id -u)" = "0" ]; then
   mkdir -p /root/workspace
   chown -R openhands:openhands /root/workspace 2>/dev/null || true
 
+  # Start D-Bus system service if installed
+  if [ -x /etc/init.d/dbus ]; then
+    /etc/init.d/dbus start >/dev/null 2>&1 || true
+  fi
+
   # Drop privileges and re-exec as openhands
   exec su -s /bin/bash openhands -c "exec tini -- /opt/agent-canvas/entrypoint.sh"
 else
