@@ -5,7 +5,7 @@ import { create } from "zustand";
  * image, so nothing in it can be clicked. "live" embeds the app itself over
  * the ingress preview route, which is what makes it interactive.
  */
-export type BrowserViewMode = "snapshot" | "live";
+export type BrowserViewMode = "snapshot" | "live" | "interactive";
 
 interface BrowserState {
   // URL of the last page the agent navigated to in the browser panel.
@@ -20,6 +20,8 @@ interface BrowserState {
   previewPort: number | null;
   // Bumped to force the preview iframe to remount and refetch.
   previewReloadCounter: number;
+  vncUrl: string;
+  vncReloadCounter: number;
 }
 
 interface BrowserStore extends BrowserState {
@@ -28,6 +30,8 @@ interface BrowserStore extends BrowserState {
   setViewMode: (viewMode: BrowserViewMode) => void;
   setPreviewPort: (previewPort: number | null) => void;
   reloadPreview: () => void;
+  setVncUrl: (vncUrl: string) => void;
+  reloadVnc: () => void;
   reset: () => void;
 }
 
@@ -37,6 +41,8 @@ const initialState: BrowserState = {
   viewMode: null,
   previewPort: null,
   previewReloadCounter: 0,
+  vncUrl: "",
+  vncReloadCounter: 0,
 };
 
 /**
@@ -63,5 +69,8 @@ export const useBrowserStore = create<BrowserStore>((set) => ({
   setPreviewPort: (previewPort: number | null) => set({ previewPort }),
   reloadPreview: () =>
     set((state) => ({ previewReloadCounter: state.previewReloadCounter + 1 })),
+  setVncUrl: (vncUrl: string) => set({ vncUrl }),
+  reloadVnc: () =>
+    set((state) => ({ vncReloadCounter: state.vncReloadCounter + 1 })),
   reset: () => set(initialState),
 }));

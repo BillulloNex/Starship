@@ -189,7 +189,8 @@ ENV CHROME_PATH=/usr/bin/chromium \
 
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
-      apt-get install -y --no-install-recommends libpq-dev curl chromium && \
+      apt-get install -y --no-install-recommends libpq-dev curl chromium xvfb x11vnc fluxbox xdotool python3-websockify novnc && \
+      ln -sf /usr/share/novnc /opt/novnc && \
       rm -rf /var/lib/apt/lists/*; \
     fi
 
@@ -220,8 +221,9 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/chrome-profile \
              /home/openhands/.claude \
              /home/openhands/.codex \
+             /tmp/vnc-browser/logs \
              /projects && \
-    chown -R openhands:openhands /home/openhands/.openhands /home/openhands/.claude /home/openhands/.codex /projects
+    chown -R openhands:openhands /home/openhands/.openhands /home/openhands/.claude /home/openhands/.codex /projects /tmp/vnc-browser
 
 # Copy the frontend build output.
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
@@ -240,6 +242,8 @@ COPY OpenHands/scripts/grokbot-app.mjs /opt/agent-canvas/grokbot-app.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-app.mjs && ln -sf /opt/agent-canvas/grokbot-app.mjs /usr/local/bin/grokbot-app
 COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-deploy.mjs && ln -sf /opt/agent-canvas/grokbot-deploy.mjs /usr/local/bin/grokbot-deploy
+COPY scripts/start-vnc-browser.sh /opt/agent-canvas/start-vnc-browser.sh
+RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka

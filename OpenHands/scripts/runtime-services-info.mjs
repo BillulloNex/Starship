@@ -173,6 +173,34 @@ export function buildRuntimeServicesInfo(options) {
     };
   }
 
+  // Shared interactive browser. On-demand VNC browser stack that lets the user
+  // interact with a headed Chromium instance sharing the same persistent cookie
+  // profile as the agent's browser tools. Used for auth handoffs (SSO, MFA).
+  if (appPreview?.urlTemplate) {
+    services.shared_browser = {
+      description:
+        "On-demand interactive browser for authentication handoffs. When you " +
+        "encounter a website requiring login (SSO, MFA, OAuth), start the VNC " +
+        "browser with `start-vnc-browser start <url>`. The user can then " +
+        "interact with the browser via the 'Interactive' tab in the Browser " +
+        "panel to complete login. After login, stop the VNC browser with " +
+        "`start-vnc-browser stop` and resume using your regular browser tools — " +
+        "the cookies from the user's login are shared via the persistent " +
+        "Chrome profile at /home/openhands/.openhands/chrome-profile.",
+      start_command: "start-vnc-browser start [url]",
+      stop_command: "start-vnc-browser stop",
+      status_command: "start-vnc-browser status",
+      vnc_port: 6080,
+      user_url: appPreview.urlTemplate.replace("{port}", "6080"),
+      note_from_agent:
+        "The VNC browser is NOT always running — start it only when needed " +
+        "for auth, and stop it when done. Never fill in passwords yourself; " +
+        "always hand off to the user. After the user logs in and you stop the " +
+        "VNC browser, your regular browser tools will have the authenticated " +
+        "session cookies automatically.",
+    };
+  }
+
   return {
     mode,
     agent_host_alias: agentHostAlias,

@@ -38503,5 +38503,17 @@
     "uk": "Перегляд застосунку наживо",
     "zh-CN": "应用实时预览",
     "zh-TW": "應用程式即時預覽"
+  },
+  "PREVIEW$INTERACTIVE": {
+    "en": "Interactive"
+  },
+  "PREVIEW$INTERACTIVE_BANNER": {
+    "en": "You're viewing the agent's browser. Complete any login or MFA here, then tell the agent to continue."
+  },
+  "PREVIEW$INTERACTIVE_NO_VNC": {
+    "en": "Interactive browser not started. Ask the agent to navigate to a website that needs authentication."
+  },
+  "PREVIEW$INTERACTIVE_TITLE": {
+    "en": "Interactive browser session"
   }
 }

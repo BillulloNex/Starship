@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Camera, MousePointerClick } from "lucide-react";
+import { Camera, MousePointerClick, Hand } from "lucide-react";
 
 import { I18nKey } from "#/i18n/declaration";
 import { SegmentedToggle } from "#/components/features/files-tab/segmented-toggle";
@@ -12,6 +12,7 @@ import { BrowserSnapshot } from "./browser-snapshot";
 import { BrowserChromeBar } from "./browser-chrome-bar";
 import { EmptyBrowserMessage } from "./empty-browser-message";
 import { LivePreview } from "./live-preview";
+import { InteractiveBrowser } from "./interactive-browser";
 
 export function BrowserPanel() {
   const { t } = useTranslation("openhands");
@@ -33,6 +34,11 @@ export function BrowserPanel() {
           testId="browser-view-mode-toggle"
           options={[
             {
+              value: "interactive",
+              label: t(I18nKey.PREVIEW$INTERACTIVE),
+              icon: <Hand />,
+            },
+            {
               value: "live",
               label: t(I18nKey.PREVIEW$LIVE),
               icon: <MousePointerClick />,
@@ -46,7 +52,9 @@ export function BrowserPanel() {
         />
       </div>
 
-      {resolvedMode === "live" ? (
+      {resolvedMode === "interactive" ? (
+        <InteractiveBrowser />
+      ) : resolvedMode === "live" ? (
         <LivePreview />
       ) : (
         <>
