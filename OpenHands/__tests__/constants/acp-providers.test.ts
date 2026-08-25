@@ -166,9 +166,10 @@ describe("getAcpProviderSecrets — containerized credentials", () => {
     ]);
   });
 
-  it("collects the Vertex SA JSON + GEMINI_API_KEY + GCP project for Antigravity", () => {
+  it("collects ANTIGRAVITY_AUTH_JSON + Vertex SA JSON + GEMINI_API_KEY + GCP project for Antigravity", () => {
     const names = getAcpProviderSecrets("antigravity").map((f) => f.name);
     expect(names).toEqual([
+      "ANTIGRAVITY_AUTH_JSON",
       "GOOGLE_APPLICATION_CREDENTIALS_JSON",
       "GEMINI_API_KEY",
       "GOOGLE_CLOUD_PROJECT",

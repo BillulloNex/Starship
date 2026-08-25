@@ -108,6 +108,7 @@ export function AcpSecretField({
 
   const isClaudeOAuth = field.name === "CLAUDE_CODE_OAUTH_TOKEN";
   const isCodexAuth = field.name === "CODEX_AUTH_JSON";
+  const isAntigravityAuth = field.name === "ANTIGRAVITY_AUTH_JSON";
 
   const handleValueChange = (raw: string) => {
     if (isClaudeOAuth) {
@@ -144,10 +145,24 @@ export function AcpSecretField({
     }
   };
 
+  const handleCopyAntigravityCmd = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(
+          "cat ~/.gemini/oauth_creds.json | pbcopy",
+        );
+        setCopiedCmd(true);
+        setTimeout(() => setCopiedCmd(false), 2000);
+      }
+    } catch {
+      // Ignore clipboard permission issues
+    }
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
       {/* Quick OAuth action helpers */}
-      {(isClaudeOAuth || isCodexAuth) && (
+      {(isClaudeOAuth || isCodexAuth || isAntigravityAuth) && (
         <div className="flex items-center justify-between text-xs pb-0.5">
           <div className="flex items-center gap-2">
             {isClaudeOAuth && (
@@ -177,6 +192,23 @@ export function AcpSecretField({
                   )}
                 </button>
               </>
+            )}
+            {isAntigravityAuth && (
+              <button
+                type="button"
+                onClick={handleCopyAntigravityCmd}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-base border border-[var(--oh-border)] text-[11px] text-[var(--oh-muted)] hover:text-white hover:border-[var(--oh-border-strong)] transition-colors cursor-pointer"
+                title="Copy terminal command: cat ~/.gemini/oauth_creds.json | pbcopy"
+              >
+                {copiedCmd ? (
+                  <>
+                    <Check className="size-2.5 text-emerald-400" />
+                    <span className="text-emerald-400">Copied cmd</span>
+                  </>
+                ) : (
+                  <span>cat ~/.gemini/oauth_creds.json | pbcopy</span>
+                )}
+              </button>
             )}
           </div>
           <button

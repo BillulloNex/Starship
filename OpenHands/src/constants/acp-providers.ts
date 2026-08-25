@@ -289,6 +289,15 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
   ],
   antigravity: [
     {
+      name: "ANTIGRAVITY_AUTH_JSON",
+      secret: true,
+      multiline: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_FILE_BLOB_HINT,
+      hint_values: {
+        file: "~/.gemini/oauth_creds.json",
+      },
+    },
+    {
       name: "GOOGLE_APPLICATION_CREDENTIALS_JSON",
       secret: true,
       multiline: true,
