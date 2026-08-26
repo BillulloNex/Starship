@@ -38,7 +38,7 @@ interface BrowserStore extends BrowserState {
 const initialState: BrowserState = {
   url: "",
   screenshotSrc: "",
-  viewMode: null,
+  viewMode: "interactive",
   previewPort: null,
   previewReloadCounter: 0,
   vncUrl: "",
@@ -48,17 +48,16 @@ const initialState: BrowserState = {
 /**
  * Pick a pane when the user hasn't chosen one.
  *
- * A screenshot means the agent just browsed somewhere and wants to show it, so
- * that wins. With no screenshot the tab would otherwise sit on "no page
- * loaded", and the live preview is the more useful thing to land on — it's
- * also the only pane that can be interacted with.
+ * Defaults to "interactive" (VM-based headed Chromium via noVNC) so that
+ * co-navigation, persistent logins, and auth handoff work out of the box.
+ * Users can still switch to snapshot or live mode manually.
  */
 export function resolveBrowserViewMode(
   viewMode: BrowserViewMode | null,
   screenshotSrc: string,
 ): BrowserViewMode {
   if (viewMode !== null) return viewMode;
-  return screenshotSrc ? "snapshot" : "live";
+  return "interactive";
 }
 
 export const useBrowserStore = create<BrowserStore>((set) => ({
