@@ -9,6 +9,7 @@ import { parseMessageFromEvent } from "../event-content-helpers/parse-message-fr
 import { CriticResultDisplay } from "./critic-result-display";
 import { CollapsibleThinking } from "./collapsible-thinking";
 import { splitInlineThink } from "../event-thought-helpers";
+import { Pencil } from "lucide-react";
 import RepoForkedIcon from "#/icons/repo-forked.svg?react";
 import { I18nKey } from "#/i18n/declaration";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
@@ -17,6 +18,7 @@ import { useForkConversation } from "#/hooks/mutation/use-fork-conversation";
 import { useConversationStore } from "#/stores/conversation-store";
 import ConversationService from "#/api/conversation-service/conversation-service.api";
 import { displayErrorToast } from "#/utils/custom-toast-handlers";
+import { convertImageUrlsToFiles } from "#/utils/image-url-to-file";
 
 interface UserAssistantEventMessageProps {
   event: MessageEvent;
@@ -66,11 +68,11 @@ export function UserAssistantEventMessage({
     });
   }
 
-  // "Branch from here": a user message is "edit message" (excludes the message,
-  // restores its text to the composer); an assistant message branches
-  // inclusively. Local agent-server only, inside a conversation.
+  // "Branch from here" / "Edit message": a user message is "edit message"
+  // (excludes the message, restores its text and attached images to the composer);
+  // an assistant message branches inclusively. Local agent-server only.
   const canBranch = !isCloud && !!conversationId;
-  const handleBranch = () => {
+  const handleBranch = async () => {
     if (!conversationId || isForking || forkInFlightRef.current) return;
     forkInFlightRef.current = true;
 
@@ -82,24 +84,32 @@ export function UserAssistantEventMessage({
       source?.id === conversationId ? source.title : undefined;
     const branchTitle = sourceTitle ? `${sourceTitle} (branch)` : undefined;
 
-    // Only edit when there's text: an image-only message parses to "", so
-    // branch it inclusively rather than dropping the image.
-    const isEdit = event.source === "user" && message.length > 0;
+    // User message is always an edit: exclude it from the fork and restore its text + images.
+    const isEdit = event.source === "user";
+    const imageFiles =
+      isEdit && imageUrls.length > 0
+        ? await convertImageUrlsToFiles(imageUrls)
+        : [];
 
     forkConversation(
       {
         sourceConversationId: conversationId,
         eventId: event.id,
-        ...(isEdit ? { editText: message } : {}),
+        ...(isEdit ? { editText: message || " " } : {}),
         ...(branchTitle ? { title: branchTitle } : {}),
       },
       {
         onSuccess: ({ info, excluded }) => {
           navigate(`/conversations/${info.id}`);
           // Prefill only when excluded (else the send duplicates it). Deferred
-          // so the new conversation's composer receives it (as useLaunchSkillInChat).
+          // so the new conversation's composer receives it.
           if (excluded) {
-            window.setTimeout(() => setMessageToSend(message), 0);
+            window.setTimeout(() => {
+              setMessageToSend(message);
+              if (imageFiles.length > 0) {
+                useConversationStore.getState().addImages(imageFiles);
+              }
+            }, 0);
           }
         },
         onError: (error) =>
@@ -110,12 +120,20 @@ export function UserAssistantEventMessage({
       },
     );
   };
+
+  const isUserMessage = event.source === "user";
   const actions = canBranch
     ? [
         {
-          icon: <RepoForkedIcon width={15} height={15} aria-hidden />,
+          icon: isUserMessage ? (
+            <Pencil width={14} height={14} aria-hidden />
+          ) : (
+            <RepoForkedIcon width={15} height={15} aria-hidden />
+          ),
           onClick: handleBranch,
-          tooltip: t(I18nKey.CHAT_INTERFACE$BRANCH_FROM_HERE),
+          tooltip: isUserMessage
+            ? t(I18nKey.CHAT_INTERFACE$EDIT_MESSAGE)
+            : t(I18nKey.CHAT_INTERFACE$BRANCH_FROM_HERE),
         },
       ]
     : undefined;

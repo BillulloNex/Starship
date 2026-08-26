@@ -41,6 +41,7 @@ vi.mock("#/context/navigation-context", async (importActual) => ({
 // test-utils re-inits i18n with empty resources, so `t()` returns the key —
 // which becomes the button's accessible name (aria-label).
 const BRANCH_LABEL = I18nKey.CHAT_INTERFACE$BRANCH_FROM_HERE;
+const EDIT_LABEL = I18nKey.CHAT_INTERFACE$EDIT_MESSAGE;
 const forkResult = { id: "fork-123" } as DirectConversationInfo;
 
 let forkSpy: ReturnType<typeof vi.spyOn>;
@@ -80,7 +81,7 @@ const renderMessage = (event: MessageEvent) =>
     />,
   );
 
-describe("UserAssistantEventMessage — branch action", () => {
+describe("UserAssistantEventMessage — branch/edit action", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     useActiveBackendMock.mockReset();
@@ -133,7 +134,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
     await waitFor(() =>
       expect(forkSpy).toHaveBeenCalledWith("conv-1", "evt-parent", undefined),
@@ -152,7 +153,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
     await waitFor(() =>
       expect(forkSpy).toHaveBeenCalledWith("conv-1", "evt-user", undefined),
@@ -168,7 +169,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
     await waitFor(() =>
       expect(forkSpy).toHaveBeenCalledWith(
@@ -191,7 +192,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
     await waitFor(() =>
       expect(navigateMock).toHaveBeenCalledWith("/conversations/fork-123"),
@@ -199,19 +200,19 @@ describe("UserAssistantEventMessage — branch action", () => {
     expect(setMessageToSendMock).not.toHaveBeenCalled();
   });
 
-  it("branches an image-only user message inclusively (keeps the image, no prefill)", async () => {
+  it("edits an image-only user message: branches at its parent and restores the image", async () => {
+    const addImagesSpy = vi.fn();
+    useConversationStore.setState({ addImages: addImagesSpy });
+
     renderMessage(makeImageOnlyEvent("evt-img"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
-    // No text to edit → branch at the message (inclusive), no parent lookup,
-    // no prefill, so the image is not dropped.
     await waitFor(() =>
-      expect(forkSpy).toHaveBeenCalledWith("conv-1", "evt-img", undefined),
+      expect(forkSpy).toHaveBeenCalledWith("conv-1", "evt-parent", undefined),
     );
-    expect(parentSpy).not.toHaveBeenCalled();
-    expect(setMessageToSendMock).not.toHaveBeenCalled();
+    expect(parentSpy).toHaveBeenCalledWith("conv-1", "evt-img");
   });
 
   it("omits the fork title when the tracked conversation is a different one", async () => {
@@ -223,7 +224,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    fireEvent.click(screen.getByRole("button", { name: BRANCH_LABEL }));
+    fireEvent.click(screen.getByRole("button", { name: EDIT_LABEL }));
 
     await waitFor(() =>
       expect(forkSpy).toHaveBeenCalledWith("conv-1", "evt-parent", undefined),
@@ -234,7 +235,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     renderMessage(makeEvent("user", "evt-user"));
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
-    const button = screen.getByRole("button", { name: BRANCH_LABEL });
+    const button = screen.getByRole("button", { name: EDIT_LABEL });
     fireEvent.click(button);
     fireEvent.click(button);
 
@@ -242,7 +243,7 @@ describe("UserAssistantEventMessage — branch action", () => {
     expect(forkSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the branch action on the cloud backend", () => {
+  it("hides the branch/edit action on the cloud backend", () => {
     useActiveBackendMock.mockReturnValue({
       backend: { kind: "cloud" },
       orgId: null,
@@ -252,11 +253,11 @@ describe("UserAssistantEventMessage — branch action", () => {
 
     fireEvent.mouseEnter(screen.getByTestId("user-message"));
     expect(
-      screen.queryByRole("button", { name: BRANCH_LABEL }),
+      screen.queryByRole("button", { name: EDIT_LABEL }),
     ).not.toBeInTheDocument();
   });
 
-  it("hides the branch action outside of a conversation", () => {
+  it("hides the branch/edit action outside of a conversation", () => {
     useOptionalConversationIdMock.mockReturnValue({ conversationId: undefined });
 
     renderMessage(makeEvent("agent", "evt-agent"));

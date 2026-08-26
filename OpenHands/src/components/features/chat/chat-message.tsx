@@ -26,6 +26,7 @@ interface ChatMessageProps {
   }>;
   isFromPlanningAgent?: boolean;
   pendingStatus?: ChatMessagePendingStatus;
+  onEdit?: () => void;
   onRetry?: () => void;
   onDismiss?: () => void;
   onStop?: () => void;
@@ -38,6 +39,7 @@ export function ChatMessage({
   actions,
   isFromPlanningAgent = false,
   pendingStatus,
+  onEdit,
   onRetry,
   onDismiss,
   onStop,
@@ -249,6 +251,16 @@ export function ChatMessage({
           className="flex items-center gap-2 text-xs text-[var(--oh-status-error)]"
         >
           <span>{t(I18nKey.CHAT_INTERFACE$MESSAGE_SEND_FAILED)}</span>
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="cursor-pointer rounded-md border border-[var(--oh-border)] px-2 py-1 text-xs font-normal text-[var(--oh-foreground)] hover:bg-[var(--oh-interactive-hover)]"
+              data-testid="chat-message-edit"
+            >
+              {t(I18nKey.BUTTON$EDIT)}
+            </button>
+          ) : null}
           {onRetry ? (
             <button
               type="button"

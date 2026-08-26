@@ -8,6 +8,7 @@ import { createChatMessage } from "#/services/chat-service";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import { matchesPendingConversationId } from "#/utils/pending-task-message-link";
 import { ImageCarousel } from "#/components/features/images/image-carousel";
+import { convertImageUrlsToFiles } from "#/utils/image-url-to-file";
 import { ChatMessage } from "./chat-message";
 
 /**
@@ -39,6 +40,9 @@ export function PendingUserMessages() {
   );
   const restoreMessageToInputIfEmpty = useConversationStore(
     (state) => state.restoreMessageToInputIfEmpty,
+  );
+  const setMessageToSend = useConversationStore(
+    (state) => state.setMessageToSend,
   );
   const { send } = useSendMessage();
 
@@ -84,6 +88,20 @@ export function PendingUserMessages() {
     [send, markPendingMessageError, markPendingMessageSending, t],
   );
 
+  const handleEdit = React.useCallback(
+    async (id: string, text: string, imageUrls: string[]) => {
+      removePendingMessage(id);
+      setMessageToSend(text);
+      if (imageUrls.length > 0) {
+        const files = await convertImageUrlsToFiles(imageUrls);
+        if (files.length > 0) {
+          useConversationStore.getState().addImages(files);
+        }
+      }
+    },
+    [removePendingMessage, setMessageToSend],
+  );
+
   const handleStop = React.useCallback(
     (id: string, text: string) => {
       restoreMessageToInputIfEmpty(text);
@@ -111,6 +129,11 @@ export function PendingUserMessages() {
           type="user"
           message={message.text}
           pendingStatus={message.status}
+          onEdit={
+            message.status === "error"
+              ? () => handleEdit(message.id, message.text, message.imageUrls)
+              : undefined
+          }
           onRetry={
             message.status === "error"
               ? () => handleRetry(message.id)

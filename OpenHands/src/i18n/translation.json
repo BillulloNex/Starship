@@ -9876,6 +9876,23 @@
     "uk": "Відгалузити звідси",
     "ca": "Ramifica des d'aquí"
   },
+  "CHAT_INTERFACE$EDIT_MESSAGE": {
+    "en": "Edit message",
+    "ja": "メッセージを編集",
+    "zh-CN": "编辑消息",
+    "zh-TW": "編輯訊息",
+    "ko-KR": "메시지 편집",
+    "no": "Rediger melding",
+    "it": "Modifica messaggio",
+    "pt": "Editar mensagem",
+    "es": "Editar mensaje",
+    "ar": "تحرير الرسالة",
+    "fr": "Modifier le message",
+    "tr": "Mesajı düzenle",
+    "de": "Nachricht bearbeiten",
+    "uk": "Редагувати повідомлення",
+    "ca": "Edita el missatge"
+  },
   "CHAT_INTERFACE$MESSAGE_RETRY": {
     "en": "Retry",
     "ja": "再試行",

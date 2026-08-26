@@ -209,7 +209,8 @@ describe("ChatMessage", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("shows retry and dismiss controls for a failed user message", async () => {
+  it("shows edit, retry, and dismiss controls for a failed user message", async () => {
+    const onEdit = vi.fn();
     const onRetry = vi.fn();
     const onDismiss = vi.fn();
     render(
@@ -217,15 +218,18 @@ describe("ChatMessage", () => {
         type="user"
         message="Failed to deliver"
         pendingStatus="error"
+        onEdit={onEdit}
         onRetry={onRetry}
         onDismiss={onDismiss}
       />,
     );
 
     expect(screen.getByTestId("chat-message-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("chat-message-edit"));
     fireEvent.click(screen.getByTestId("chat-message-retry"));
     fireEvent.click(screen.getByTestId("chat-message-dismiss"));
 
+    expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
