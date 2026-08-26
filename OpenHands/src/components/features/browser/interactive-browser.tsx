@@ -6,10 +6,6 @@ import { ExternalLink, Hand, RotateCw, Settings2, Check } from "lucide-react";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
 import { useBrowserStore } from "#/stores/browser-store";
-import {
-  buildPreviewUrl,
-  usePreviewPorts,
-} from "#/hooks/query/use-preview-ports";
 import { ConversationTabEmptyState } from "#/components/features/conversation/conversation-tab-empty-state";
 
 const iconButtonClassName = cn(
@@ -22,23 +18,17 @@ const iconClassName = "size-3.5";
 export function InteractiveBrowser() {
   const { t } = useTranslation("openhands");
   const { vncUrl, setVncUrl, vncReloadCounter, reloadVnc } = useBrowserStore();
-  const { data: previewData } = usePreviewPorts();
 
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [customInput, setCustomInput] = useState("");
 
+  // Priority: 1) user-set URL in store, 2) build-time env var, 3) empty (show setup prompt)
   const envBrowserUrl =
     (import.meta.env.VITE_BROWSER_VM_URL as string | undefined) ||
     (import.meta.env.VITE_REMOTE_BROWSER_URL as string | undefined) ||
     "";
 
-  const effectiveUrl =
-    vncUrl ||
-    envBrowserUrl ||
-    (previewData?.urlTemplate
-      ? buildPreviewUrl(previewData.urlTemplate, 6080)
-      : "") ||
-    "";
+  const effectiveUrl = vncUrl || envBrowserUrl || "";
 
   const handleSaveCustomUrl = () => {
     if (customInput.trim()) {
