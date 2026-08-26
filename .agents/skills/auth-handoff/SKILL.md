@@ -1,52 +1,17 @@
 ---
-name: auth-handoff
+name: auth-handoff (DEPRECATED)
 description: >
-  Handle websites requiring authentication (SSO, MFA, OAuth) by first
-  attempting programmatic login with provided credentials, then falling
-  back to an interactive VNC browser session for MFA/2FA.
-  triggers on: login, sign in, signin, log in, authenticate, SSO, MFA,
-  2FA, OTP, CAPTCHA, OAuth, library search, EBSCO, authentication required,
-  403, 401, unauthorized, forbidden, access denied, password, credential,
-  microsoftonline, okta, auth0, pick an account, verify your identity.
+  [DEPRECATED / SUPERSEDED by browser-v2]
+  Legacy browser auth skill retained for reference only.
 triggers:
-  type: keyword
-  keywords:
-    - login
-    - sign in
-    - sign-in
-    - signin
-    - log in
-    - log-in
-    - authenticate
-    - authentication
-    - SSO
-    - MFA
-    - 2FA
-    - two-factor
-    - OTP
-    - CAPTCHA
-    - OAuth
-    - authentication required
-    - access denied
-    - 403
-    - 401
-    - unauthorized
-    - forbidden
-    - password
-    - credential
-    - credentials
-    - library
-    - EBSCO
-    - microsoftonline
-    - okta
-    - auth0
-    - accounts.google
-    - pick an account
-    - verify your identity
-    - device verification
+  type: manual
+  keywords: []
 ---
 
-# Auth Handoff Skill
+# [DEPRECATED] Auth Handoff Skill (Superseded by browser-v2)
+
+> **NOTE:** This skill has been superseded by `browser-v2` which uses the unified collaborative Browser VM stack. Retained for historical reference.
+
 
 When the agent encounters a website that requires authentication, follow
 this two-phase approach.

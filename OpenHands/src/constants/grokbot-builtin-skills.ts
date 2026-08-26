@@ -126,66 +126,43 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
-const AUTH_HANDOFF_CONTENT = [
-  "# Auth Handoff — MANDATORY for All Authenticated Websites",
-  "",
-  "## BANNED — These will ALWAYS fail, do NOT use them:",
-  "- pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer",
-  "- chromium --headless, chromium --dump-dom (SSO providers like Microsoft detect and block headless browsers)",
-  "- Writing custom Python/Node.js scripts to automate login",
-  "- Lecturing the user about password security or suggesting they rotate credentials",
-  "",
-  "## THE COMMAND YOU MUST USE:",
-  "",
-  "    start-vnc-browser start \"<url>\"",
-  "",
-  "This is an executable bash command already installed at /usr/local/bin/start-vnc-browser.",
-  "It starts a HEADED Chromium browser with Xvfb + VNC + noVNC on port 6080.",
-  "The user can see and interact with it via the Interactive tab in the Browser panel.",
-  "",
-  "Other commands:",
-  "    start-vnc-browser stop      — Stop the VNC browser and release the Chrome profile lock",
-  "    start-vnc-browser status    — Check if the VNC browser is running (returns JSON)",
-  "    start-vnc-browser open URL  — Open a URL in the already-running VNC browser",
-  "",
-  "## WHEN TO USE IT:",
-  "- When you see login.microsoftonline.com, accounts.google.com, okta.com, auth0.com in the URL",
-  "- When a page shows 'Sign in', 'Pick an account', or any SSO redirect",
-  "- When headless chromium returns 'incorrect password' but the user says credentials are correct",
-  "- When you hit MFA, 2FA, CAPTCHA, or device verification",
-  "- When ANY login attempt fails",
-  "",
-  "## PROCEDURE:",
-  "1. Run this command in the terminal:",
-  "       start-vnc-browser start \"https://the-login-url.com\"",
-  "",
-  "2. Tell the user to switch to the Interactive tab in the Browser panel to complete login.",
-  "   If you have the user's credentials, you can also type them using xdotool:",
-  "       DISPLAY=:99 xdotool type \"username\"",
-  "       DISPLAY=:99 xdotool key Tab",
-  "       DISPLAY=:99 xdotool type \"password\"",
-  "       DISPLAY=:99 xdotool key Return",
-  "",
-  "3. If MFA/2FA appears, tell the user to complete it in the Interactive tab.",
-  "",
-  "4. After login, stop the VNC browser:",
-  "       start-vnc-browser stop",
-  "",
-  "5. Resume with your regular browser tools. Cookies are shared via the persistent Chrome profile.",
-  "",
-  "## KEY FACTS:",
-  "- The VNC browser shares the SAME cookie profile as your browser tools at /home/openhands/.openhands/chrome-profile",
-  "- Cookies persist across conversations. Once logged in, future sessions keep the auth.",
-  "- The VNC browser is on-demand. Start it only when needed, stop it when done.",
-].join("\n");
+const BROWSER_V2_CONTENT = `# Browser V2 — Collaborative Browser on Persistent VM
 
+Grokbot uses a dedicated persistent Browser VM where both the Agent and Human share the exact same headed Google Chrome browser in real time.
+
+## BANNED — Do NOT do these:
+- pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer
+- chromium --headless, chromium --dump-dom (SSO providers detect and block headless browsers)
+- Writing custom Python/Node.js scripts to automate login
+- Lecturing the user about password security or suggesting they rotate credentials
+
+## HOW COLLABORATIVE BROWSING WORKS:
+- The persistent Chrome instance runs on the Browser VM with user data preserved at \`/data/chrome-profile\`.
+- All cookies, logins, and session states persist permanently across conversations.
+- The user can see and interact directly with the browser via the **Browser** tab (Interactive stream).
+
+## PROCEDURE FOR AUTH / SSO / MFA:
+1. Navigate to the requested website using standard browser tools.
+2. If the user gave credentials, type and submit them.
+3. If an MFA / 2FA prompt, CAPTCHA, or biometric challenge appears:
+   - Inform the user: "I've navigated to the login page. Please complete the verification in the **Interactive Browser** tab."
+   - Wait for the user to confirm.
+4. Once the user is logged in, immediately resume your task on the exact same page. No browser restarts needed.
+`;
+
+const AUTH_HANDOFF_CONTENT = [
+  "# [DEPRECATED] Auth Handoff — Superseded by browser-v2",
+  "This skill is deprecated. Use browser-v2 for all collaborative browser workflows.",
+].join("\n");
 
 export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
   {
-    name: "auth-handoff",
+    name: "browser-v2",
     description:
-      "Handle websites requiring authentication (SSO, MFA, OAuth) by starting an interactive VNC browser and guiding the user through login. ALWAYS use this instead of installing puppeteer/selenium manually.",
+      "Unified collaborative browser skill for Grokbot on the dedicated Browser VM. Supports persistent multi-session logins, real-time MFA/SSO human handoff, and remote browser navigation.",
     triggers: [
+      "browser",
+      "browse",
       "login",
       "sign in",
       "sign-in",
@@ -223,6 +200,14 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
       "device verification",
     ],
     category: "integrations",
+    content: BROWSER_V2_CONTENT,
+  },
+  {
+    name: "auth-handoff (deprecated)",
+    description:
+      "[DEPRECATED] Legacy auth handoff skill. Retained for historical reference.",
+    triggers: [],
+    category: "integrations",
     content: AUTH_HANDOFF_CONTENT,
   },
   {
@@ -240,7 +225,6 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
     ],
     category: "automations",
     content: RALPH_LOOP_CONTENT,
-
   },
   {
     name: "deploy-to-cloudflare-pages",

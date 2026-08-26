@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  browser-vm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grokbot-browser-vm
+    restart: unless-stopped
+    ports:
+      - "6080:6080" # noVNC Web UI stream (for human co-navigation & iframe embed)
+      - "9222:9222" # Chrome DevTools Protocol (CDP) WebSocket endpoint (for AI Agent)
+      - "5900:5900" # Raw VNC
+    environment:
+      - SCREEN_WIDTH=1920
+      - SCREEN_HEIGHT=1080
+      - SCREEN_DEPTH=24
+      - CHROME_ARGS=--no-sandbox --disable-dev-shm-usage --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --window-size=1920,1080 --window-position=0,0 --start-maximized --disable-blink-features=AutomationControlled
+    volumes:
+      - /data/chrome-profile:/home/browseruser/.config/google-chrome
+      - /data/downloads:/home/browseruser/Downloads
+    shm_size: "2gb"

@@ -173,70 +173,41 @@ export function buildRuntimeServicesInfo(options) {
     };
   }
 
-  // ── Browser routing guide ──────────────────────────────────────────────────
-  // Injected into EVERY conversation so the agent always knows which browser
-  // tool to reach for. This is the #1 fix for models ignoring VNC in favour
-  // of headless tools that cannot handle MFA / CAPTCHA / SSO.
+  // ── Browser routing guide (browser-v2) ──────────────────────────────────
+  // Dedicated persistent Browser VM where both Agent and Human share the same
+  // live headed Google Chrome instance with persistent auth at /data/chrome-profile.
   if (appPreview?.urlTemplate) {
     services.browser_routing_guide = {
       CRITICAL:
         "READ THIS BEFORE USING ANY BROWSER TOOL. " +
-        "You have TWO browser modes. Using the wrong one wastes time and fails.",
-      decision_tree: {
-        step_1:
-          "For routine browsing (reading pages, clicking links, filling " +
-          "simple forms with NO login): use your built-in browser tools " +
-          "(browser_navigate, browser_click, browser_type, etc.).",
-        step_2:
-          "The MOMENT you encounter ANY of these, STOP using built-in " +
-          "browser tools and switch to the VNC interactive browser: " +
-          "(a) a login / sign-in page, " +
-          "(b) SSO redirects (login.microsoftonline.com, accounts.google.com, " +
-          "okta.com, auth0.com, login.salesforce.com, sso.*, idp.*), " +
-          "(c) MFA / 2FA / OTP / device verification prompts, " +
-          "(d) CAPTCHA or bot-detection challenges, " +
-          "(e) 'Pick an account' or consent screens, " +
-          "(f) OAuth authorization flows, " +
-          "(g) any page that returns 401/403 or says 'Access Denied', " +
-          "(h) any login attempt that fails or loops, " +
-          "(i) the user asks you to 'log in' or 'sign in' to anything.",
-        step_3:
+        "Grokbot uses the browser-v2 collaborative stack with persistent auth.",
+      workflow: {
+        routine_browsing:
+          "Use standard browser actions to navigate, click, fill forms, and read content.",
+        auth_and_mfa:
+          "When you encounter login, SSO (Microsoft, Google, Okta), 2FA/MFA, CAPTCHAs, or " +
+          "security challenges, tell the user to complete verification in the 'Interactive' tab " +
+          "in the Browser panel. Once the user completes it, resume immediately on the same tab.",
+        prohibitions:
           "NEVER install puppeteer, selenium, or playwright manually. " +
           "NEVER run chromium --headless for login pages. " +
-          "NEVER write custom Python/Node scripts to automate SSO. " +
-          "These ALL fail because SSO providers detect and block them.",
+          "Auth cookies and sessions persist across conversations.",
       },
-      vnc_command: "start-vnc-browser start \"<url>\"",
-      vnc_stop: "start-vnc-browser stop",
     };
 
-    services.shared_browser = {
+    services.collaborative_browser = {
       description:
-        "MANDATORY tool for any website requiring authentication. This is " +
-        "a headed Chromium browser with a real GUI that the user can see " +
-        "and interact with via the 'Interactive' tab in the Browser panel. " +
-        "It shares the same persistent cookie profile as your built-in " +
-        "browser tools, so after the user logs in here, your headless " +
-        "browser tools inherit the authenticated session automatically.",
-      start_command: "start-vnc-browser start [url]",
-      stop_command: "start-vnc-browser stop",
-      status_command: "start-vnc-browser status",
-      vnc_port: 6080,
-      user_url: appPreview.urlTemplate.replace("{port}", "6080"),
+        "Dedicated persistent Browser VM. The user views and interacts with the live " +
+        "stream via the 'Interactive' tab in the Browser panel. All logins, cookies, " +
+        "and session state persist across conversations.",
+      stream_url: appPreview.urlTemplate.replace("{port}", "6080"),
+      persistent_profile: "/data/chrome-profile",
       procedure: [
-        "1. Run: start-vnc-browser start \"<login-url>\"",
-        "2. Tell the user to switch to the Interactive tab in the Browser panel",
-        "3. If you have credentials, type them with: DISPLAY=:99 xdotool type \"text\"",
-        "4. If MFA/CAPTCHA appears, tell the user to complete it in the Interactive tab",
-        "5. After login succeeds, run: start-vnc-browser stop",
-        "6. Resume with your regular built-in browser tools — cookies are now shared",
+        "1. Navigate to the requested website using standard browser actions.",
+        "2. If credentials are provided, fill and submit the form.",
+        "3. If MFA, CAPTCHA, or SSO prompt appears, ask the user to complete it in the Interactive tab.",
+        "4. After the user confirms login, continue on the same page seamlessly.",
       ],
-      persistent_profile: "/home/openhands/.openhands/chrome-profile",
-      note_from_agent:
-        "The VNC browser is on-demand — start it ONLY when needed for auth, " +
-        "stop it when done. After the user logs in and you stop the VNC " +
-        "browser, your regular browser tools will have the authenticated " +
-        "session cookies automatically. Cookies persist across conversations.",
     };
   }
 
