@@ -1,5 +1,5 @@
-/* eslint-disable i18next/no-literal-string */
 import { useState } from "react";
+import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   ExternalLink,
@@ -29,7 +29,14 @@ const STEEL_DEVTOOLS_URL = "https://surf.beenex.org/v1/devtools/inspector.html";
 
 export function InteractiveBrowser() {
   const { t } = useTranslation("openhands");
+  const { conversationId, automationId } = useParams<{
+    conversationId?: string;
+    automationId?: string;
+  }>();
+  const activeSessionId = conversationId || automationId || "default";
+
   const { vncUrl, setVncUrl, vncReloadCounter, reloadVnc } = useBrowserStore();
+
 
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [customInput, setCustomInput] = useState("");
@@ -200,7 +207,7 @@ export function InteractiveBrowser() {
 
       {effectiveUrl ? (
         <iframe
-          key={`steel-${vncReloadCounter}-${effectiveUrl}`}
+          key={`steel-${activeSessionId}-${vncReloadCounter}-${effectiveUrl}`}
           src={effectiveUrl}
           title={t(I18nKey.PREVIEW$INTERACTIVE_TITLE)}
           data-testid="interactive-browser-iframe"
@@ -208,6 +215,7 @@ export function InteractiveBrowser() {
           allow="clipboard-read; clipboard-write"
         />
       ) : null}
+
     </div>
   );
 }
