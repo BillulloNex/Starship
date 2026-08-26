@@ -26,8 +26,8 @@ export VITE_LANGWATCH_BASE_URL="${VITE_LANGWATCH_BASE_URL:-https://app.langwatch
 export VITE_OPIK_API_KEY="${VITE_OPIK_API_KEY:-BQr4JlCiiNlMR8x3raGyTDUtn}"
 export VITE_RAINDROP_WRITE_KEY="${VITE_RAINDROP_WRITE_KEY:-35699173-1136-4b61-b748-02e3722ccebe}"
 
-# Browser VM (browser-v2): noVNC via Cloudflare Tunnel (HTTPS required for iframe embedding)
-export VITE_BROWSER_VM_URL="${VITE_BROWSER_VM_URL:-https://sides-optical-sense-enrolled.trycloudflare.com/vnc.html?autoconnect=true&resize=scale}"
+# Browser VM (browser-v2): Steel.dev Browser on surf.beenex.org (HTTPS required for Cloudflare Pages iframe embedding)
+export VITE_BROWSER_VM_URL="${VITE_BROWSER_VM_URL:-https://surf.beenex.org/v1/sessions/debug?interactive=true&showControls=true&theme=dark}"
 
 echo "⚡ [1/2] Building frontend..."
 npm --prefix OpenHands run build

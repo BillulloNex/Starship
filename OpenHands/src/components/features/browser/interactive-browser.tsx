@@ -1,7 +1,15 @@
 /* eslint-disable i18next/no-literal-string */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Hand, RotateCw, Settings2, Check } from "lucide-react";
+import {
+  ExternalLink,
+  Hand,
+  RotateCw,
+  Settings2,
+  Check,
+  Globe,
+  TerminalSquare,
+} from "lucide-react";
 
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
@@ -15,6 +23,10 @@ const iconButtonClassName = cn(
 
 const iconClassName = "size-3.5";
 
+const STEEL_DEFAULT_URL =
+  "https://surf.beenex.org/v1/sessions/debug?interactive=true&showControls=true&theme=dark";
+const STEEL_DEVTOOLS_URL = "https://surf.beenex.org/v1/devtools/inspector.html";
+
 export function InteractiveBrowser() {
   const { t } = useTranslation("openhands");
   const { vncUrl, setVncUrl, vncReloadCounter, reloadVnc } = useBrowserStore();
@@ -22,13 +34,15 @@ export function InteractiveBrowser() {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [customInput, setCustomInput] = useState("");
 
-  // Priority: 1) user-set URL in store, 2) build-time env var, 3) empty (show setup prompt)
+  // Priority: 1) user-set URL in store, 2) build-time env var, 3) Steel default
   const envBrowserUrl =
     (import.meta.env.VITE_BROWSER_VM_URL as string | undefined) ||
     (import.meta.env.VITE_REMOTE_BROWSER_URL as string | undefined) ||
-    "";
+    STEEL_DEFAULT_URL;
 
-  const effectiveUrl = vncUrl || envBrowserUrl || "";
+  const effectiveUrl = vncUrl || envBrowserUrl;
+
+  const isDevTools = effectiveUrl.includes("devtools/inspector.html");
 
   const handleSaveCustomUrl = () => {
     if (customInput.trim()) {
@@ -37,12 +51,17 @@ export function InteractiveBrowser() {
     setIsEditingUrl(false);
   };
 
+  const handleSelectPreset = (url: string) => {
+    setVncUrl(url);
+    setIsEditingUrl(false);
+  };
+
   if (!effectiveUrl && !isEditingUrl) {
     return (
       <ConversationTabEmptyState icon={<Hand />}>
         <div className="flex flex-col items-center gap-3 text-center max-w-sm px-4">
           <span className="font-semibold text-sm text-[var(--oh-text-secondary)]">
-            Collaborative Browser VM (browser-v2)
+            Collaborative Steel Browser (surf.beenex.org)
           </span>
           <p className="text-xs text-[var(--oh-muted)]">
             {t(I18nKey.PREVIEW$INTERACTIVE_NO_VNC)}
@@ -50,13 +69,13 @@ export function InteractiveBrowser() {
           <button
             type="button"
             onClick={() => {
-              setCustomInput(effectiveUrl);
+              setCustomInput(effectiveUrl || STEEL_DEFAULT_URL);
               setIsEditingUrl(true);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--oh-surface-raised)] border border-[var(--oh-border)] text-[var(--oh-text-secondary)] hover:bg-[var(--oh-interactive-hover)] transition-colors"
           >
             <Settings2 className="size-3.5" />
-            Connect Browser VM URL
+            Configure Steel Browser URL
           </button>
         </div>
       </ConversationTabEmptyState>
@@ -75,7 +94,7 @@ export function InteractiveBrowser() {
               type="text"
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
-              placeholder="e.g. http://<VM_IP>:6080/vnc.html or https://browser.beenex.org"
+              placeholder="e.g. https://surf.beenex.org/v1/sessions/debug or custom URL"
               className="flex-1 h-7 rounded-md border border-[var(--oh-border)] bg-[var(--oh-surface-raised)] px-2 text-xs text-[var(--oh-text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSaveCustomUrl();
@@ -93,15 +112,47 @@ export function InteractiveBrowser() {
         ) : (
           <div
             className={cn(
-              "flex min-h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-[var(--oh-border)]",
+              "flex min-h-7 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-md border border-[var(--oh-border)]",
               "bg-amber-500/10 border-amber-500/30 px-2 text-xs leading-5 text-amber-300",
             )}
             data-testid="interactive-browser-banner"
           >
-            <Hand className="size-3 shrink-0" />
-            <span className="truncate">
-              {t(I18nKey.PREVIEW$INTERACTIVE_BANNER)}
-            </span>
+            <div className="flex items-center gap-1.5 truncate">
+              <Hand className="size-3 shrink-0" />
+              <span className="truncate">
+                {t(I18nKey.PREVIEW$INTERACTIVE_BANNER)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSelectPreset(STEEL_DEFAULT_URL)}
+                title="Switch to Live Steel Viewer"
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer",
+                  !isDevTools
+                    ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
+                    : "text-amber-300/60 hover:text-amber-200",
+                )}
+              >
+                <Globe className="size-2.5 inline mr-1" />
+                Live
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset(STEEL_DEVTOOLS_URL)}
+                title="Switch to DevTools Inspector"
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer",
+                  isDevTools
+                    ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
+                    : "text-amber-300/60 hover:text-amber-200",
+                )}
+              >
+                <TerminalSquare className="size-2.5 inline mr-1" />
+                DevTools
+              </button>
+            </div>
           </div>
         )}
 
@@ -111,8 +162,8 @@ export function InteractiveBrowser() {
             setCustomInput(effectiveUrl);
             setIsEditingUrl(!isEditingUrl);
           }}
-          aria-label="Configure Browser VM URL"
-          title="Configure Browser VM URL"
+          aria-label="Configure Browser URL"
+          title="Configure Browser URL"
           className={iconButtonClassName}
         >
           <Settings2 className={iconClassName} aria-hidden strokeWidth={2} />
@@ -149,7 +200,7 @@ export function InteractiveBrowser() {
 
       {effectiveUrl ? (
         <iframe
-          key={`vnc-${vncReloadCounter}-${effectiveUrl}`}
+          key={`steel-${vncReloadCounter}-${effectiveUrl}`}
           src={effectiveUrl}
           title={t(I18nKey.PREVIEW$INTERACTIVE_TITLE)}
           data-testid="interactive-browser-iframe"
@@ -160,3 +211,4 @@ export function InteractiveBrowser() {
     </div>
   );
 }
+

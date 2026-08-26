@@ -54,11 +54,12 @@ const initialState: BrowserState = {
  */
 export function resolveBrowserViewMode(
   viewMode: BrowserViewMode | null,
-  screenshotSrc: string,
+  _screenshotSrc: string,
 ): BrowserViewMode {
   if (viewMode !== null) return viewMode;
   return "interactive";
 }
+
 
 export const useBrowserStore = create<BrowserStore>((set) => ({
   ...initialState,
