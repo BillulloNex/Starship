@@ -43,11 +43,13 @@ export function BrowserPanel() {
               label: t(I18nKey.PREVIEW$LIVE),
               icon: <MousePointerClick />,
             },
+            /* Legacy Snapshot mode commented out to prevent split-brain with Steel.dev:
             {
               value: "snapshot",
               label: t(I18nKey.PREVIEW$SNAPSHOT),
               icon: <Camera />,
             },
+            */
           ]}
         />
       </div>
@@ -57,6 +59,7 @@ export function BrowserPanel() {
       ) : resolvedMode === "live" ? (
         <LivePreview />
       ) : (
+        /* Legacy fallback preserved */
         <>
           <BrowserChromeBar url={url} hasPage={hasPage} />
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-hide bg-[var(--oh-surface)]">
@@ -68,6 +71,7 @@ export function BrowserPanel() {
           </div>
         </>
       )}
+
     </div>
   );
 }
