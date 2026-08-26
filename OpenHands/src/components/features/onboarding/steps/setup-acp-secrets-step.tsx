@@ -9,6 +9,7 @@ import { useAcpAuthStatus } from "#/hooks/query/use-acp-auth-status";
 import { useAcpCredentialForm } from "#/hooks/use-acp-credential-form";
 import { useActiveBackend } from "#/contexts/active-backend-context";
 import {
+  getAcpProvider,
   getAcpProviderDisplayName,
   getAcpPreferredDefaultModel,
 } from "#/constants/acp-providers";

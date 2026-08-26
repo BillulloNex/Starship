@@ -10,6 +10,7 @@ const CLIPBOARD_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/gif": "gif",
   "image/webp": "webp",
   "image/bmp": "bmp",
+  "image/avif": "avif",
 };
 
 /**
