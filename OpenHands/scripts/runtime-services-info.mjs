@@ -174,42 +174,43 @@ export function buildRuntimeServicesInfo(options) {
   }
 
   // ── Browser routing guide (browser-v2) ──────────────────────────────────
-  // Dedicated persistent Browser VM where both Agent and Human share the same
-  // live headed Google Chrome instance with persistent auth at /data/chrome-profile.
+  // Dedicated persistent Steel.dev Browser instance where both Agent and Human
+  // share the same live headed Google Chrome instance at surf.beenex.org.
   if (appPreview?.urlTemplate) {
     services.browser_routing_guide = {
       CRITICAL:
         "READ THIS BEFORE USING ANY BROWSER TOOL. " +
-        "Grokbot uses the browser-v2 collaborative stack with persistent auth.",
+        "Grokbot uses the Steel.dev collaborative browser at https://surf.beenex.org.",
       workflow: {
         routine_browsing:
-          "Use standard browser actions to navigate, click, fill forms, and read content.",
+          "Use browser tools or CDP connecting to https://surf.beenex.org to navigate, click, fill forms, and read content.",
         auth_and_mfa:
           "When you encounter login, SSO (Microsoft, Google, Okta), 2FA/MFA, CAPTCHAs, or " +
           "security challenges, tell the user to complete verification in the 'Interactive' tab " +
           "in the Browser panel. Once the user completes it, resume immediately on the same tab.",
         prohibitions:
+          "NEVER run chromium/google-chrome bash commands with DISPLAY=:1 in the container. " +
           "NEVER install puppeteer, selenium, or playwright manually. " +
-          "NEVER run chromium --headless for login pages. " +
-          "Auth cookies and sessions persist across conversations.",
+          "NEVER run chromium --headless for login pages.",
       },
     };
 
     services.collaborative_browser = {
       description:
-        "Dedicated persistent Browser VM. The user views and interacts with the live " +
+        "Dedicated persistent Steel.dev Browser on surf.beenex.org. The user views and interacts with the live " +
         "stream via the 'Interactive' tab in the Browser panel. All logins, cookies, " +
         "and session state persist across conversations.",
-      stream_url: appPreview.urlTemplate.replace("{port}", "6080"),
-      persistent_profile: "/data/chrome-profile",
+      stream_url: "https://surf.beenex.org/v1/sessions/debug",
+      persistent_profile: "mounted on Steel server",
       procedure: [
-        "1. Navigate to the requested website using standard browser actions.",
+        "1. Navigate to the requested website using browser tools or CDP to https://surf.beenex.org.",
         "2. If credentials are provided, fill and submit the form.",
         "3. If MFA, CAPTCHA, or SSO prompt appears, ask the user to complete it in the Interactive tab.",
         "4. After the user confirms login, continue on the same page seamlessly.",
       ],
     };
   }
+
 
   return {
     mode,

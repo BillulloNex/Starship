@@ -126,29 +126,30 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
-const BROWSER_V2_CONTENT = `# Browser V2 — Collaborative Browser on Persistent VM
+const BROWSER_V2_CONTENT = `# Browser V2 — Collaborative Browser (Steel.dev on surf.beenex.org)
 
-Grokbot uses a dedicated persistent Browser VM where both the Agent and Human share the exact same headed Google Chrome browser in real time.
+Grokbot uses a dedicated persistent Steel.dev browser instance at \`https://surf.beenex.org\` where both the Agent and Human share the exact same headed Google Chrome browser in real time.
 
 ## BANNED — Do NOT do these:
+- Running bash commands like \`chromium\`, \`google-chrome\`, \`DISPLAY=:1\`, \`DISPLAY=:99\` in the local sandbox container
 - pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer
 - chromium --headless, chromium --dump-dom (SSO providers detect and block headless browsers)
 - Writing custom Python/Node.js scripts to automate login
-- Lecturing the user about password security or suggesting they rotate credentials
 
 ## HOW COLLABORATIVE BROWSING WORKS:
-- The persistent Chrome instance runs on the Browser VM with user data preserved at \`/data/chrome-profile\`.
+- The persistent Chrome instance runs at \`https://surf.beenex.org\` (CDP at \`ws://surf.beenex.org/\`).
 - All cookies, logins, and session states persist permanently across conversations.
-- The user can see and interact directly with the browser via the **Browser** tab (Interactive stream).
+- The user watches and interacts directly with the live browser stream in the **Interactive** browser tab (\`https://surf.beenex.org/v1/sessions/debug\`).
 
 ## PROCEDURE FOR AUTH / SSO / MFA:
-1. Navigate to the requested website using standard browser tools.
+1. Navigate to the requested website using browser tools or CDP connecting to \`https://surf.beenex.org\`.
 2. If the user gave credentials, type and submit them.
 3. If an MFA / 2FA prompt, CAPTCHA, or biometric challenge appears:
-   - Inform the user: "I've navigated to the login page. Please complete the verification in the **Interactive Browser** tab."
+   - Inform the user: "I've navigated to the login page. Please complete the verification in the **Interactive** browser tab."
    - Wait for the user to confirm.
 4. Once the user is logged in, immediately resume your task on the exact same page. No browser restarts needed.
 `;
+
 
 const AUTH_HANDOFF_CONTENT = [
   "# [DEPRECATED] Auth Handoff — Superseded by browser-v2",
