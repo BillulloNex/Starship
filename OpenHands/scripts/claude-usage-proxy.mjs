@@ -379,6 +379,7 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
   // endpoint that Claude Code CLI uses for /usage.
   // -------------------------------------------------------------------
   const isOAuthToken = token.startsWith("sk-ant-oat");
+  let oauthError = null;
 
   if (isOAuthToken) {
     try {
@@ -399,15 +400,30 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
       }
     } catch (err) {
       console.error("[claude-proxy] OAuth usage API error:", err.message);
-      // Fall through to unverified
+      // Detect token expiry (401) vs other failures and surface a specific message
+      oauthError = err.message || "Unknown error";
+      // Fall through to unverified with specific error
     }
   }
 
   // -------------------------------------------------------------------
-  // FALLBACK: Non-OAuth token (API key) or OAuth API call failed.
-  // API keys (sk-ant-api*) don't have the /api/oauth/usage endpoint.
-  // Mark as unverified so the fuel gauge shows a warning.
+  // FALLBACK: Non-OAuth token (API key), OAuth API call failed, or
+  // token expired. Show a specific warning so the user knows WHY.
   // -------------------------------------------------------------------
+  let warning;
+  if (oauthError && oauthError.includes("401")) {
+    warning =
+      "⛽ Claude OAuth token EXPIRED — fuel gauge data is stale. Run `claude auth login` to refresh, then update CLAUDE_OAUTH_TOKEN in Coolify.";
+  } else if (oauthError) {
+    warning = `⛽ Claude usage API failed: ${oauthError}. Data may be stale.`;
+  } else if (!isOAuthToken && token.startsWith("sk-ant-api")) {
+    warning =
+      "API keys cannot check subscription quota. Use an OAuth token (from Claude Code) for real usage data.";
+  } else {
+    warning =
+      "Token found but quota cannot be verified via API. Check claude.ai/settings for real usage.";
+  }
+
   const quotaResult = {
     provider: "claude",
     planType: token.startsWith("sk-ant-") ? "Claude API" : "Claude Pro",
@@ -415,8 +431,7 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
     primaryWindow: null,
     secondaryWindow: null,
     updatedAt: Math.floor(Date.now() / 1000),
-    warning:
-      "Token found but quota cannot be verified via API. Check claude.ai/settings for real usage.",
+    warning,
   };
 
   res.writeHead(200, {
