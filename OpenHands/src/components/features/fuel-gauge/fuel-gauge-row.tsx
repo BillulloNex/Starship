@@ -80,7 +80,7 @@ export function FuelGaugeRow({ provider }: FuelGaugeRowProps) {
       {/* Top row: name + status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-[var(--oh-foreground)] truncate max-w-[140px]">
+          <span className="text-xs sm:text-sm font-medium text-[var(--oh-foreground)] truncate max-w-xs sm:max-w-md">
             {provider.displayName}
           </span>
           {provider.source === "manual" && (

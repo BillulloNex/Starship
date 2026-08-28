@@ -6,11 +6,7 @@ import {
   useLocation,
 } from "react-router";
 
-const FuelGaugeWidget = React.lazy(() =>
-  import("#/components/features/fuel-gauge/fuel-gauge-widget").then((m) => ({
-    default: m.FuelGaugeWidget,
-  })),
-);
+import { useAutoDecrement } from "#/hooks/use-auto-decrement";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
 import i18n from "#/i18n";
@@ -98,6 +94,7 @@ export default function MainApp() {
 
   useSyncTelemetryConsent();
   useTelemetryIdentity();
+  useAutoDecrement();
   // Local-mode policy: keep a profile active so a usable LLM is always selected.
   useEnsureActiveProfile();
 
@@ -159,9 +156,6 @@ export default function MainApp() {
         <React.Suspense fallback={null}>
           <EnvironmentSwitchOverlay />
           <CommandMenu />
-        </React.Suspense>
-        <React.Suspense fallback={null}>
-          <FuelGaugeWidget />
         </React.Suspense>
         {showOnboardingPreview ? <OnboardingHost /> : null}
       </SidebarMobileNavProvider>

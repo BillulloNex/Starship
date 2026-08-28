@@ -1,4 +1,4 @@
-import { AppWindow, Brain, Shield } from "lucide-react";
+import { AppWindow, Brain, Fuel, Shield } from "lucide-react";
 import KeyIcon from "#/icons/key.svg?react";
 import MemoryIcon from "#/icons/memory_icon.svg?react";
 import CircuitIcon from "#/icons/u-circuit.svg?react";
@@ -95,6 +95,12 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/verification",
     text: "SETTINGS$NAV_VERIFICATION",
     subtitle: "SETTINGS$PAGE_VERIFICATION_SUBLINE",
+  },
+  {
+    icon: <Fuel className="size-4" strokeWidth={2} aria-hidden />,
+    to: "/settings/fuel-gauge",
+    text: "SETTINGS$NAV_FUEL_GAUGE",
+    subtitle: "SETTINGS$PAGE_FUEL_GAUGE_SUBLINE",
   },
   {
     icon: <AppWindow className="size-4" strokeWidth={2} aria-hidden />,

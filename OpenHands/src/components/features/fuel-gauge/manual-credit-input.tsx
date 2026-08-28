@@ -114,10 +114,10 @@ export function ManualCreditInput({ onUpdate }: ManualCreditInputProps) {
                 setTotalCredits(String(preset.defaultCredits));
               }
             }}
-            className="bg-transparent border border-[var(--oh-border)] rounded px-2 py-1 text-xs text-[var(--oh-foreground)]"
+            className="bg-surface-base border border-[var(--oh-border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--oh-foreground)]"
           >
             {availablePresets.map((preset) => (
-              <option key={preset.providerId} value={preset.providerId}>
+              <option key={preset.providerId} value={preset.providerId} className="bg-[#1e1e24] text-[var(--oh-foreground)]">
                 {preset.displayName}
                 {preset.defaultCredits > 0
                   ? ` ($${preset.defaultCredits} default)`

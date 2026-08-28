@@ -33,6 +33,7 @@ export default [
       route("skills", "routes/skills-settings.tsx"),
       route("plugins", "routes/skills-plugins.tsx"),
       route("verification", "routes/verification-settings.tsx"),
+      route("fuel-gauge", "routes/fuel-gauge-settings.tsx"),
       route("app", "routes/app-settings.tsx"),
     ]),
     route("oauth/device/verify", "routes/device-verify.tsx"),

@@ -5490,6 +5490,23 @@
     "uk": "Аналізатор безпеки",
     "ca": "Analitzador de seguretat"
   },
+  "SETTINGS$NAV_FUEL_GAUGE": {
+    "en": "Fuel Gauge",
+    "ja": "燃料計",
+    "zh-CN": "油量计",
+    "zh-TW": "油量計",
+    "ko-KR": "연료 게이지",
+    "no": "Drivstoffmåler",
+    "it": "Indicatore carburante",
+    "pt": "Indicador de combustível",
+    "es": "Indicador de combustible",
+    "ar": "مقياس الوقود",
+    "fr": "Jauge de carburant",
+    "tr": "Yakıt Göstergesi",
+    "de": "Kraftstoffanzeige",
+    "uk": "Покажчик палива",
+    "ca": "Indicador de combustible"
+  },
   "SETTINGS$NAV_APPLICATION": {
     "en": "Application",
     "ja": "アプリケーション",
@@ -6118,6 +6135,23 @@
     "de": "Bestätigungsabfragen und Sicherheitsprüfungen für Aktionen.",
     "uk": "Запити підтвердження та перевірки безпеки для дій.",
     "ca": "Sol·licituds de confirmació i comprovacions de seguretat sobre les accions."
+  },
+  "SETTINGS$PAGE_FUEL_GAUGE_SUBLINE": {
+    "en": "Monitor provider rate limits, token quotas, and manage manual credit balances.",
+    "ja": "プロバイダーのレート制限、トークンクォータを監視し、手動クレジット残高を管理します。",
+    "zh-CN": "监控提供商速率限制、Token 配额并管理手动额度余额。",
+    "zh-TW": "監控提供商速率限制、Token 配額並管理手動額度餘額。",
+    "ko-KR": "제공자 속度 제한, 토큰 할당량을 모니터링하고 수동 크레딧 잔액을 관리합니다.",
+    "no": "Overvåk leverandørens hastighetsgrenser, tokenkvoter og administrer manuelle kredittsaldoer.",
+    "it": "Monitora i limiti di frequenza dei provider, le quote di token e gestisci i saldi di credito manuali.",
+    "pt": "Monitore os limites de taxa dos provedores, cotas de tokens e gerencie saldos de crédito manuais.",
+    "es": "Supervise los límites de velocidad de los proveedores, cuotas de tokens y administre saldos de crédito manuales.",
+    "ar": "مراقبة حدود معدل الموفرين وحصص الرموز وإدارة أرصدة الائتمان اليدوية.",
+    "fr": "Surveillez les limites de débit des fournisseurs, les quotas de jetons et gérez les soldes de crédit manuels.",
+    "tr": "Sağlayıcı hız sınırlarını, belirteç kotalarını izleyin ve manuel kredi bakiyelerini yönetin.",
+    "de": "Überwachen Sie Anbieter-Ratenlimits, Token-Kontingente und verwalten Sie manuelle Guthaben.",
+    "uk": "Відстежуйте ліміти швидкості постачальників, квоти токенів та керуйте ручними балансами кредитів.",
+    "ca": "Superviseu els límits de velocitat dels proveïdors, les quotes de fitxes i gestioneu els saldos de crèdit manuals."
   },
   "SETTINGS$PAGE_APPLICATION_SUBLINE": {
     "en": "Language, theme, notifications, and Git identity.",
