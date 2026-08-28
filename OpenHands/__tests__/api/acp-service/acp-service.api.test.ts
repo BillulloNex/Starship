@@ -121,6 +121,31 @@ describe("AcpService.getAuthStatus", () => {
     });
   });
 
+  describe("cursor (agent status)", () => {
+    it("runs the installed CLI probe and maps a logged-in account", async () => {
+      executeCommand.mockResolvedValue(
+        bashOutput({ stdout: "Authenticated as dev@example.com\n" }),
+      );
+      await expect(AcpService.getAuthStatus("cursor")).resolves.toBe(
+        "authenticated",
+      );
+      expect(executeCommand).toHaveBeenCalledWith(
+        "agent status",
+        undefined,
+        expect.any(Number),
+      );
+    });
+
+    it("maps Cursor's logged-out response", async () => {
+      executeCommand.mockResolvedValue(
+        bashOutput({ stdout: "Not logged in\n", exit_code: 1 }),
+      );
+      await expect(AcpService.getAuthStatus("cursor")).resolves.toBe(
+        "unauthenticated",
+      );
+    });
+  });
+
   it("→ unknown for an unprobeable provider, without running any command", async () => {
     await expect(AcpService.getAuthStatus("openhands")).resolves.toBe(
       "unknown",

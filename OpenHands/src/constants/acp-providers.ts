@@ -192,18 +192,19 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   if (key === "cursor") {
     display_name = "Cursor";
     default_command = ["agent", "acp"];
-    available_models = [
-      { id: "default", label: "Default (recommended)" },
-    ];
-    default_model = "default";
+    // Cursor's ACP server owns model discovery through its session config
+    // options. `default` is not a documented Cursor model id, and sending it
+    // through set_config_option can reject an otherwise valid session. Leave
+    // the model unset so Cursor uses the account/CLI selection, then surface
+    // the concrete runtime model reported by the ACP session.
+    available_models = [];
+    default_model = undefined;
   }
 
   if (key === "opencode") {
     display_name = "OpenCode";
     default_command = ["npx", "-y", "opencode-ai@latest", "acp"];
-    available_models = [
-      { id: "default", label: "Default (recommended)" },
-    ];
+    available_models = [{ id: "default", label: "Default (recommended)" }];
     default_model = "default";
   }
 
@@ -349,6 +350,11 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
       name: "CURSOR_API_KEY",
       secret: true,
       hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
+    },
+    {
+      name: "CURSOR_AUTH_TOKEN",
+      secret: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_OAUTH_TOKEN_HINT,
     },
   ],
   opencode: [
@@ -616,11 +622,9 @@ export function buildAcpAgentSettingsDiff(
   // The Python agent-server's Pydantic validation enum strictly enforces
   // ``Literal['claude-code', 'codex', 'gemini-cli', 'custom']``. Any other
   // ACP provider key maps to ``"custom"`` so the backend accepts the payload.
-  const isNativeSdkServer = [
-    "claude-code",
-    "codex",
-    "gemini-cli",
-  ].includes(providerKey);
+  const isNativeSdkServer = ["claude-code", "codex", "gemini-cli"].includes(
+    providerKey,
+  );
   const backendServer =
     options.allowUnknownServer || isNativeSdkServer
       ? providerKey

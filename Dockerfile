@@ -219,6 +219,26 @@ RUN bun --version && \
     chmod +x /usr/local/bin/agy && \
     /usr/local/bin/agy --version || true
 
+# Install the official Cursor Agent CLI for the Cursor ACP provider. Keep the
+# release explicit so production rebuilds do not silently pick up a different
+# agent binary. Cursor publishes x64/arm64 Linux bundles under the same release
+# identifier; install the complete bundle because the launcher has adjacent
+# runtime assets, then expose both current and legacy CLI names on PATH.
+ARG CURSOR_AGENT_VERSION="2026.08.25-3e8eec8"
+RUN set -eux; \
+    case "$(uname -m)" in \
+      x86_64|amd64) cursor_agent_arch="x64" ;; \
+      arm64|aarch64) cursor_agent_arch="arm64" ;; \
+      *) echo "Unsupported Cursor Agent architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    cursor_agent_dir="/opt/cursor-agent/${CURSOR_AGENT_VERSION}"; \
+    mkdir -p "${cursor_agent_dir}"; \
+    curl -fsSL "https://downloads.cursor.com/lab/${CURSOR_AGENT_VERSION}/linux/${cursor_agent_arch}/agent-cli-package.tar.gz" \
+      | tar --strip-components=1 -xzf - -C "${cursor_agent_dir}"; \
+    ln -s "${cursor_agent_dir}/cursor-agent" /usr/local/bin/agent; \
+    ln -s "${cursor_agent_dir}/cursor-agent" /usr/local/bin/cursor-agent; \
+    agent --version
+
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
@@ -228,6 +248,7 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/chrome-profile \
              /home/openhands/.claude \
              /home/openhands/.codex \
+             /home/openhands/.cursor \
              /home/openhands/.gemini \
              /home/openhands/.agy-acp \
              /tmp/vnc-browser/logs \

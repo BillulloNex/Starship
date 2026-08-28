@@ -18,6 +18,7 @@ describe("getAcpProviderDisplayName", () => {
     expect(getAcpProviderDisplayName("codex")).toBe("Codex");
     expect(getAcpProviderDisplayName("gemini-cli")).toBe("Gemini CLI");
     expect(getAcpProviderDisplayName("antigravity")).toBe("Google Antigravity");
+    expect(getAcpProviderDisplayName("cursor")).toBe("Cursor");
   });
 
   it("returns null for the Custom-command preset so callers can fall back to the generic 'ACP' label", () => {
@@ -56,6 +57,28 @@ describe("ACP provider registry", () => {
         expect(provider.description_key).toBeTruthy();
         continue;
       }
+      if (provider.key === "cursor") {
+        expect(provider.display_name).toBe("Cursor");
+        expect(provider.default_command).toEqual(["agent", "acp"]);
+        expect(provider.available_models).toEqual([]);
+        expect(provider.default_model).toBeUndefined();
+        expect(provider.icon).toBe("cursor");
+        expect(provider.description_key).toBeTruthy();
+        continue;
+      }
+      if (provider.key === "opencode") {
+        expect(provider.display_name).toBe("OpenCode");
+        expect(provider.default_command).toEqual([
+          "npx",
+          "-y",
+          "opencode-ai@latest",
+          "acp",
+        ]);
+        expect(provider.default_model).toBe("default");
+        expect(provider.icon).toBe("opencode");
+        expect(provider.description_key).toBeTruthy();
+        continue;
+      }
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
       const expectedCommand =
@@ -77,6 +100,13 @@ describe("ACP provider registry", () => {
 
   it("keeps every built-in default model in the UX suggestions", () => {
     for (const provider of ACP_PROVIDERS) {
+      // Cursor discovers models from the authenticated ACP session. No local
+      // placeholder is safer than sending an undocumented model id.
+      if (provider.key === "cursor") {
+        expect(provider.default_model).toBeUndefined();
+        expect(provider.available_models).toEqual([]);
+        continue;
+      }
       expect(provider.default_model, provider.key).toBeTruthy();
       expect(provider.available_models, provider.key).toBeTruthy();
       expect(
@@ -111,11 +141,9 @@ describe("ACP provider registry", () => {
     // EVERY default-model surface must agree on this, including this diff
     // builder's fallback.
     for (const provider of ACP_PROVIDERS) {
-      const expectedServer = [
-        "claude-code",
-        "codex",
-        "gemini-cli",
-      ].includes(provider.key)
+      const expectedServer = ["claude-code", "codex", "gemini-cli"].includes(
+        provider.key,
+      )
         ? provider.key
         : "custom";
       expect(buildAcpAgentSettingsDiff(provider.key)).toMatchObject({
@@ -183,6 +211,11 @@ describe("getAcpProviderSecrets — containerized credentials", () => {
     ]);
   });
 
+  it("collects both supported Cursor container credentials", () => {
+    const names = getAcpProviderSecrets("cursor").map((f) => f.name);
+    expect(names).toEqual(["CURSOR_API_KEY", "CURSOR_AUTH_TOKEN"]);
+  });
+
   it("renders file-content blobs as multiline secret fields", () => {
     // ``multiline`` also drives the orphaned-credential warning on backends
     // that can't materialise file secrets (cloud, agent-canvas#1016).
@@ -244,6 +277,16 @@ describe("getAcpPreferredDefaultModel", () => {
     expect(getAcpPreferredDefaultModel("claude-code")).toBe(
       getAcpProvider("claude-code")?.default_model,
     );
+  });
+
+  it("leaves Cursor's model unset for ACP runtime discovery", () => {
+    expect(getAcpPreferredDefaultModel("cursor")).toBeNull();
+    expect(buildAcpAgentSettingsDiff("cursor")).toMatchObject({
+      agent_kind: "acp",
+      acp_server: "custom",
+      acp_command: ["agent", "acp"],
+      acp_model: null,
+    });
   });
 
   it("returns null for OpenHands / custom / unknown", () => {
