@@ -20,3 +20,13 @@ export const GEMINI_VIEWBOX = "0 0 24 24";
 export const ANTIGRAVITY_MARK_PATH =
   "M12 2L2 19h20L12 2zm0 4.3L18.1 17H5.9L12 6.3zM7 21h10v2H7z";
 export const ANTIGRAVITY_VIEWBOX = "0 0 24 24";
+
+// Cursor: a mouse-pointer / cursor icon
+export const CURSOR_MARK_PATH =
+  "M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.85a.5.5 0 0 0-.85.36Z";
+export const CURSOR_VIEWBOX = "0 0 24 24";
+
+// OpenCode: angle brackets representing code / terminal
+export const OPENCODE_MARK_PATH =
+  "M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z";
+export const OPENCODE_VIEWBOX = "0 0 24 24";

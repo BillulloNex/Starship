@@ -7,8 +7,12 @@ import {
   CLAUDE_CODE_VIEWBOX,
   CODEX_MARK_PATH,
   CODEX_VIEWBOX,
+  CURSOR_MARK_PATH,
+  CURSOR_VIEWBOX,
   GEMINI_MARK_PATH,
   GEMINI_VIEWBOX,
+  OPENCODE_MARK_PATH,
+  OPENCODE_VIEWBOX,
 } from "#/constants/acp-brand-marks";
 import type { ACPProviderIcon } from "#/constants/acp-providers";
 import { cn } from "#/utils/utils";
@@ -16,8 +20,8 @@ import { cn } from "#/utils/utils";
 /**
  * Icons the conversation chip + onboarding tiles can render. Strictly broader
  * than {@link ACPProviderIcon} — that type covers ACP CLI subprocesses only
- * (Claude Code, Codex, Gemini, Antigravity, generic terminal fallback), whereas this type
- * additionally includes the native OpenHands harness.
+ * (Claude Code, Codex, Gemini, Antigravity, Cursor, OpenCode, generic terminal
+ * fallback), whereas this type additionally includes the native OpenHands harness.
  */
 export type AgentBrandIconKind = "openhands" | ACPProviderIcon;
 
@@ -120,6 +124,36 @@ export function AgentBrandIcon({
         aria-hidden
       >
         <path fill="currentColor" d={ANTIGRAVITY_MARK_PATH} />
+      </svg>
+    );
+  }
+  if (kind === "cursor") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={CURSOR_VIEWBOX}
+        width={size}
+        height={size}
+        className={cn("shrink-0", className)}
+        data-testid={testId ?? "agent-brand-icon-cursor"}
+        aria-hidden
+      >
+        <path fill="currentColor" d={CURSOR_MARK_PATH} />
+      </svg>
+    );
+  }
+  if (kind === "opencode") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={OPENCODE_VIEWBOX}
+        width={size}
+        height={size}
+        className={cn("shrink-0", className)}
+        data-testid={testId ?? "agent-brand-icon-opencode"}
+        aria-hidden
+      >
+        <path fill="currentColor" d={OPENCODE_MARK_PATH} />
       </svg>
     );
   }

@@ -30990,6 +30990,12 @@
     "tr": "Google Antigravity ACP aracı.",
     "uk": "Агент Google Antigravity ACP."
   },
+  "ONBOARDING$AGENT_CURSOR_DESCRIPTION": {
+    "en": "Use your Cursor subscription to power AI coding agents."
+  },
+  "ONBOARDING$AGENT_OPENCODE_DESCRIPTION": {
+    "en": "Open-source AI coding agent supporting 75+ LLM providers."
+  },
   "ONBOARDING$BACKEND_TITLE": {
     "en": "Check your backend",
     "ja": "バックエンドを確認",

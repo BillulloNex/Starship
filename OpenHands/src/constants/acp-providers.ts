@@ -6,6 +6,8 @@ export type ACPProviderIcon =
   | "codex"
   | "gemini"
   | "antigravity"
+  | "cursor"
+  | "opencode"
   | "cli-generic";
 
 export const ACP_PROVIDER_FALLBACK_ICON: ACPProviderIcon = "cli-generic";
@@ -147,6 +149,14 @@ const ACP_PROVIDER_UI: Record<
     icon: "antigravity",
     description_key: I18nKey.ONBOARDING$AGENT_ANTIGRAVITY_DESCRIPTION,
   },
+  cursor: {
+    icon: "cursor",
+    description_key: I18nKey.ONBOARDING$AGENT_CURSOR_DESCRIPTION,
+  },
+  opencode: {
+    icon: "opencode",
+    description_key: I18nKey.ONBOARDING$AGENT_OPENCODE_DESCRIPTION,
+  },
 };
 
 // Built-in ACP providers Canvas surfaces, built by enriching each upstream
@@ -177,6 +187,24 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
     ];
     default_model = "claude-opus-4-6-thinking";
+  }
+
+  if (key === "cursor") {
+    display_name = "Cursor";
+    default_command = ["agent", "acp"];
+    available_models = [
+      { id: "default", label: "Default (recommended)" },
+    ];
+    default_model = "default";
+  }
+
+  if (key === "opencode") {
+    display_name = "OpenCode";
+    default_command = ["opencode", "acp"];
+    available_models = [
+      { id: "default", label: "Default (recommended)" },
+    ];
+    default_model = "default";
   }
 
   if (
@@ -316,6 +344,14 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
       hint_key: I18nKey.ONBOARDING$ACP_SECRET_GCP_PROJECT_HINT,
     },
   ],
+  cursor: [
+    {
+      name: "CURSOR_API_KEY",
+      secret: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
+    },
+  ],
+  opencode: [],
 };
 
 /**
@@ -423,6 +459,12 @@ export function getAcpProviderSecrets(
   if (!key) return [];
   if (key === "antigravity") {
     return [...(ACP_RESERVED_CREDENTIALS.antigravity ?? [])];
+  }
+  if (key === "cursor") {
+    return [...(ACP_RESERVED_CREDENTIALS.cursor ?? [])];
+  }
+  if (key === "opencode") {
+    return [...(ACP_RESERVED_CREDENTIALS.opencode ?? [])];
   }
   const info = getClientAcpProvider(key);
   if (!info) return [];

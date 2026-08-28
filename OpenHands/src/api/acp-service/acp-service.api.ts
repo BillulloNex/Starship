@@ -65,6 +65,17 @@ function classifyGemini(out: BashOutput): AcpAuthStatus {
   return "unknown";
 }
 
+// Cursor: ``agent status`` prints login info or "not logged in" to stdout/stderr.
+// Match "not logged in" first since it contains "logged in" as a substring.
+function classifyCursor(out: BashOutput): AcpAuthStatus {
+  const text = streams(out).toLowerCase();
+  if (text.includes("not logged in") || text.includes("not authenticated"))
+    return "unauthenticated";
+  if (text.includes("logged in") || text.includes("authenticated"))
+    return "authenticated";
+  return "unknown";
+}
+
 // Per-provider login detection, keyed by ``acp_server`` / OnboardingAgentId.
 // Providers absent here (OpenHands, custom, unknown) report ``unknown``.
 const ACP_AUTH_PROBES: Record<string, AcpAuthProbe> = {
@@ -80,6 +91,15 @@ const ACP_AUTH_PROBES: Record<string, AcpAuthProbe> = {
     command:
       'test -f "$HOME/.gemini/oauth_creds.json" && echo present || echo absent',
     classify: classifyGemini,
+  },
+  cursor: {
+    command: "agent status",
+    classify: classifyCursor,
+  },
+  opencode: {
+    command:
+      'test -f "$HOME/.local/share/opencode/auth.json" && echo present || echo absent',
+    classify: classifyGemini, // Reuse present/absent classifier
   },
 };
 
