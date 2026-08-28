@@ -156,6 +156,22 @@ export class UnifiedLimitsService {
                     },
                   ]
                 : []),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...((claude as any).spend?.enabled
+                ? [
+                    {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      label: `Credits ($${(((claude as any).spend.usedMinor ?? 0) / Math.pow(10, (claude as any).spend.exponent ?? 2)).toFixed(2)} / $${(((claude as any).spend.limitMinor ?? 0) / Math.pow(10, (claude as any).spend.exponent ?? 2)).toFixed(2)})`,
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      usedPercent: (claude as any).spend.percent ?? 0,
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      remainingPercent: 100 - ((claude as any).spend.percent ?? 0),
+                      resetAt: null,
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      limitReached: ((claude as any).spend.severity === "critical"),
+                    },
+                  ]
+                : []),
             ],
             lastUpdated: claude.updatedAt,
           });

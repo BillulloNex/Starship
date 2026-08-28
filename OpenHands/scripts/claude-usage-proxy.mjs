@@ -51,15 +51,43 @@ export function extractClaudeAccessToken(raw) {
 }
 
 /**
- * Attempt to read token or cached quota from ~/.claude/ on host
+ * Extract OAuth access token from the macOS Keychain credential JSON format.
+ * Claude Code stores credentials in Keychain as:
+ *   { claudeAiOauth: { accessToken: "sk-ant-oat01-...", ... }, ... }
+ */
+function extractOAuthFromKeychainJSON(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw.trim());
+    const oauth = parsed?.claudeAiOauth;
+    if (oauth?.accessToken && typeof oauth.accessToken === "string") {
+      return oauth.accessToken;
+    }
+  } catch {
+    // Not the keychain format
+  }
+  return null;
+}
+
+/**
+ * Attempt to read token or cached quota from env vars / ~/.claude/ on host
  */
 async function getHostClaudeCredentials() {
-  // Check env vars first
+  // Direct OAuth token (highest priority — the exact format needed for /api/oauth/usage)
+  if (process.env.CLAUDE_OAUTH_TOKEN) {
+    return { token: process.env.CLAUDE_OAUTH_TOKEN.trim(), source: "oauth_token_env" };
+  }
+
+  // Check env vars — also try to extract OAuth token from full keychain JSON
   if (process.env.CLAUDE_AUTH_JSON) {
+    const oauthToken = extractOAuthFromKeychainJSON(process.env.CLAUDE_AUTH_JSON);
+    if (oauthToken) return { token: oauthToken, source: "env_oauth" };
     const token = extractClaudeAccessToken(process.env.CLAUDE_AUTH_JSON);
     if (token) return { token, source: "env_json" };
   }
   if (process.env.ANTHROPIC_AUTH_JSON) {
+    const oauthToken = extractOAuthFromKeychainJSON(process.env.ANTHROPIC_AUTH_JSON);
+    if (oauthToken) return { token: oauthToken, source: "env_oauth" };
     const token = extractClaudeAccessToken(process.env.ANTHROPIC_AUTH_JSON);
     if (token) return { token, source: "env_json" };
   }
@@ -345,10 +373,41 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
     return;
   }
 
-  // CRITICAL: We have a token but no real API to verify actual quota usage.
-  // Anthropic does NOT expose a public subscription quota API.
-  // Instead of lying with "100% available", mark the data as UNVERIFIED
-  // so the fuel gauge shows a warning rather than a false green.
+  // -------------------------------------------------------------------
+  // REAL API CALL: OAuth tokens (sk-ant-oat*) can call the dedicated
+  // usage endpoint at api.anthropic.com/api/oauth/usage — the same
+  // endpoint that Claude Code CLI uses for /usage.
+  // -------------------------------------------------------------------
+  const isOAuthToken = token.startsWith("sk-ant-oat");
+
+  if (isOAuthToken) {
+    try {
+      const utilization = await fetchOAuthUsage(token);
+      if (utilization) {
+        const quotaResult = normalizeOAuthUsage(utilization);
+
+        usageCache.set(tokenHash, { timestamp: now, data: quotaResult });
+
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "X-Cache": "MISS",
+          "X-Source": "oauth-api",
+        });
+        res.end(JSON.stringify(quotaResult));
+        return;
+      }
+    } catch (err) {
+      console.error("[claude-proxy] OAuth usage API error:", err.message);
+      // Fall through to unverified
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // FALLBACK: Non-OAuth token (API key) or OAuth API call failed.
+  // API keys (sk-ant-api*) don't have the /api/oauth/usage endpoint.
+  // Mark as unverified so the fuel gauge shows a warning.
+  // -------------------------------------------------------------------
   const quotaResult = {
     provider: "claude",
     planType: token.startsWith("sk-ant-") ? "Claude API" : "Claude Pro",
@@ -357,10 +416,9 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
     secondaryWindow: null,
     updatedAt: Math.floor(Date.now() / 1000),
     warning:
-      "Token found but quota cannot be verified — Anthropic has no public quota API. Check claude.ai/settings for real usage.",
+      "Token found but quota cannot be verified via API. Check claude.ai/settings for real usage.",
   };
 
-  // Do NOT cache unverified results — they're not real data
   res.writeHead(200, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -369,3 +427,136 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
   });
   res.end(JSON.stringify(quotaResult));
 }
+
+// -------------------------------------------------------------------
+// fetchOAuthUsage — calls the real Anthropic OAuth usage endpoint.
+// This is the same endpoint Claude Code CLI uses for /usage.
+// GET https://api.anthropic.com/api/oauth/usage
+// Authorization: Bearer <oauth_token>
+// -------------------------------------------------------------------
+async function fetchOAuthUsage(oauthToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.anthropic.com",
+      port: 443,
+      path: "/api/oauth/usage",
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${oauthToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": "grokbot-fuel-gauge/1.0",
+      },
+      timeout: 8000,
+    };
+
+    const req = httpsRequest(options, (resp) => {
+      const chunks = [];
+      resp.on("data", (chunk) => chunks.push(chunk));
+      resp.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        if (resp.statusCode !== 200) {
+          reject(new Error(`OAuth usage API returned ${resp.statusCode}: ${body.slice(0, 200)}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (e) {
+          reject(new Error(`Failed to parse OAuth usage response: ${e.message}`));
+        }
+      });
+    });
+
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("OAuth usage API timed out"));
+    });
+    req.end();
+  });
+}
+
+// -------------------------------------------------------------------
+// normalizeOAuthUsage — converts the raw /api/oauth/usage response
+// into the normalized format the fuel gauge frontend expects.
+//
+// Input shape (from Anthropic):
+//   five_hour:    { utilization: 0.0, resets_at: "..." }
+//   seven_day:    { utilization: 21.0, resets_at: "..." }
+//   extra_usage:  { is_enabled, used_credits, monthly_limit, utilization }
+//   limits:       [{ kind, percent, severity, resets_at }]
+//   spend:        { percent, severity, used, limit }
+// -------------------------------------------------------------------
+function normalizeOAuthUsage(data) {
+  let primaryWindow = null;
+  let secondaryWindow = null;
+
+  // --- 5-hour session window ---
+  const fiveHour = data.five_hour;
+  if (fiveHour && fiveHour.utilization !== undefined) {
+    const usedPercent = Math.max(0, Math.min(100, Math.round(fiveHour.utilization * 10) / 10));
+    const resetAt = fiveHour.resets_at
+      ? Math.floor(new Date(fiveHour.resets_at).getTime() / 1000)
+      : null;
+    primaryWindow = {
+      limitSeconds: 18000,
+      usedPercent,
+      remainingPercent: Math.round((100 - usedPercent) * 10) / 10,
+      resetAt,
+      limitReached: usedPercent >= 100,
+    };
+  }
+
+  // --- Weekly window ---
+  const sevenDay = data.seven_day;
+  if (sevenDay && sevenDay.utilization !== undefined) {
+    const usedPercent = Math.max(0, Math.min(100, Math.round(sevenDay.utilization * 10) / 10));
+    const resetAt = sevenDay.resets_at
+      ? Math.floor(new Date(sevenDay.resets_at).getTime() / 1000)
+      : null;
+    secondaryWindow = {
+      limitSeconds: 604800,
+      usedPercent,
+      remainingPercent: Math.round((100 - usedPercent) * 10) / 10,
+      resetAt,
+      limitReached: usedPercent >= 100,
+    };
+  }
+
+  // --- Extra usage / spend credits ---
+  let extraUsage = null;
+  if (data.extra_usage && data.extra_usage.is_enabled) {
+    extraUsage = {
+      enabled: true,
+      usedCredits: data.extra_usage.used_credits ?? 0,
+      monthlyLimit: data.extra_usage.monthly_limit ?? 0,
+      utilization: data.extra_usage.utilization ?? 0,
+      currency: data.extra_usage.currency ?? "USD",
+      decimalPlaces: data.extra_usage.decimal_places ?? 2,
+    };
+  }
+
+  // --- Spend summary ---
+  let spend = null;
+  if (data.spend) {
+    spend = {
+      percent: data.spend.percent ?? 0,
+      severity: data.spend.severity ?? "normal",
+      enabled: data.spend.enabled ?? false,
+      usedMinor: data.spend.used?.amount_minor ?? 0,
+      limitMinor: data.spend.limit?.amount_minor ?? 0,
+      currency: data.spend.used?.currency ?? "USD",
+      exponent: data.spend.used?.exponent ?? 2,
+    };
+  }
+
+  return {
+    provider: "claude",
+    planType: "Claude Pro",
+    primaryWindow,
+    secondaryWindow,
+    extraUsage,
+    spend,
+    updatedAt: Math.floor(Date.now() / 1000),
+  };
+}
+
