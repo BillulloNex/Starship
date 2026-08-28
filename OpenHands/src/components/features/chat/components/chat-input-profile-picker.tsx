@@ -55,45 +55,47 @@ export function ChatInputProfileMenuContent({
               {t(I18nKey.SETTINGS$AVAILABLE_PROFILES)}
             </Typography.Text>
           </li>
-          {profiles.map((profile) => {
-            const isCurrent =
-              profile.id != null && profile.id === currentProfileId;
-            return (
-              <ContextMenuListItem
-                key={profile.id ?? profile.name}
-                testId={`chat-input-agent-profile-option-${profile.name}`}
-                isDisabled={isSwitching}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (isCurrent) {
-                    onClose();
-                    return;
-                  }
-                  handleSelect(profile);
-                }}
-                className={cn(
-                  "flex items-center gap-2",
-                  isCurrent && "bg-[var(--oh-interactive-hover)]",
-                )}
-              >
-                <span
-                  className="flex-1 truncate text-sm leading-5"
-                  title={profile.name}
+          <div className="flex max-h-[220px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
+            {profiles.map((profile) => {
+              const isCurrent =
+                profile.id != null && profile.id === currentProfileId;
+              return (
+                <ContextMenuListItem
+                  key={profile.id ?? profile.name}
+                  testId={`chat-input-agent-profile-option-${profile.name}`}
+                  isDisabled={isSwitching}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (isCurrent) {
+                      onClose();
+                      return;
+                    }
+                    handleSelect(profile);
+                  }}
+                  className={cn(
+                    "flex items-center gap-2",
+                    isCurrent && "bg-[var(--oh-interactive-hover)]",
+                  )}
                 >
-                  {profile.name}
-                </span>
-                {isCurrent && (
-                  <CheckIcon
-                    width={14}
-                    height={14}
-                    className="shrink-0"
-                    aria-hidden
-                  />
-                )}
-              </ContextMenuListItem>
-            );
-          })}
+                  <span
+                    className="flex-1 truncate text-sm leading-5"
+                    title={profile.name}
+                  >
+                    {profile.name}
+                  </span>
+                  {isCurrent && (
+                    <CheckIcon
+                      width={14}
+                      height={14}
+                      className="shrink-0"
+                      aria-hidden
+                    />
+                  )}
+                </ContextMenuListItem>
+              );
+            })}
+          </div>
           {isInConversation && (
             <li role="presentation" className="px-2 pt-0.5 pb-1">
               <Typography.Text className="text-[11px] text-[var(--oh-text-dim)] leading-4">

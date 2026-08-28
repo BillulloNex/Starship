@@ -75,39 +75,41 @@ export function ChatInputModelMenuContent({
               {t(I18nKey.MODEL$AVAILABLE_MODELS)}
             </Typography.Text>
           </li>
-          {model.availableAcpModels.map((option) => {
-            const isSelected = option.id === model.currentModelId;
-            return (
-              <ContextMenuListItem
-                key={option.id}
-                testId={`chat-input-acp-model-option-${option.id}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleSelectAcpModel(option.id);
-                }}
-                className={cn(
-                  "flex items-center gap-2",
-                  isSelected && "bg-[var(--oh-interactive-hover)]",
-                )}
-              >
-                <span
-                  className="flex-1 truncate text-sm leading-5"
-                  title={option.label}
+          <div className="flex max-h-[220px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
+            {model.availableAcpModels.map((option) => {
+              const isSelected = option.id === model.currentModelId;
+              return (
+                <ContextMenuListItem
+                  key={option.id}
+                  testId={`chat-input-acp-model-option-${option.id}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleSelectAcpModel(option.id);
+                  }}
+                  className={cn(
+                    "flex items-center gap-2",
+                    isSelected && "bg-[var(--oh-interactive-hover)]",
+                  )}
                 >
-                  {option.label}
-                </span>
-                {isSelected && (
-                  <CheckIcon
-                    width={14}
-                    height={14}
-                    className="shrink-0"
-                    aria-hidden
-                  />
-                )}
-              </ContextMenuListItem>
-            );
-          })}
+                  <span
+                    className="flex-1 truncate text-sm leading-5"
+                    title={option.label}
+                  >
+                    {option.label}
+                  </span>
+                  {isSelected && (
+                    <CheckIcon
+                      width={14}
+                      height={14}
+                      className="shrink-0"
+                      aria-hidden
+                    />
+                  )}
+                </ContextMenuListItem>
+              );
+            })}
+          </div>
         </>
       ) : model.displayModel ? (
         <li className="text-sm">
@@ -187,7 +189,7 @@ export function ChatInputModel() {
           position="top"
           alignment="left"
           spacing="none"
-          className="z-[60] mb-2 min-w-[200px] max-w-[320px] max-h-[60vh] overflow-y-auto"
+          className="z-[60] mb-2 min-w-[200px] max-w-[320px]"
         >
           <ChatInputModelMenuContent
             model={model}

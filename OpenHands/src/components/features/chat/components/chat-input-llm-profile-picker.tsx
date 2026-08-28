@@ -72,51 +72,53 @@ export function ChatInputLlmProfileMenuContent({
               {t(I18nKey.SETTINGS$AVAILABLE_PROFILES)}
             </Typography.Text>
           </li>
-          {profiles.map((profile) => {
-            const isCurrent = profile.name === currentProfileName;
-            const displayModel = formatModelNameForDisplay(profile.model);
-            return (
-              <ContextMenuListItem
-                key={profile.name}
-                testId={`chat-input-llm-profile-option-${profile.name}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (isCurrent) {
-                    onClose();
-                    return;
-                  }
-                  handleSelect(profile.name);
-                }}
-                className={cn(
-                  "flex flex-col items-stretch gap-0.5",
-                  isCurrent && "bg-[var(--oh-interactive-hover)]",
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <span
-                    className="flex-1 truncate text-sm leading-5"
-                    title={profile.model ?? profile.name}
-                  >
-                    {profile.name}
-                  </span>
-                  {isCurrent && (
-                    <CheckIcon
-                      width={14}
-                      height={14}
-                      className="shrink-0"
-                      aria-hidden
-                    />
+          <div className="flex max-h-[220px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
+            {profiles.map((profile) => {
+              const isCurrent = profile.name === currentProfileName;
+              const displayModel = formatModelNameForDisplay(profile.model);
+              return (
+                <ContextMenuListItem
+                  key={profile.name}
+                  testId={`chat-input-llm-profile-option-${profile.name}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (isCurrent) {
+                      onClose();
+                      return;
+                    }
+                    handleSelect(profile.name);
+                  }}
+                  className={cn(
+                    "flex flex-col items-stretch gap-0.5",
+                    isCurrent && "bg-[var(--oh-interactive-hover)]",
                   )}
-                </span>
-                {displayModel && (
-                  <span className="block truncate text-xs leading-4 text-[var(--oh-muted)]">
-                    {displayModel}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="flex-1 truncate text-sm leading-5"
+                      title={profile.model ?? profile.name}
+                    >
+                      {profile.name}
+                    </span>
+                    {isCurrent && (
+                      <CheckIcon
+                        width={14}
+                        height={14}
+                        className="shrink-0"
+                        aria-hidden
+                      />
+                    )}
                   </span>
-                )}
-              </ContextMenuListItem>
-            );
-          })}
+                  {displayModel && (
+                    <span className="block truncate text-xs leading-4 text-[var(--oh-muted)]">
+                      {displayModel}
+                    </span>
+                  )}
+                </ContextMenuListItem>
+              );
+            })}
+          </div>
         </>
       )}
       {readOnlyProfileName && (
@@ -211,7 +213,7 @@ export function ChatInputLlmProfilePicker() {
           position="top"
           alignment="left"
           spacing="none"
-          className="z-[60] mb-2 min-w-[200px] max-w-[320px] max-h-[60vh] overflow-y-auto"
+          className="z-[60] mb-2 min-w-[200px] max-w-[320px]"
         >
           <ChatInputLlmProfileMenuContent
             onClose={() => setIsPopoverOpen(false)}
