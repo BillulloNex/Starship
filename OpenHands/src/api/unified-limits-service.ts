@@ -1,6 +1,7 @@
 import { ClaudeUsageService } from "./claude-usage-service";
 import { CodexUsageService } from "./codex-usage-service";
 import { VercelGatewayService } from "./vercel-gateway-service";
+import LLMBalanceService from "./llm-balance-service";
 import type {
   UnifiedProviderLimit,
   ManualCreditEntry,
@@ -73,10 +74,24 @@ export class UnifiedLimitsService {
    * Fan out to every known provider and return normalised snapshots.
    * Providers that fail or are unconfigured are silently omitted.
    */
-  static async getAll(opts?: {
-    vercelKey?: string | null;
-  }): Promise<UnifiedProviderLimit[]> {
+  static async getAll(): Promise<UnifiedProviderLimit[]> {
     const results: UnifiedProviderLimit[] = [];
+
+    // --- Resolve Vercel key from settings store ---
+    let vercelKey: string | null = null;
+    try {
+      const { SettingsClient } = await import(
+        "@openhands/typescript-client/clients"
+      );
+      const { getAgentServerClientOptions } = await import(
+        "./agent-server-client-options"
+      );
+      const client = new SettingsClient(getAgentServerClientOptions());
+      const raw = await client.getSecret("VERCEL_AI_GATEWAY_KEY");
+      if (raw) vercelKey = typeof raw === "string" ? raw : String(raw);
+    } catch {
+      // Settings store unavailable
+    }
 
     // --- Claude (ACP subscription) ---
     try {
@@ -178,10 +193,37 @@ export class UnifiedLimitsService {
       // Codex unavailable
     }
 
+    // --- OpenRouter (API provider) ---
+    try {
+      const balance = await LLMBalanceService.getBalance();
+      if (balance) {
+        results.push({
+          providerId: "openrouter",
+          displayName: balance.isFreeTier
+            ? "OpenRouter (Free)"
+            : "OpenRouter",
+          icon: "openrouter",
+          category: "api",
+          source: "auto",
+          status: statusFromBalance(balance.limitRemaining),
+          limits: [],
+          balance: {
+            used: balance.usage,
+            remaining: balance.limitRemaining,
+            limit: balance.limit,
+            isFreeTier: balance.isFreeTier,
+          },
+          lastUpdated: Math.floor(Date.now() / 1000),
+        });
+      }
+    } catch {
+      // OpenRouter unavailable
+    }
+
     // --- Vercel AI Gateway (API gateway) ---
     try {
       const vercel = await VercelGatewayService.getCredits(
-        opts?.vercelKey ?? null,
+        vercelKey,
       );
       if (vercel) {
         results.push({

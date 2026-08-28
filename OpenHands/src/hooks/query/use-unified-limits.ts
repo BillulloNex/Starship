@@ -11,11 +11,7 @@ import type { UnifiedProviderLimit } from "#/api/unified-limits.types";
 export function useUnifiedLimits() {
   const query = useQuery<UnifiedProviderLimit[]>({
     queryKey: ["unified-limits"],
-    queryFn: () =>
-      UnifiedLimitsService.getAll({
-        // TODO: resolve Vercel key from settings store when wired up
-        vercelKey: null,
-      }),
+    queryFn: () => UnifiedLimitsService.getAll(),
     refetchInterval: 60_000,
     staleTime: 30_000,
     retry: false,
