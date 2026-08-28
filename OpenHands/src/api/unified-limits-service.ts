@@ -97,49 +97,72 @@ export class UnifiedLimitsService {
     try {
       const claude = await ClaudeUsageService.getUsage(false);
       if (claude) {
-        const primaryRemaining =
-          claude.primaryWindow?.remainingPercent ?? 100;
-        results.push({
-          providerId: "claude-code",
-          displayName:
-            claude.planType?.toLowerCase().includes("team")
-              ? "Claude Team"
-              : claude.planType?.toLowerCase().includes("max")
-                ? "Claude Max"
-                : "Claude Pro",
-          icon: "claude-code",
-          category: "subscription-acp",
-          source: "auto",
-          status: statusFromPercent(primaryRemaining),
-          limits: [
-            ...(claude.primaryWindow
-              ? [
-                  {
-                    label: "5-hour session",
-                    usedPercent: claude.primaryWindow.usedPercent,
-                    remainingPercent: claude.primaryWindow.remainingPercent,
-                    resetAt: claude.primaryWindow.resetAt,
-                    limitReached: claude.primaryWindow.limitReached,
-                  },
-                ]
-              : []),
-            ...(claude.secondaryWindow
-              ? [
-                  {
-                    label: "Weekly",
-                    usedPercent: claude.secondaryWindow.usedPercent,
-                    remainingPercent: claude.secondaryWindow.remainingPercent,
-                    resetAt: claude.secondaryWindow.resetAt,
-                    limitReached: claude.secondaryWindow.limitReached,
-                  },
-                ]
-              : []),
-          ],
-          lastUpdated: claude.updatedAt,
-        });
+        // CRITICAL: Detect fake/unverified responses.
+        // The proxy sets `unverified: true` when it has a token but
+        // can't actually verify quota (Anthropic has no public API).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isUnverified = (claude as any).unverified === true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const warning = (claude as any).warning as string | undefined;
+
+        if (isUnverified || (!claude.primaryWindow && !claude.secondaryWindow)) {
+          // Show as UNKNOWN — never fake a green status
+          results.push({
+            providerId: "claude-code",
+            displayName: claude.planType ?? "Claude",
+            icon: "claude-code",
+            category: "subscription-acp",
+            source: "auto",
+            status: "unknown",
+            limits: [],
+            lastUpdated: claude.updatedAt,
+            error: warning ?? "Quota cannot be verified — check claude.ai/settings",
+          });
+        } else {
+          const primaryRemaining =
+            claude.primaryWindow?.remainingPercent ?? 0;
+          results.push({
+            providerId: "claude-code",
+            displayName:
+              claude.planType?.toLowerCase().includes("team")
+                ? "Claude Team"
+                : claude.planType?.toLowerCase().includes("max")
+                  ? "Claude Max"
+                  : "Claude Pro",
+            icon: "claude-code",
+            category: "subscription-acp",
+            source: "auto",
+            status: statusFromPercent(primaryRemaining),
+            limits: [
+              ...(claude.primaryWindow
+                ? [
+                    {
+                      label: "5-hour session",
+                      usedPercent: claude.primaryWindow.usedPercent,
+                      remainingPercent: claude.primaryWindow.remainingPercent,
+                      resetAt: claude.primaryWindow.resetAt,
+                      limitReached: claude.primaryWindow.limitReached,
+                    },
+                  ]
+                : []),
+              ...(claude.secondaryWindow
+                ? [
+                    {
+                      label: "Weekly",
+                      usedPercent: claude.secondaryWindow.usedPercent,
+                      remainingPercent: claude.secondaryWindow.remainingPercent,
+                      resetAt: claude.secondaryWindow.resetAt,
+                      limitReached: claude.secondaryWindow.limitReached,
+                    },
+                  ]
+                : []),
+            ],
+            lastUpdated: claude.updatedAt,
+          });
+        }
       }
     } catch {
-      // Claude unavailable
+      // Claude unavailable — silently omit
     }
 
     // --- Codex / ChatGPT (ACP subscription) ---

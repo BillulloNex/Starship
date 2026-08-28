@@ -130,6 +130,14 @@ export function FuelGaugeRow({ provider }: FuelGaugeRowProps) {
           {resetLabel}
         </div>
       )}
+
+      {/* Warning for unverified/error providers */}
+      {provider.error && (provider.status === "unknown" || provider.status === "error") && (
+        <div className="flex items-start gap-1 rounded bg-amber-500/10 border border-amber-500/20 p-1.5 text-[10px] text-amber-400 leading-tight mt-0.5">
+          <span className="shrink-0">⚠</span>
+          <span>{provider.error}</span>
+        </div>
+      )}
     </div>
   );
 }

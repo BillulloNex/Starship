@@ -311,32 +311,21 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
   }
 
   if (!token) {
-    // Default active quota state
-    const defaultQuota = {
-      provider: "claude",
-      planType: "Claude Pro",
-      primaryWindow: {
-        limitSeconds: 18000,
-        usedPercent: 0,
-        remainingPercent: 100,
-        resetAt: Math.floor(Date.now() / 1000) + 18000,
-        limitReached: false,
-      },
-      secondaryWindow: {
-        limitSeconds: 604800,
-        usedPercent: 0,
-        remainingPercent: 100,
-        resetAt: Math.floor(Date.now() / 1000) + 604800,
-        limitReached: false,
-      },
-      updatedAt: Math.floor(Date.now() / 1000),
-    };
-
-    res.writeHead(200, {
+    // CRITICAL: Do NOT return fake "100% available" defaults.
+    // Returning a fake positive is worse than returning nothing — it makes
+    // the user think they have quota when they might be completely exhausted.
+    // Return 503 so the fuel gauge shows "Unknown" instead of a green lie.
+    res.writeHead(503, {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
     });
-    res.end(JSON.stringify(defaultQuota));
+    res.end(
+      JSON.stringify({
+        error: "no_credentials",
+        message:
+          "No Claude token found. Cannot verify quota. Set CLAUDE_AUTH_JSON or ANTHROPIC_API_KEY.",
+      }),
+    );
     return;
   }
 
@@ -356,35 +345,27 @@ export async function handleClaudeUsageProxy(req, res, pathname, query = {}) {
     return;
   }
 
+  // CRITICAL: We have a token but no real API to verify actual quota usage.
+  // Anthropic does NOT expose a public subscription quota API.
+  // Instead of lying with "100% available", mark the data as UNVERIFIED
+  // so the fuel gauge shows a warning rather than a false green.
   const quotaResult = {
     provider: "claude",
     planType: token.startsWith("sk-ant-") ? "Claude API" : "Claude Pro",
-    primaryWindow: {
-      limitSeconds: 18000,
-      usedPercent: 0,
-      remainingPercent: 100,
-      resetAt: Math.floor(Date.now() / 1000) + 18000,
-      limitReached: false,
-    },
-    secondaryWindow: {
-      limitSeconds: 604800,
-      usedPercent: 0,
-      remainingPercent: 100,
-      resetAt: Math.floor(Date.now() / 1000) + 604800,
-      limitReached: false,
-    },
+    unverified: true,
+    primaryWindow: null,
+    secondaryWindow: null,
     updatedAt: Math.floor(Date.now() / 1000),
+    warning:
+      "Token found but quota cannot be verified — Anthropic has no public quota API. Check claude.ai/settings for real usage.",
   };
 
-  usageCache.set(tokenHash, {
-    timestamp: now,
-    data: quotaResult,
-  });
-
+  // Do NOT cache unverified results — they're not real data
   res.writeHead(200, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "X-Cache": "MISS",
+    "X-Unverified": "true",
   });
   res.end(JSON.stringify(quotaResult));
 }
