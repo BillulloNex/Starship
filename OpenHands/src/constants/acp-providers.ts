@@ -356,8 +356,7 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
       name: "OPENCODE_AUTH_JSON",
       secret: true,
       multiline: true,
-      hint_key: I18nKey.ONBOARDING$ACP_SECRET_FILE_BLOB_HINT,
-      hint_values: { file: "~/.local/share/opencode/auth.json" },
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_OPENCODE_AUTH_HINT,
     },
     {
       name: "OPENCODE_GO_API_KEY",

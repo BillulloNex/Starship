@@ -34158,6 +34158,9 @@
     "tr": "{{file}} dosyasının tüm içeriğini yapıştırın. Almak için `cat {{file}}` çalıştırın. Bir secret olarak kaydedilir ve çalışma zamanında aracı için diske yazılır.",
     "uk": "Вставте повний вміст {{file}}. Виконайте `cat {{file}}`, щоб отримати його. Зберігається як секрет і записується на диск для агента під час виконання."
   },
+  "ONBOARDING$ACP_SECRET_OPENCODE_AUTH_HINT": {
+    "en": "1) Install: `npm i -g opencode-ai@latest`  2) Login: `opencode auth login`  3) Copy to clipboard: `cat ~/.local/share/opencode/auth.json | pbcopy` (macOS) or `cat ~/.local/share/opencode/auth.json | xclip -sel clip` (Linux)  4) Paste here."
+  },
   "ONBOARDING$ACP_SECRET_OAUTH_TOKEN_HINT": {
     "en": "Subscription OAuth token for Claude Pro/Max. Run `claude setup-token` in your terminal to get it.",
     "ja": "Claude Pro/Max のサブスクリプション OAuth トークン。ターミナルで `claude setup-token` を実行して取得してください。",
