@@ -18,6 +18,20 @@ import { createHash } from "node:crypto";
 const CACHE_TTL_MS = 60 * 1000; // 60s cache
 const usageCache = new Map(); // tokenHash -> { timestamp, data }
 
+// -------------------------------------------------------------------
+// OAuth Token Auto-Refresh
+// When CLAUDE_REFRESH_TOKEN is set, we automatically mint fresh access
+// tokens using Anthropic's OAuth token endpoint. Same flow as Claude
+// Code CLI's checkAndRefreshOAuthTokenIfNeeded().
+// -------------------------------------------------------------------
+const OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
+const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+
+// In-memory cache for the auto-refreshed access token
+let cachedAccessToken = null;   // string
+let cachedTokenExpiresAt = 0;   // ms timestamp
+
 /**
  * Extract token from a raw string or credentials JSON
  */
@@ -73,7 +87,18 @@ function extractOAuthFromKeychainJSON(raw) {
  * Attempt to read token or cached quota from env vars / ~/.claude/ on host
  */
 async function getHostClaudeCredentials() {
-  // Direct OAuth token (highest priority — the exact format needed for /api/oauth/usage)
+  // Auto-refresh (highest priority) — uses refresh token to mint fresh access tokens
+  if (process.env.CLAUDE_REFRESH_TOKEN) {
+    try {
+      const freshToken = await getOrRefreshAccessToken(process.env.CLAUDE_REFRESH_TOKEN.trim());
+      if (freshToken) return { token: freshToken, source: "auto_refresh" };
+    } catch (err) {
+      console.error("[claude-proxy] Auto-refresh failed:", err.message);
+      // Fall through to static token
+    }
+  }
+
+  // Static OAuth token (fallback — will expire in ~8h)
   if (process.env.CLAUDE_OAUTH_TOKEN) {
     return { token: process.env.CLAUDE_OAUTH_TOKEN.trim(), source: "oauth_token_env" };
   }
@@ -575,3 +600,82 @@ function normalizeOAuthUsage(data) {
   };
 }
 
+// -------------------------------------------------------------------
+// getOrRefreshAccessToken — uses a refresh token to keep a fresh
+// access token in memory. Matches Claude Code CLI's refresh flow:
+//   POST https://platform.claude.com/v1/oauth/token
+//   { grant_type: "refresh_token", refresh_token, client_id, scope }
+// Returns a fresh access token (sk-ant-oat*) every ~8 hours.
+// -------------------------------------------------------------------
+async function getOrRefreshAccessToken(refreshToken) {
+  const now = Date.now();
+
+  // Return cached token if still valid (with 5-min buffer)
+  if (cachedAccessToken && (now + TOKEN_REFRESH_BUFFER_MS) < cachedTokenExpiresAt) {
+    return cachedAccessToken;
+  }
+
+  console.log("[claude-proxy] Refreshing OAuth access token...");
+
+  const body = JSON.stringify({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: OAUTH_CLIENT_ID,
+    scope: "user:inference user:profile user:sessions:claude_code",
+  });
+
+  return new Promise((resolve, reject) => {
+    const url = new URL(OAUTH_TOKEN_URL);
+    const options = {
+      hostname: url.hostname,
+      port: 443,
+      path: url.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+        "User-Agent": "grokbot-fuel-gauge/1.0",
+      },
+      timeout: 15000,
+    };
+
+    const req = httpsRequest(options, (resp) => {
+      const chunks = [];
+      resp.on("data", (chunk) => chunks.push(chunk));
+      resp.on("end", () => {
+        const responseBody = Buffer.concat(chunks).toString("utf8");
+        if (resp.statusCode !== 200) {
+          reject(new Error(`Token refresh failed (${resp.statusCode}): ${responseBody.slice(0, 200)}`));
+          return;
+        }
+        try {
+          const data = JSON.parse(responseBody);
+          const accessToken = data.access_token;
+          const expiresIn = data.expires_in || 28800; // default 8h
+
+          if (!accessToken) {
+            reject(new Error("Token refresh response missing access_token"));
+            return;
+          }
+
+          // Cache the fresh token
+          cachedAccessToken = accessToken;
+          cachedTokenExpiresAt = now + (expiresIn * 1000);
+
+          console.log(`[claude-proxy] OAuth token refreshed, expires in ${(expiresIn / 3600).toFixed(1)}h`);
+          resolve(accessToken);
+        } catch (e) {
+          reject(new Error(`Failed to parse token refresh response: ${e.message}`));
+        }
+      });
+    });
+
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("Token refresh timed out"));
+    });
+    req.write(body);
+    req.end();
+  });
+}
