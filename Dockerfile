@@ -225,6 +225,9 @@ RUN bun --version && \
 # identifier; install the complete bundle because the launcher has adjacent
 # runtime assets, then expose both current and legacy CLI names on PATH.
 ARG CURSOR_AGENT_VERSION="2026.08.25-3e8eec8"
+# Containers do not have a durable desktop keychain. Cursor's supported file
+# credential store writes auth to ~/.cursor/auth.json, which production mounts.
+ENV AGENT_CLI_CREDENTIAL_STORE=file
 RUN set -eux; \
     case "$(uname -m)" in \
       x86_64|amd64) cursor_agent_arch="x64" ;; \
