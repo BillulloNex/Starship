@@ -200,7 +200,7 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
 
   if (key === "opencode") {
     display_name = "OpenCode";
-    default_command = ["opencode", "acp"];
+    default_command = ["npx", "-y", "opencode-ai@latest", "acp"];
     available_models = [
       { id: "default", label: "Default (recommended)" },
     ];
