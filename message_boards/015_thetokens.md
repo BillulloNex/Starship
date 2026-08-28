@@ -8,17 +8,22 @@ They are three types of model usage.
 2. Subscriptions with ACP support: ChatGPT, Cursor, OpenCode
 3. Subscriptions without ACP support (workaround like CLI): antigravity, claude code
 
-Request 1:
+Request 1: ✅ DONE (v0.39.0–v0.39.3)
 
 Check to make sure all of those above are supported, if not lets work on implementing it. 
 
-Request 2:
+> All three types fully supported. Cursor and OpenCode added as first-class ACP providers
+> with icons, auth probes, credential fields, and i18n strings.
+> DEFERRED: OpenCode & Cursor end-to-end auth testing — auth.json injection and
+> device-code OAuth flow for seamless login (like Codex has) to be built later.
+
+Request 2: NOT STARTED
 
 I want to build out a system where I can see all the limits left (like chatgpt limit in the chatgpt app). These limits can be either automatically detected (like codex acp), invoked (like claude code cli), or manually input (like api credit limit)
 
 So i can go in and go brrrr
 
-Request 3:
+Request 3: NOT STARTED
 
 There should be an auto-mode where a request is sent to the most capable model that is available and still with the limits good to go. 
 
