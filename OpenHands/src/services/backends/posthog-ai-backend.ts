@@ -114,7 +114,25 @@ class PostHogAIBackend implements ObservabilityBackend {
         (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||
         "https://us.i.posthog.com";
 
-      // 1. Direct REST fetch to PostHog's capture API for instant delivery
+      // Prefer the shared PostHog client so batching, consent, and retries stay
+      // on one delivery path. Sending the same event through both the client
+      // and /capture creates duplicate AI generations.
+      const posthog = await initializePostHogClient(true);
+      if (posthog) {
+        posthog.opt_in_capturing();
+        console.debug("[PostHogAI] calling posthog.capture:", eventName);
+        posthog.capture(eventName, properties, { send_instantly: true });
+        if (
+          typeof (posthog as unknown as { flush?: () => void }).flush ===
+          "function"
+        ) {
+          (posthog as unknown as { flush: () => void }).flush();
+        }
+        return;
+      }
+
+      // Fall back to the capture API only when the JS client could not be
+      // initialized. This keeps telemetry working without double-sending.
       if (apiKey) {
         fetch(`${apiHost.replace(/\/$/, "")}/capture/`, {
           method: "POST",
@@ -129,20 +147,6 @@ class PostHogAIBackend implements ObservabilityBackend {
         }).catch((err) => {
           console.warn("[PostHogAI] direct capture fetch failed:", err);
         });
-      }
-
-      // 2. Also pass to PostHog JS client instance
-      const posthog = await initializePostHogClient(true);
-      if (posthog) {
-        posthog.opt_in_capturing();
-        console.debug("[PostHogAI] calling posthog.capture:", eventName);
-        posthog.capture(eventName, properties, { send_instantly: true });
-        if (
-          typeof (posthog as unknown as { flush?: () => void }).flush ===
-          "function"
-        ) {
-          (posthog as unknown as { flush: () => void }).flush();
-        }
       }
     } catch (e) {
       console.warn("Failed to capture PostHog AI event", e);
