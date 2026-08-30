@@ -610,7 +610,7 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       expect(fanoutGeneration).toHaveBeenCalledWith(
         expect.objectContaining({
           conversationId: "conv-cursor",
-          generationId: "cursor-response-1",
+          generationId: "cursor-stats-1",
           modelName: "grok-4.6[effort=high,fast=true]",
           executionProvider: "cursor",
           usageAvailable: false,
@@ -627,16 +627,17 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       await renderCursorProvider();
 
       deliver(createUserMessageEvent("cursor-user-2"));
-      deliver(makeStatsEvent("cursor-stats-2", "cursor-response-2"));
+      const statsEvent = makeStatsEvent("cursor-stats-2", "cursor-response-2");
+      deliver(statsEvent);
       expect(fanoutGeneration).not.toHaveBeenCalled();
 
       deliver(makeAgentReply());
-      deliver(makeStatsEvent("cursor-stats-2-replay", "cursor-response-2"));
+      deliver(statsEvent);
 
       expect(fanoutGeneration).toHaveBeenCalledTimes(1);
       expect(fanoutGeneration).toHaveBeenCalledWith(
         expect.objectContaining({
-          generationId: "cursor-response-2",
+          generationId: "cursor-stats-2",
           input: "User message",
           output: "Hi!",
         }),

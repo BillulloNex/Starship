@@ -750,7 +750,9 @@ export function ConversationWebSocketProvider({
                     const genData = {
                       conversationId,
                       generationId:
-                        lastLatency?.response_id ||
+                        (isCompletedCursorTurnWithoutUsage
+                          ? event.id
+                          : lastLatency?.response_id) ||
                         tokenUsage.response_id ||
                         undefined,
                       modelName,
