@@ -16,6 +16,24 @@ Check to make sure all of those above are supported, if not lets work on impleme
 > with icons, auth probes, credential fields, and i18n strings.
 > DEFERRED: OpenCode & Cursor end-to-end auth testing — auth.json injection and
 > device-code OAuth flow for seamless login (like Codex has) to be built later.
+>
+> ### Cursor ACP model-selection follow-up (verified Aug 30, 2026)
+>
+> Cursor Pro authentication and end-to-end chat are working. Cursor's native
+> `agent acp` session advertises account-specific models with parameterized IDs,
+> so the friendly short name is not always a valid selection value:
+>
+> - Saving `grok-4.6` left the live ACP session on `default[]` (Cursor Auto).
+> - Saving the exact advertised value
+>   `grok-4.6[effort=high,fast=true]` successfully selected Grok 4.6.
+> - Cursor's usage dashboard then recorded `cursor-grok-4.6-high-fast` with
+>   16.6K included tokens, separately from the preceding `auto` requests.
+>
+> Product implication: the Grokbot model picker should read Cursor's live ACP
+> `available_models`, display the friendly model name, and persist the exact
+> parameterized `model_id`. Do not derive or hard-code a short alias. Treat the
+> ACP session's `current_model_id` plus Cursor usage records as the proof of the
+> model actually used.
 
 Request 2: ✅ DONE (v0.40.0–v0.42.0)
 
