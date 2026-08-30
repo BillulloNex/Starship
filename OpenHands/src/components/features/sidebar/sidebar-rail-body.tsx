@@ -4,6 +4,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   Globe,
   Plus,
   Server,
@@ -194,6 +195,13 @@ export function SidebarRailBody({
           testId="sidebar-apps-link"
           collapsed={collapsed}
           icon={<Globe width={ICON_SIZE} height={ICON_SIZE} />}
+        />
+        <SidebarNavLink
+          to="/jobs"
+          label="Job Board"
+          testId="sidebar-jobs-link"
+          collapsed={collapsed}
+          icon={<Columns3 width={ICON_SIZE} height={ICON_SIZE} />}
         />
       </nav>
 

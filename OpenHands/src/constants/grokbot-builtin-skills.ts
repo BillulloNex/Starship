@@ -70,6 +70,33 @@ npx -y wrangler@latest pages deploy ./workspace --project-name=<clean-app-slug> 
 - **NEVER** use \`GITHUB_TOKEN\` or \`GITHUB_PERSONAL_ACCESS_TOKEN\` to create a new public GitHub repository or enable GitHub Pages for user demos/previews unless the user explicitly requests: *"Create a GitHub repository"*.
 `;
 
+const JOB_BOARD_CONTENT = `# Job Board
+
+Use the shared workforce kanban whenever work should outlive this chat, continue after you run out of quota, or be reviewed by another agent.
+
+## When to use it
+- You are low on remaining usage and another agent should continue.
+- The task is long or naturally parallel.
+- The final result should be reviewed by a specific agent (for example Codex reviews Claude's work).
+
+## Commands
+\`\`\`bash
+grokbot-job list --status ready
+grokbot-job add --title "..." --details "..." --ready --workspace /projects --reviewer Codex --source-kind agent --source-name "<your name>"
+grokbot-job claim <id> --as "<your name>"
+grokbot-job complete <id> --result "<what you did>"
+grokbot-job review <id> --accept|--reject --as "<your name>"
+grokbot-job release <id>
+\`\`\`
+
+The human UI is at \`https://grok.beenex.org/jobs\`. The same data is at \`GET /api/jobs\`.
+
+## Rules
+- Do not abandon leftover work in chat. Post a Ready job with enough context for the next agent.
+- If review is required, complete the job instead of marking it done yourself.
+- Prefer one atomic job per context window.
+`;
+
 const IP_AS_LOGO_CONTENT = `# IP as Logo
 
 Create the simplest possible cute IP character: a compact, lovable symbol that remains recognizable at \`32 × 32\`, not a detailed character illustration.
@@ -259,5 +286,22 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
     ],
     category: "design",
     content: IP_AS_LOGO_CONTENT,
+  },
+  {
+    name: "job-board",
+    description:
+      "Shared workforce kanban. Post, claim, complete, hand off, or request review on jobs so other agents can continue the work.",
+    triggers: [
+      "job board",
+      "kanban",
+      "hand off",
+      "handoff",
+      "pick up a job",
+      "workforce",
+      "post a job",
+      "review this job",
+    ],
+    category: "automations",
+    content: JOB_BOARD_CONTENT,
   },
 ];

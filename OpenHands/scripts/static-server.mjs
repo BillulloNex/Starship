@@ -68,11 +68,17 @@ import {
   checkPortListening,
   DEFAULT_REGISTRY_PATH,
 } from "./app-registry.mjs";
+import {
+  handleJobBoardRequest,
+  startJobBoardDispatcher,
+} from "./job-board.mjs";
 
 /** Where the frontend reads the live-preview state from. */
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
 /** Where apps are registered and listed. */
 const PREVIEW_APPS_PATH = "/api/preview/apps";
+/** Persistent workforce kanban. */
+const JOBS_API_PREFIX = "/api/jobs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPA fallback helpers
@@ -960,6 +966,24 @@ export function startStaticServer(config) {
       return;
     }
 
+    if (parsedUrl.pathname === JOBS_API_PREFIX || parsedUrl.pathname.startsWith(`${JOBS_API_PREFIX}/`)) {
+      const agentServerUrl =
+        config.routes["/api"] ||
+        process.env.GROKBOT_AGENT_SERVER_URL ||
+        "http://127.0.0.1:18000";
+      handleJobBoardRequest(req, res, {
+        sessionApiKey: config.sessionApiKey,
+        agentServerUrl,
+      }).catch((err) => {
+        console.error("Job board error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
     if (parsedUrl.pathname === PREVIEW_APPS_PATH) {
       handlePreviewAppsRequest(
         req,
@@ -1135,6 +1159,22 @@ export function startStaticServer(config) {
         console.log(`  Backend setup locked to Cloud: ${config.lockToCloud}`);
       }
       console.log("  * (default) -> static files + SPA fallback");
+      const agentServerUrl =
+        config.routes["/api"] ||
+        process.env.GROKBOT_AGENT_SERVER_URL ||
+        "";
+      const dispatchApiKey =
+        process.env.GROKBOT_AGENT_SERVER_API_KEY ||
+        process.env.LOCAL_BACKEND_API_KEY ||
+        config.sessionApiKey;
+      if (agentServerUrl && dispatchApiKey) {
+        const stopDispatcher = startJobBoardDispatcher({
+          agentServerUrl,
+          apiKey: dispatchApiKey,
+        });
+        server.on("close", stopDispatcher);
+        console.log("  Job board dispatcher: armed (auto-run when enabled)");
+      }
       console.log("");
       resolveListen(server);
     });

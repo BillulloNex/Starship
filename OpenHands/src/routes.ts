@@ -21,6 +21,7 @@ export default [
     route("mcp", "routes/mcp-redirect.tsx"),
     route("observability", "routes/observability.tsx"),
     route("apps", "routes/apps.tsx"),
+    route("jobs", "routes/jobs.tsx"),
     route("settings", "routes/settings.tsx", [
       index("routes/settings-index.tsx"),
       route("agents", "routes/agent-profiles-settings.tsx"),

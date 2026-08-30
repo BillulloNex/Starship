@@ -421,6 +421,10 @@ if [ -f /opt/agent-canvas/grokbot-app.mjs ]; then
   node /opt/agent-canvas/grokbot-app.mjs auto-start || true
 fi
 
+# Job board CLI + dispatcher use the same in-container agent-server credentials.
+export GROKBOT_AGENT_SERVER_URL="${GROKBOT_AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
+export GROKBOT_AGENT_SERVER_API_KEY="${GROKBOT_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
+
 # EFFECTIVE_SESSION_KEY is set above from LOCAL_BACKEND_API_KEY or the persisted api-key.txt
 node /opt/agent-canvas/static-server.mjs \
   --port "$PORT" \

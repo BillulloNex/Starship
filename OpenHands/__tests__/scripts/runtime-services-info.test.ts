@@ -183,6 +183,7 @@ describe("runtime-services-info.mjs", () => {
       expect(info.services.automation.url_from_agent).toBe(
         "http://127.0.0.1:8000",
       );
+      expect(info.services.job_board.cli).toBe("grokbot-job");
     });
   });
 });

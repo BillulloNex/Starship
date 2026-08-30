@@ -173,6 +173,25 @@ export function buildRuntimeServicesInfo(options) {
     };
   }
 
+  services.job_board = {
+    description:
+      "Shared workforce kanban. Humans, agents, and automations post jobs; " +
+      "idle agents claim them, execute, and update status. Use this when a " +
+      "task is long, parallel, or you are low on quota so another agent can continue.",
+    ui_url: "https://grok.beenex.org/jobs",
+    api_from_agent: "http://127.0.0.1:8000/api/jobs",
+    cli: "grokbot-job",
+    commands: {
+      list_ready: "grokbot-job list --status ready",
+      add: 'grokbot-job add --title "..." --details "..." --ready --source-kind agent --source-name "<your name>"',
+      claim: "grokbot-job claim <id> --as <your name>",
+      complete: 'grokbot-job complete <id> --result "<what you did>"',
+      review: "grokbot-job review <id> --accept|--reject --as <your name>",
+      handoff:
+        "If quota is low or the job should continue in parallel, add a follow-up job instead of abandoning the work.",
+    },
+  };
+
   // ── Browser routing guide (browser-v2) ──────────────────────────────────
   // Dedicated persistent Steel.dev Browser instance where both Agent and Human
   // share the same live headed Google Chrome instance at surf.beenex.org.

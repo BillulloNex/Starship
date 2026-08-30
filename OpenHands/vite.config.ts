@@ -274,6 +274,34 @@ export default defineConfig(({ mode }) => {
         },
       },
       {
+        name: "serve-job-board",
+        apply: "serve",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const parsedUrl = new URL(req.url ?? "", "http://localhost");
+            if (
+              parsedUrl.pathname === "/api/jobs" ||
+              parsedUrl.pathname.startsWith("/api/jobs/")
+            ) {
+              const { handleJobBoardRequest } = await import(
+                "./scripts/job-board.mjs"
+              );
+              handleJobBoardRequest(req, res).catch((err) => {
+                console.error("Job board error:", err);
+                if (!res.headersSent) {
+                  res.writeHead(500, {
+                    "Content-Type": "application/json; charset=utf-8",
+                  });
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+              return;
+            }
+            next();
+          });
+        },
+      },
+      {
         name: "serve-cursor-observability",
         apply: "serve",
         configureServer(server) {

@@ -12,3 +12,14 @@ The features can include like:
 - the job board UI should show clearly what's been done, assigned by whom (source of the job), the workspace attached (if any), dates & times, details, completed by whom, review by whom (if applicable), so on and so forth
 
 You get the gist
+
+# Status: SHIPPED (v0.46.0)
+
+Kanban at `/jobs` with persistent JSON store (`/projects/.grokbot/jobs.json`).
+
+- Humans post from the UI. Agents post/claim/complete/review via `grokbot-job` or `GET/POST /api/jobs`.
+- Columns: Backlog, Ready, In Progress, Review, Done, Blocked.
+- Cards show source, assignee, workspace, timestamps, reviewer, completed-by.
+- Start launches a conversation with the job prompt. Optional Auto-run picks Ready jobs when enabled.
+- Reviewer field sends completed work to Review instead of Done.
+- Agent skill `job-board` + `<RUNTIME_SERVICES>` advertise the CLI so agents can hand off when quota is low.
