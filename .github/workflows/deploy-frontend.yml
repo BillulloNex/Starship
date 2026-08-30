@@ -1,0 +1,81 @@
+name: Deploy Frontend to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'OpenHands/src/**'
+      - 'OpenHands/public/**'
+      - 'OpenHands/index.html'
+      - 'OpenHands/package.json'
+      - 'OpenHands/package-lock.json'
+      - 'OpenHands/vite.config.ts'
+      - 'OpenHands/tsconfig*.json'
+      - 'OpenHands/tailwind.config.*'
+      - 'OpenHands/postcss.config.*'
+      - 'scripts/deploy-frontend.sh'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  deploy-frontend:
+    name: Build & Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: OpenHands/package-lock.json
+
+      - name: Install Dependencies
+        run: npm --prefix OpenHands ci
+
+      - name: Lint
+        run: npm --prefix OpenHands run lint
+
+      - name: Build Frontend
+        env:
+          # Client-side observability & telemetry (public keys, safe to embed)
+          VITE_POSTHOG_AI_ENABLED: 'true'
+          VITE_TELEMETRY_AUTO_CONSENT: 'true'
+          VITE_POSTHOG_API_KEY: 'phc_uAcMi6kFo9gVGsUTtTxSRHQuspXojDphT9ZkcsbhSQt9'
+          VITE_POSTHOG_HOST: 'https://us.i.posthog.com'
+          VITE_LANGFUSE_PUBLIC_KEY: 'pk-lf-544aeabf-e6ae-402e-b1f2-c876b355c34f'
+          VITE_LANGFUSE_BASE_URL: 'https://hipaa.cloud.langfuse.com'
+          VITE_DD_APPLICATION_ID: '0d5c0440-1b43-481b-acf8-0fbbd4f9a44b'
+          VITE_DD_CLIENT_TOKEN: 'pub9a571a74b58240aa46b3e5dc569e3db4'
+          VITE_DD_SITE: 'us5.datadoghq.com'
+          VITE_LANGWATCH_API_KEY: 'sk-lw-Wvsoy6ulq3QYtMFH_O5X2dD2Z1XVtMNDsHNBQw5DvYqxMmgSUmuQXhw7w9gMYnf9t'
+          VITE_LANGWATCH_BASE_URL: 'https://app.langwatch.ai'
+          VITE_OPIK_API_KEY: 'BQr4JlCiiNlMR8x3raGyTDUtn'
+          VITE_RAINDROP_WRITE_KEY: '35699173-1136-4b61-b748-02e3722ccebe'
+          VITE_BROWSER_VM_URL: 'https://surf.beenex.org/v1/sessions/debug?interactive=true&showControls=true&theme=dark'
+        run: npm --prefix OpenHands run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy OpenHands/build --project-name=grokbot --commit-dirty=true
+
+      - name: Verify Deployment
+        run: |
+          echo "⏳ Waiting 10s for edge propagation..."
+          sleep 10
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://grok.beenex.org/ 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Frontend is live at https://grok.beenex.org (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Frontend returned HTTP $HTTP_CODE — may still be propagating"
+          fi
