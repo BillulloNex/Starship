@@ -732,7 +732,7 @@ export function ConversationWebSocketProvider({
                     !!tokenUsage &&
                     (tokenUsage.prompt_tokens > 0 ||
                       tokenUsage.completion_tokens > 0);
-                  const lastLatency = metrics.response_latencies.at(-1);
+                  const lastLatency = metrics.response_latencies?.at(-1);
                   // Cursor's ACP server currently omits both `usage_update`
                   // and prompt-response usage. The agent server still emits a
                   // completed stats record with model + response latency, so

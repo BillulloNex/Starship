@@ -643,6 +643,23 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       );
     });
 
+    it("skips incomplete stats entries without stopping later Cursor updates", async () => {
+      await renderCursorProvider();
+
+      const incompleteStats = makeStatsEvent(
+        "cursor-stats-incomplete",
+        "cursor-response-incomplete",
+      );
+      delete (
+        incompleteStats.value.usage_to_metrics.default as {
+          response_latencies?: unknown;
+        }
+      ).response_latencies;
+
+      expect(() => deliver(incompleteStats)).not.toThrow();
+      expect(fanoutGeneration).not.toHaveBeenCalled();
+    });
+
     it("still ignores zero-token stats from non-Cursor conversations", async () => {
       render(
         <QueryClientProvider client={queryClient}>
