@@ -226,6 +226,25 @@ export function ConversationWebSocketProvider({
     [],
   );
 
+  const trackAssistantOutput = useCallback(
+    (assistantText: string | undefined) => {
+      if (!assistantText) return;
+      lastAssistantOutputRef.current = assistantText;
+      // If stats arrived before the final output, dispatch the completed
+      // generation now. Cursor ACP returns its final text as FinishAction;
+      // direct LLM providers normally use an assistant MessageEvent.
+      for (const stats of Object.values(lastStatsMapRef.current)) {
+        emitGenerationOnce({
+          ...stats,
+          input: lastUserPromptRef.current,
+          output: assistantText,
+        });
+      }
+      lastStatsMapRef.current = {};
+    },
+    [emitGenerationOnce],
+  );
+
   const isPlanFilePath = (path: string | null): boolean =>
     path?.toUpperCase().endsWith("PLAN.MD") ?? false;
 
@@ -419,10 +438,10 @@ export function ConversationWebSocketProvider({
           consumeMatchingPendingMessage(conversationId, userText);
         }
         if (isMessageEvent(event) && event.llm_message.role === "assistant") {
-          const assistantText = extractMessageEventText(event);
-          if (assistantText) {
-            lastAssistantOutputRef.current = assistantText;
-          }
+          trackAssistantOutput(extractMessageEventText(event));
+        }
+        if (isActionEvent(event) && event.action.kind === "FinishAction") {
+          trackAssistantOutput(event.action.message);
         }
       }
     }
@@ -431,6 +450,7 @@ export function ConversationWebSocketProvider({
     addEvents,
     conversationId,
     consumeMatchingPendingMessage,
+    trackAssistantOutput,
   ]);
 
   /**
@@ -684,18 +704,13 @@ export function ConversationWebSocketProvider({
 
           // Track assistant messages for observability (PostHog AI output)
           if (isMessageEvent(event) && event.llm_message.role === "assistant") {
-            const assistantText = extractMessageEventText(event);
-            lastAssistantOutputRef.current = assistantText;
-            // If stats were already recorded for this conversation, dispatch the
-            // complete generation with both prompt and completion text.
-            for (const stats of Object.values(lastStatsMapRef.current)) {
-              emitGenerationOnce({
-                ...stats,
-                input: lastUserPromptRef.current,
-                output: assistantText,
-              });
-            }
-            lastStatsMapRef.current = {};
+            trackAssistantOutput(extractMessageEventText(event));
+          }
+
+          // ACP agents, including Cursor, publish their final response as a
+          // FinishAction rather than an assistant MessageEvent.
+          if (isActionEvent(event) && event.action.kind === "FinishAction") {
+            trackAssistantOutput(event.action.message);
           }
 
           // Handle cache invalidation for ActionEvent
@@ -891,8 +906,8 @@ export function ConversationWebSocketProvider({
       appendInput,
       appendOutput,
       updateMetricsFromStats,
-      emitGenerationOnce,
       isCursorAcpConversation,
+      trackAssistantOutput,
       handleNonErrorEvent,
     ],
   );

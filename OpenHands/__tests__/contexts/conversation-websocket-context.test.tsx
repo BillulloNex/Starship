@@ -75,6 +75,18 @@ const makeAgentReply = (): MessageEvent => ({
   extended_content: [],
 });
 
+const makeCursorFinishAction = () => ({
+  id: "evt-cursor-finish",
+  timestamp: new Date(Date.now() + 1000).toISOString(),
+  source: "agent",
+  thought: [],
+  thinking_blocks: [],
+  action: { kind: "FinishAction", message: "Cursor done!" },
+  tool_name: "finish",
+  tool_call_id: "cursor-finish-call",
+  kind: "ActionEvent",
+});
+
 const makeStatsEvent = (
   id: string,
   responseId: string,
@@ -658,7 +670,7 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       ).response_latencies;
 
       deliver(createUserMessageEvent("cursor-user-incomplete"));
-      deliver(makeAgentReply());
+      deliver(makeCursorFinishAction());
       expect(() => deliver(incompleteStats)).not.toThrow();
       expect(fanoutGeneration).toHaveBeenCalledTimes(1);
       expect(fanoutGeneration).toHaveBeenCalledWith(
@@ -668,6 +680,7 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
           usageAvailable: false,
           costAvailable: false,
           responseLatencies: undefined,
+          output: "Cursor done!",
         }),
       );
     });
