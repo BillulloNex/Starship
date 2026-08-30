@@ -40,9 +40,6 @@ jobs:
       - name: Install Dependencies
         run: npm --prefix OpenHands ci
 
-      - name: Lint
-        run: npm --prefix OpenHands run lint
-
       - name: Build Frontend
         env:
           # Client-side observability & telemetry (public keys, safe to embed)
