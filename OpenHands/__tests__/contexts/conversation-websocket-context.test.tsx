@@ -59,6 +59,7 @@ vi.mock("#/hooks/query/use-user-conversation", () => ({
 }));
 vi.mock("#/services/observability-fanout", () => ({
   fanoutGeneration: vi.fn(),
+  fanoutToolCall: vi.fn(),
 }));
 
 const AGENT_REPLY_ID = "evt-agent-reply";
@@ -133,6 +134,7 @@ const cursorConversation = {
   agent_kind: "acp",
   acp_server: "cursor",
   tags: { acpserver: "cursor" },
+  llm_model: "grok-4.6[effort=high,fast=true]",
 } as unknown as AppConversation;
 
 const eventIds = () => useEventStore.getState().events.map((event) => event.id);
@@ -622,15 +624,32 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       expect(fanoutGeneration).toHaveBeenCalledWith(
         expect.objectContaining({
           conversationId: "conv-cursor",
-          generationId: "cursor-stats-1",
-          modelName: "grok-4.6[effort=high,fast=true]",
+          generationId: AGENT_REPLY_ID,
           executionProvider: "cursor",
           usageAvailable: false,
           costAvailable: false,
-          promptTokens: 0,
-          completionTokens: 0,
           input: "User message",
           output: "Hi!",
+        }),
+      );
+    });
+
+    it("records a Cursor turn from FinishAction when no stats event arrives", async () => {
+      await renderCursorProvider();
+
+      deliver(createUserMessageEvent("cursor-user-no-stats"));
+      deliver(makeCursorFinishAction());
+
+      expect(fanoutGeneration).toHaveBeenCalledTimes(1);
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv-cursor",
+          generationId: "evt-cursor-finish",
+          executionProvider: "cursor",
+          usageAvailable: false,
+          costAvailable: false,
+          input: "User message",
+          output: "Cursor done!",
         }),
       );
     });
@@ -675,11 +694,36 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       expect(fanoutGeneration).toHaveBeenCalledTimes(1);
       expect(fanoutGeneration).toHaveBeenCalledWith(
         expect.objectContaining({
-          generationId: "cursor-stats-incomplete",
+          generationId: "evt-cursor-finish",
           executionProvider: "cursor",
           usageAvailable: false,
           costAvailable: false,
-          responseLatencies: undefined,
+          output: "Cursor done!",
+        }),
+      );
+    });
+
+    it("backfills Cursor generations from REST history without live stats", async () => {
+      vi.mocked(EventService.searchEvents).mockResolvedValue({
+        // searchEvents is TIMESTAMP_DESC; the hook reverses to chronological.
+        items: [
+          makeCursorFinishAction(),
+          createUserMessageEvent("hist-cursor-user"),
+        ],
+        next_page_id: null,
+      });
+
+      await renderCursorProvider();
+
+      await waitFor(() => expect(fanoutGeneration).toHaveBeenCalledTimes(1));
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv-cursor",
+          generationId: "evt-cursor-finish",
+          modelName: "grok-4.6[effort=high,fast=true]",
+          executionProvider: "cursor",
+          usageAvailable: false,
+          input: "User message",
           output: "Cursor done!",
         }),
       );
