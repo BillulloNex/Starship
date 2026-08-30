@@ -135,7 +135,7 @@ check "Job board API lists jobs" "$JOBS_OK"
 
 # ── 2. Datadog Status ──
 echo "📋 Step 2: Datadog status..."
-DD_STATUS=$(curl -sf --max-time 10 "$BASE_URL/api/observability/datadog/status" 2>/dev/null) || DD_STATUS="{}"
+DD_STATUS=$(curl -sf --max-time 10 "$API_URL/api/observability/datadog/status" 2>/dev/null) || DD_STATUS="{}"
 DD_VALID=$(echo "$DD_STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('isValidKey') else 'false')" 2>/dev/null) || DD_VALID="false"
 DD_HAS_APP=$(echo "$DD_STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('hasAppKey') else 'false')" 2>/dev/null) || DD_HAS_APP="false"
 check "Datadog API key valid" "$DD_VALID"
@@ -143,7 +143,7 @@ check "Datadog App key present" "$DD_HAS_APP"
 
 # ── 3. PostHog Status ──
 echo "📋 Step 3: PostHog status..."
-PH_STATUS=$(curl -sf --max-time 10 "$BASE_URL/api/observability/posthog/status" 2>/dev/null) || PH_STATUS="{}"
+PH_STATUS=$(curl -sf --max-time 10 "$API_URL/api/observability/posthog/status" 2>/dev/null) || PH_STATUS="{}"
 PH_VALID=$(echo "$PH_STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('isValidKey') else 'false')" 2>/dev/null) || PH_VALID="false"
 check "PostHog API key valid" "$PH_VALID"
 
