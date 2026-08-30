@@ -644,7 +644,7 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       );
     });
 
-    it("skips incomplete stats entries without stopping later Cursor updates", async () => {
+    it("records Cursor stats when the live event omits response latencies", async () => {
       await renderCursorProvider();
 
       const incompleteStats = makeStatsEvent(
@@ -657,8 +657,19 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
         }
       ).response_latencies;
 
+      deliver(createUserMessageEvent("cursor-user-incomplete"));
+      deliver(makeAgentReply());
       expect(() => deliver(incompleteStats)).not.toThrow();
-      expect(fanoutGeneration).not.toHaveBeenCalled();
+      expect(fanoutGeneration).toHaveBeenCalledTimes(1);
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationId: "cursor-stats-incomplete",
+          executionProvider: "cursor",
+          usageAvailable: false,
+          costAvailable: false,
+          responseLatencies: undefined,
+        }),
+      );
     });
 
     it("still ignores zero-token stats from non-Cursor conversations", async () => {

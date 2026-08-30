@@ -734,15 +734,16 @@ export function ConversationWebSocketProvider({
                       tokenUsage.completion_tokens > 0);
                   const lastLatency = metrics.response_latencies?.at(-1);
                   // Cursor's ACP server currently omits both `usage_update`
-                  // and prompt-response usage. The agent server still emits a
-                  // completed stats record with model + response latency, so
-                  // accept that exact shape without also admitting unrelated
-                  // zero-token entries such as an unfired condenser.
+                  // and prompt-response usage. Its live WebSocket stats event
+                  // also omits `response_latencies` even though the persisted
+                  // conversation snapshot later includes them. Accept the
+                  // Cursor-specific zero-token placeholder here; emission is
+                  // still deferred until assistant output exists and deduped
+                  // by this stats event's ID.
                   const isCompletedCursorTurnWithoutUsage =
                     isCursorAcpConversation &&
                     !!tokenUsage &&
-                    !hasReportedUsage &&
-                    !!lastLatency?.response_id;
+                    !hasReportedUsage;
 
                   if (hasReportedUsage || isCompletedCursorTurnWithoutUsage) {
                     const modelName =
