@@ -791,6 +791,37 @@ describe("AgentServerConversationService", () => {
       expect(conversation?.acp_server).toBe("claude-code");
     });
 
+    it("recovers Cursor identity from the materialized agent_state shape", async () => {
+      mockHttpGet.mockResolvedValue({
+        data: [
+          {
+            id: "conv-cursor-agent-state",
+            created_at: "2024-01-01",
+            updated_at: "2024-01-01",
+            agent_state: {
+              agent: {
+                kind: "ACPAgent",
+                acp_server: "custom",
+                acp_command: ["agent", "acp"],
+                acp_model: "grok-4.6[effort=high,fast=true]",
+                llm: { model: "acp-managed" },
+              },
+            },
+            tags: {},
+          },
+        ],
+      });
+
+      const [conversation] =
+        await AgentServerConversationService.batchGetAppConversations([
+          "conv-cursor-agent-state",
+        ]);
+
+      expect(conversation?.agent_kind).toBe("acp");
+      expect(conversation?.acp_server).toBe("cursor");
+      expect(conversation?.llm_model).toBe("grok-4.6[effort=high,fast=true]");
+    });
+
     it("falls back to acp_model when SDK runtime fields are absent on the wire", async () => {
       // Older agent-servers don't populate ``current_model_*``. The
       // adapter must still surface a model on the chip — falling through

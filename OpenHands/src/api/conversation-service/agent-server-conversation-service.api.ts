@@ -243,6 +243,12 @@ function requireDirectConversationInfo(item: unknown): DirectConversationInfo {
     throw invalidConversationResponse();
   }
 
+  // Current agent-server responses nest the materialized agent under
+  // `agent_state.agent`, while older responses expose it directly as `agent`.
+  // Preserve both shapes so ACP provider identity survives profile launches.
+  const agentState = isRecord(item.agent_state) ? item.agent_state : null;
+  const wireAgent = item.agent ?? agentState?.agent;
+
   return {
     id: item.id.trim(),
     title: stringOrNull(item.title),
@@ -251,7 +257,7 @@ function requireDirectConversationInfo(item: unknown): DirectConversationInfo {
     execution_status: stringOrNull(item.execution_status),
     sandbox_status: stringOrNull(item.sandbox_status),
     metrics: normalizeMetrics(item.metrics),
-    agent: normalizeAgent(item.agent),
+    agent: normalizeAgent(wireAgent),
     workspace: normalizeWorkspace(item.workspace),
     tags: normalizeTags(item.tags),
     launched_agent_profile: normalizeLaunchedAgentProfile(
