@@ -8,10 +8,12 @@ import { useActiveBackend } from "#/contexts/active-backend-context";
 import { useCanManageOrgProfiles } from "#/hooks/use-can-manage-org-profiles";
 import { useActiveAcpProfileDetail } from "#/hooks/query/use-active-acp-profile-detail";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
+import { useCursorModels } from "#/hooks/query/use-cursor-models";
 import {
   getAcpPreferredDefaultModel,
   getAcpProvider,
   labelForAcpModel,
+  resolveAcpProviderKey,
   resolveEffectiveAcpModel,
   type ACPModelOption,
 } from "#/constants/acp-providers";
@@ -51,12 +53,24 @@ export function useChatInputModelState(): ChatInputModelState {
     typeof settings?.agent_settings?.acp_server === "string"
       ? settings.agent_settings.acp_server
       : null;
-  const acpServerKey = isActiveAcpConversation
+  const rawAcpServerKey = isActiveAcpConversation
     ? conversation?.acp_server
     : isHomeAcp
       ? (activeAcpProfile?.acp_server ?? settingsAcpServerKey)
       : null;
+  const acpServerKey = resolveAcpProviderKey(
+    rawAcpServerKey,
+    isHomeAcp ? activeAcpProfile?.acp_command : null,
+  );
   const acpProvider = isAcpContext ? getAcpProvider(acpServerKey) : undefined;
+  const isCursor = acpServerKey === "cursor";
+  const { data: cursorCatalog } = useCursorModels(isAcpContext && isCursor);
+  const availableAcpModels: ACPModelOption[] = isCursor
+    ? (cursorCatalog?.models ?? [])
+    : (acpProvider?.available_models ?? []);
+  const runtimeProviderDefault =
+    availableAcpModels.find((model) => model.isDefault)?.id ??
+    getAcpPreferredDefaultModel(acpServerKey);
 
   const settingsAcpModel =
     typeof settings?.agent_settings?.acp_model === "string"
@@ -79,14 +93,14 @@ export function useChatInputModelState(): ChatInputModelState {
       conversation?.llm_model ??
       resolveEffectiveAcpModel({
         configured: acpConfiguredModel,
-        providerDefault: getAcpPreferredDefaultModel(acpServerKey),
+        providerDefault: runtimeProviderDefault,
       });
   } else if (isHomeAcp) {
     currentModelId = resolveEffectiveAcpModel({
       configured: acpConfiguredModel,
       // Preferred default (Vertex-safe for Gemini) — must match what the
       // start request would substitute for an unconfigured model.
-      providerDefault: getAcpPreferredDefaultModel(acpServerKey),
+      providerDefault: runtimeProviderDefault,
     });
   } else {
     currentModelId = conversation?.llm_model ?? settings?.llm_model ?? null;
@@ -94,9 +108,11 @@ export function useChatInputModelState(): ChatInputModelState {
 
   const displayModel =
     currentModelId && isAcpContext
-      ? (labelForAcpModel(acpServerKey, currentModelId) ?? currentModelId)
+      ? (availableAcpModels.find((model) => model.id === currentModelId)
+          ?.label ??
+        labelForAcpModel(acpServerKey, currentModelId) ??
+        currentModelId)
       : currentModelId;
-  const availableAcpModels = acpProvider?.available_models ?? [];
   // A home-page pick persists into the active ACP profile, which on cloud is
   // org-owned — hide the selectable rows from members who'd only get a 403.
   // Conversation-scoped switches (blank or started) stay member-allowed.

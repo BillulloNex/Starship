@@ -39,6 +39,7 @@ import {
   type ACPProviderConfig,
 } from "#/constants/acp-providers";
 import { parseCommand, formatCommand } from "#/utils/acp-command";
+import { useCursorModels } from "#/hooks/query/use-cursor-models";
 
 export const handle = { hideTitle: true };
 
@@ -155,13 +156,10 @@ export function buildAgentProfileFields(
     toolConcurrency,
   } = input;
   if (isAcp) {
-    const isNativeSdkServer = [
-      "claude-code",
-      "codex",
-      "gemini-cli",
-    ].includes(selectedPreset);
-    const isBuiltinDefault =
-      isDefaultProviderCommand && isNativeSdkServer;
+    const isNativeSdkServer = ["claude-code", "codex", "gemini-cli"].includes(
+      selectedPreset,
+    );
+    const isBuiltinDefault = isDefaultProviderCommand && isNativeSdkServer;
     return {
       agent_kind: "acp",
       acp_server: isNativeSdkServer ? selectedPreset : ACP_CUSTOM_PRESET_KEY,
@@ -300,6 +298,29 @@ export function AgentSettingsScreen({
       ? acpPresetForCreds
       : null,
   );
+  const liveSelectedPreset =
+    agentType === "acp" ? detectPreset(commandText, ACP_PROVIDERS) : null;
+  const { data: cursorCatalog } = useCursorModels(
+    liveSelectedPreset === "cursor",
+  );
+  const preferredCursorModel =
+    cursorCatalog?.models.find((model) => model.isDefault)?.id ??
+    cursorCatalog?.models[0]?.id ??
+    "";
+
+  useEffect(() => {
+    if (
+      liveSelectedPreset === "cursor" &&
+      preferredCursorModel &&
+      !acpModel.trim()
+    ) {
+      setAcpModel(preferredCursorModel);
+      setIsCustomAcpModel(false);
+      // Persist an explicit, currently valid Cursor model. The account-level
+      // default can be stale even when the key and catalog are valid.
+      setIsDirty(true);
+    }
+  }, [liveSelectedPreset, preferredCursorModel, acpModel]);
 
   const lastInitializedSettingsRef = useRef<unknown>(null);
   const loadedAcpServerRef = useRef<string | null>(null);
@@ -420,9 +441,14 @@ export function AgentSettingsScreen({
   const isAcpInvalid = isAcp && commandTokens.length === 0;
   const selectedPreset = detectPreset(commandText, ACP_PROVIDERS);
   const selectedProvider = getAcpProvider(selectedPreset);
-  const modelSuggestions = selectedProvider?.available_models ?? [];
+  const modelSuggestions =
+    selectedPreset === "cursor"
+      ? (cursorCatalog?.models ?? [])
+      : (selectedProvider?.available_models ?? []);
   const hasModelSuggestions = modelSuggestions.length > 0;
-  const selectedModelIsSuggestion = isKnownAcpModel(selectedProvider, acpModel);
+  const selectedModelIsSuggestion = modelSuggestions.some(
+    ({ id }) => id === acpModel.trim(),
+  );
   const selectedModelKey =
     isCustomAcpModel || !selectedModelIsSuggestion
       ? ACP_CUSTOM_MODEL_KEY
@@ -678,7 +704,11 @@ export function AgentSettingsScreen({
               const provider = getAcpProvider(preset);
               if (provider) {
                 setCommandText(formatCommand(provider.default_command));
-                setAcpModel(getAcpPreferredDefaultModel(preset) ?? "");
+                setAcpModel(
+                  preset === "cursor"
+                    ? preferredCursorModel
+                    : (getAcpPreferredDefaultModel(preset) ?? ""),
+                );
                 setIsCustomAcpModel(false);
               } else if (preset === ACP_CUSTOM_PRESET_KEY) {
                 // Clear command + model: the previous provider's default
@@ -719,7 +749,11 @@ export function AgentSettingsScreen({
                 const prevPreset = detectPreset(commandText, ACP_PROVIDERS);
                 const nextPreset = detectPreset(nextCommandText, ACP_PROVIDERS);
                 if (nextPreset !== prevPreset) {
-                  setAcpModel(getAcpPreferredDefaultModel(nextPreset) ?? "");
+                  setAcpModel(
+                    nextPreset === "cursor"
+                      ? preferredCursorModel
+                      : (getAcpPreferredDefaultModel(nextPreset) ?? ""),
+                  );
                   setIsCustomAcpModel(false);
                 }
                 setCommandText(nextCommandText);

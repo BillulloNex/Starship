@@ -33,6 +33,21 @@ export interface UnifiedProviderLimit {
     isFreeTier?: boolean;
   };
 
+  /** Token usage reported by providers that do not expose a remaining quota. */
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheReadTokens: number;
+    totalTokens: number;
+    agentCount?: number;
+    runCount?: number;
+    scope: string;
+  };
+
+  /** Provider-specific context that is informational rather than an error. */
+  note?: string;
+
   /** Epoch seconds when this snapshot was captured. */
   lastUpdated: number;
   /** Human-readable error when `status === "error"`. */

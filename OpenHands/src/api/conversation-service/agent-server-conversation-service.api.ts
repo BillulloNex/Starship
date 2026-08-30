@@ -154,6 +154,13 @@ function normalizeAgent(value: unknown): DirectConversationInfo["agent"] {
     kind: stringOrNull(value.kind),
     acp_server: stringOrNull(value.acp_server),
     acp_model: stringOrNull(value.acp_model),
+    acp_command:
+      typeof value.acp_command === "string"
+        ? value.acp_command
+        : Array.isArray(value.acp_command) &&
+            value.acp_command.every((token) => typeof token === "string")
+          ? value.acp_command
+          : null,
     llm,
   };
 }

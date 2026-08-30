@@ -64,6 +64,9 @@ export function useSaveAcpSecrets(
       }
       await queryClient.invalidateQueries({ queryKey: ["secrets-search"] });
       await queryClient.invalidateQueries({ queryKey: ["secrets"] });
+      if (toSave.some(({ field }) => field.name === "CURSOR_API_KEY")) {
+        await queryClient.invalidateQueries({ queryKey: ["cursor-api"] });
+      }
 
       const savedOrphanedFileCredential =
         !consumesFileCredentials && toSave.some(({ field }) => field.multiline);

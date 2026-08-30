@@ -8,6 +8,7 @@ import { AgentKind, Settings, SettingsValue } from "#/types/settings";
 import {
   getAcpPreferredDefaultModel,
   getAcpProvider,
+  resolveAcpProviderKey,
   resolveEffectiveAcpModel,
 } from "#/constants/acp-providers";
 import { getAgentServerClientOptions } from "./agent-server-client-options";
@@ -81,6 +82,8 @@ export interface DirectConversationInfo {
      * client-side and the server may not repopulate it. Read by {@link toAppConversation}.
      */
     acp_server?: string | null;
+    /** Explicit launch command for custom ACP servers (used for UI identity). */
+    acp_command?: string | string[] | null;
     llm?: {
       model?: string | null;
     } | null;
@@ -383,7 +386,10 @@ export function toAppConversation(
   // launch doesn't stamp the tag, so tag-only reads would drop the ACP model
   // picker and degrade the chip to a generic "ACP" (#1571).
   const acpServer = isAcp
-    ? (info.tags?.[ACP_SERVER_TAG_KEY] ?? info.agent?.acp_server ?? null)
+    ? resolveAcpProviderKey(
+        info.tags?.[ACP_SERVER_TAG_KEY] ?? info.agent?.acp_server ?? null,
+        info.agent?.acp_command,
+      )
     : null;
   return {
     id: info.id,
@@ -847,7 +853,15 @@ function isAcpAgent(settings: Settings): boolean {
 
 function getAcpServerTag(settings: Settings): string | undefined {
   const agentSettings = toRecord(settings.agent_settings);
-  const value = agentSettings.acp_server;
+  const command = agentSettings.acp_command;
+  const value = resolveAcpProviderKey(
+    typeof agentSettings.acp_server === "string"
+      ? agentSettings.acp_server
+      : null,
+    typeof command === "string" || Array.isArray(command)
+      ? (command as string | string[])
+      : null,
+  );
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 

@@ -58,6 +58,7 @@ interface FuelGaugeRowProps {
 
 export function FuelGaugeRow({ provider }: FuelGaugeRowProps) {
   const hasBalance = provider.balance && provider.balance.remaining !== null;
+  const hasUsage = Boolean(provider.usage);
   const primaryLimit = provider.limits[0];
 
   // For balance-based providers, compute percentage from balance
@@ -103,6 +104,10 @@ export function FuelGaugeRow({ provider }: FuelGaugeRowProps) {
             <span className={cn("text-xs font-semibold", tone?.text)}>
               {displayPercent}% left
             </span>
+          ) : hasUsage ? (
+            <span className="text-xs font-semibold text-[var(--oh-foreground)]">
+              {provider.usage!.totalTokens.toLocaleString()} tokens
+            </span>
           ) : null}
           <StatusBadge status={provider.status} />
         </div>
@@ -131,13 +136,32 @@ export function FuelGaugeRow({ provider }: FuelGaugeRowProps) {
         </div>
       )}
 
-      {/* Warning for unverified/error providers */}
-      {provider.error && (provider.status === "unknown" || provider.status === "error") && (
-        <div className="flex items-start gap-1 rounded bg-amber-500/10 border border-amber-500/20 p-1.5 text-[10px] text-amber-400 leading-tight mt-0.5">
-          <span className="shrink-0">⚠</span>
-          <span>{provider.error}</span>
+      {provider.usage && (
+        <div className="text-[10px] text-[var(--oh-muted)]">
+          {provider.usage.agentCount?.toLocaleString() ?? 0} Cloud agents
+          {" · "}
+          {provider.usage.runCount?.toLocaleString() ?? 0} runs
+          {" · "}
+          {provider.usage.inputTokens.toLocaleString()} input
+          {" · "}
+          {provider.usage.outputTokens.toLocaleString()} output
         </div>
       )}
+
+      {provider.note && (
+        <div className="text-[10px] leading-tight text-[var(--oh-muted)]">
+          {provider.note}
+        </div>
+      )}
+
+      {/* Warning for unverified/error providers */}
+      {provider.error &&
+        (provider.status === "unknown" || provider.status === "error") && (
+          <div className="flex items-start gap-1 rounded bg-amber-500/10 border border-amber-500/20 p-1.5 text-[10px] text-amber-400 leading-tight mt-0.5">
+            <span className="shrink-0">⚠</span>
+            <span>{provider.error}</span>
+          </div>
+        )}
     </div>
   );
 }

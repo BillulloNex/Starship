@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import React from "react";
 import { Bot, RefreshCw, AlertTriangle, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -98,14 +99,15 @@ export function CodexQuotaCard() {
   const { data: conversation } = useActiveConversation();
   const { data: quota, isLoading, isFetching, refetch } = useCodexUsage();
 
-  const isClaudeConversation =
-    (conversation?.agent_kind === "acp" &&
-      (conversation?.acp_server === "claude-code" ||
-        conversation?.tags?.acpserver === "claude-code")) ||
-    (typeof conversation?.llm_model === "string" &&
-      conversation.llm_model.toLowerCase().includes("claude"));
+  const acpProvider =
+    conversation?.acp_server ?? conversation?.tags?.acpserver ?? null;
+  const isOtherAcpConversation =
+    conversation?.agent_kind === "acp" && acpProvider !== "codex";
+  const isClaudeModel =
+    typeof conversation?.llm_model === "string" &&
+    conversation.llm_model.toLowerCase().includes("claude");
 
-  if (!quota || isClaudeConversation) {
+  if (!quota || isOtherAcpConversation || isClaudeModel) {
     return null;
   }
 

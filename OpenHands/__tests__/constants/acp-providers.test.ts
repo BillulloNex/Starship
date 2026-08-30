@@ -10,6 +10,7 @@ import {
   getAcpProvider,
   getAcpProviderDisplayName,
   getAcpProviderSecrets,
+  resolveAcpProviderKey,
 } from "#/constants/acp-providers";
 
 describe("getAcpProviderDisplayName", () => {
@@ -39,6 +40,19 @@ describe("getAcpProviderDisplayName", () => {
     expect(getAcpProviderDisplayName(null)).toBeNull();
     expect(getAcpProviderDisplayName(undefined)).toBeNull();
     expect(getAcpProviderDisplayName("")).toBeNull();
+  });
+});
+
+describe("resolveAcpProviderKey", () => {
+  it("recovers Cursor identity from its exact custom ACP command", () => {
+    expect(resolveAcpProviderKey("custom", ["agent", "acp"])).toBe("cursor");
+    expect(resolveAcpProviderKey("custom", "agent acp")).toBe("cursor");
+  });
+
+  it("does not brand an edited custom command as Cursor", () => {
+    expect(resolveAcpProviderKey("custom", "agent acp --future-flag")).toBe(
+      "custom",
+    );
   });
 });
 

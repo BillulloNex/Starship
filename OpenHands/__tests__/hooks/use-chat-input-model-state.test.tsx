@@ -8,6 +8,7 @@ const useSettingsMock = vi.fn();
 const useActiveBackendMock = vi.fn();
 const useAcpModelContextMock = vi.fn();
 const useOptionalConversationIdMock = vi.fn();
+const useCursorModelsMock = vi.fn();
 
 vi.mock("#/hooks/query/use-active-conversation", () => ({
   useActiveConversation: () => useActiveConversationMock(),
@@ -33,6 +34,10 @@ vi.mock("#/hooks/use-acp-model-context", () => ({
 
 vi.mock("#/hooks/use-conversation-id", () => ({
   useOptionalConversationId: () => useOptionalConversationIdMock(),
+}));
+
+vi.mock("#/hooks/query/use-cursor-models", () => ({
+  useCursorModels: (...args: unknown[]) => useCursorModelsMock(...args),
 }));
 
 // The detail query and the org-permission check need a QueryClient this
@@ -79,6 +84,8 @@ describe("useChatInputModelState", () => {
     useAcpModelContextMock.mockReturnValue(acpContext());
     useOptionalConversationIdMock.mockReset();
     useOptionalConversationIdMock.mockReturnValue({ conversationId: null });
+    useCursorModelsMock.mockReset();
+    useCursorModelsMock.mockReturnValue({ data: null });
     useActiveAcpProfileDetailMock.mockReset();
     useActiveAcpProfileDetailMock.mockReturnValue(null);
     useCanManageOrgProfilesMock.mockReset();
@@ -294,5 +301,72 @@ describe("useChatInputModelState", () => {
     expect(result.current.showAcpPicker).toBe(false);
     // Unknown model id has no registry label → falls back to the raw id.
     expect(result.current.displayModel).toBe("custom-model");
+  });
+
+  it("Cursor: uses the live model catalog and exact parameterized ACP model id", () => {
+    const model = {
+      id: "grok-4.6[effort=high,fast=true]",
+      baseId: "grok-4.6",
+      label: "Grok 4.6 · High · Fast",
+      params: [
+        { id: "effort", value: "high" },
+        { id: "fast", value: "true" },
+      ],
+    };
+    useCursorModelsMock.mockReturnValue({
+      data: { provider: "cursor", models: [model], modelCount: 1 },
+    });
+    useActiveConversationMock.mockReturnValue({
+      data: {
+        conversation_id: "cursor-1",
+        agent_kind: "acp",
+        acp_server: "cursor",
+        llm_model: model.id,
+      },
+    });
+    useOptionalConversationIdMock.mockReturnValue({
+      conversationId: "cursor-1",
+    });
+    useAcpModelContextMock.mockReturnValue(
+      acpContext({ isActiveAcpConversation: true, isAcpContext: true }),
+    );
+
+    const { result } = renderHook(() => useChatInputModelState());
+
+    expect(useCursorModelsMock).toHaveBeenCalledWith(true);
+    expect(result.current.availableAcpModels).toEqual([model]);
+    expect(result.current.currentModelId).toBe(model.id);
+    expect(result.current.displayModel).toBe(model.label);
+    expect(result.current.showAcpPicker).toBe(true);
+  });
+
+  it("Cursor profile: recognizes the exact agent acp command behind a custom backend server", () => {
+    const autoModel = {
+      id: "default[]",
+      baseId: "default",
+      label: "Auto",
+      params: [],
+      isDefault: true,
+    };
+    useCursorModelsMock.mockReturnValue({
+      data: { provider: "cursor", models: [autoModel], modelCount: 1 },
+    });
+    useActiveAcpProfileDetailMock.mockReturnValue({
+      id: "cursor-profile",
+      name: "Cursor",
+      agent_kind: "acp",
+      acp_server: "custom",
+      acp_command: "agent acp",
+      acp_model: autoModel.id,
+    });
+    useAcpModelContextMock.mockReturnValue(
+      acpContext({ isHomeAcp: true, isAcpContext: true }),
+    );
+
+    const { result } = renderHook(() => useChatInputModelState());
+
+    expect(useCursorModelsMock).toHaveBeenCalledWith(true);
+    expect(result.current.currentModelId).toBe(autoModel.id);
+    expect(result.current.displayModel).toBe("Auto");
   });
 });

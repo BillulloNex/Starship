@@ -273,6 +273,35 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      {
+        name: "serve-cursor-observability",
+        apply: "serve",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const parsedUrl = new URL(req.url ?? "", "http://localhost");
+            if (parsedUrl.pathname.startsWith("/api/observability/cursor")) {
+              const { handleCursorApiProxy } =
+                await import("./scripts/cursor-api-proxy.mjs");
+              const query = Object.fromEntries(
+                parsedUrl.searchParams.entries(),
+              );
+              handleCursorApiProxy(req, res, parsedUrl.pathname, query).catch(
+                (err) => {
+                  console.error("Cursor API proxy error:", err);
+                  if (!res.headersSent) {
+                    res.writeHead(500, {
+                      "Content-Type": "application/json; charset=utf-8",
+                    });
+                    res.end(JSON.stringify({ error: err.message }));
+                  }
+                },
+              );
+              return;
+            }
+            next();
+          });
+        },
+      },
       !process.env.VITEST && !isLibraryBuild && reactRouter(),
       svgr(),
       tailwindcss(),

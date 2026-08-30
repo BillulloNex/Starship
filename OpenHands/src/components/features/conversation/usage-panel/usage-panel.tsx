@@ -13,6 +13,7 @@ import { ContextMeter } from "./context-meter";
 import { ProviderBalanceCard } from "./provider-balance-card";
 import { CodexQuotaCard } from "./codex-quota-card";
 import { ClaudeUsageCard } from "./claude-usage-card";
+import { CursorUsageCard } from "./cursor-usage-card";
 import { ObservabilityLangfuseCard } from "./observability-langfuse-card";
 import { McpPerformanceSection } from "./mcp-performance-section";
 import { getContextWindowUsagePercentage } from "#/utils/format-token-count";
@@ -52,6 +53,8 @@ export function UsagePanel() {
       className="h-full overflow-y-auto custom-scrollbar-always flex flex-col gap-3 p-3"
     >
       <ObservabilityLangfuseCard />
+
+      <CursorUsageCard currentUsage={usage} />
 
       <CodexQuotaCard />
 

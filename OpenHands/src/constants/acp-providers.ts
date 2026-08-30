@@ -121,6 +121,8 @@ export interface ACPModelOption {
   id: string;
   /** Human-readable label shown in Settings -> Agent. */
   label: string;
+  /** Provider-recommended default when the list is discovered at runtime. */
+  isDefault?: boolean;
 }
 
 // Canvas-only UI metadata per built-in provider, keyed by the ACP registry
@@ -192,11 +194,10 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   if (key === "cursor") {
     display_name = "Cursor";
     default_command = ["agent", "acp"];
-    // Cursor's ACP server owns model discovery through its session config
-    // options. `default` is not a documented Cursor model id, and sending it
-    // through set_config_option can reject an otherwise valid session. Leave
-    // the model unset so Cursor uses the account/CLI selection, then surface
-    // the concrete runtime model reported by the ACP session.
+    // Cursor's account-specific catalog is discovered at runtime through the
+    // authenticated /v1/models proxy. Keep the static registry empty so stale
+    // model ids are never shipped in the bundle; the picker persists the live
+    // default variant's exact parameterized ACP id.
     available_models = [];
     default_model = undefined;
   }
@@ -522,6 +523,28 @@ export function getAcpProvider(
 ): ACPProviderConfig | undefined {
   if (!key) return undefined;
   return ACP_PROVIDERS.find((provider) => provider.key === key);
+}
+
+/**
+ * Recover a UI provider identity for ACP servers that must be materialized as
+ * `custom` because the pinned SDK enum does not include them. The backend
+ * identity remains `custom`; this helper only recognizes an exact built-in
+ * launch command so model discovery, branding, and usage UI survive a profile
+ * launch. An edited/custom command deliberately stays custom.
+ */
+export function resolveAcpProviderKey(
+  serverKey: string | null | undefined,
+  command?: string | string[] | null,
+): string | null {
+  if (getAcpProvider(serverKey)) return serverKey ?? null;
+  const normalizedCommand = Array.isArray(command)
+    ? command.join(" ").trim()
+    : command?.trim();
+  if (!normalizedCommand) return serverKey ?? null;
+  const match = ACP_PROVIDERS.find(
+    (provider) => provider.default_command.join(" ") === normalizedCommand,
+  );
+  return match?.key ?? serverKey ?? null;
 }
 
 /**

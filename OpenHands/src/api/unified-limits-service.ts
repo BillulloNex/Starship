@@ -1,5 +1,6 @@
 import { ClaudeUsageService } from "./claude-usage-service";
 import { CodexUsageService } from "./codex-usage-service";
+import { CursorApiService } from "./cursor-api-service";
 import { VercelGatewayService } from "./vercel-gateway-service";
 import LLMBalanceService from "./llm-balance-service";
 import type {
@@ -80,12 +81,10 @@ export class UnifiedLimitsService {
     // --- Resolve Vercel key from settings store ---
     let vercelKey: string | null = null;
     try {
-      const { SettingsClient } = await import(
-        "@openhands/typescript-client/clients"
-      );
-      const { getAgentServerClientOptions } = await import(
-        "./agent-server-client-options"
-      );
+      const { SettingsClient } =
+        await import("@openhands/typescript-client/clients");
+      const { getAgentServerClientOptions } =
+        await import("./agent-server-client-options");
       const client = new SettingsClient(getAgentServerClientOptions());
       const raw = await client.getSecret("VERCEL_AI_GATEWAY_KEY");
       if (raw) vercelKey = typeof raw === "string" ? raw : String(raw);
@@ -97,15 +96,29 @@ export class UnifiedLimitsService {
     try {
       const claude = await ClaudeUsageService.getUsage(false);
       if (claude) {
+        const extendedClaude = claude as typeof claude & {
+          unverified?: boolean;
+          warning?: string;
+          spend?: {
+            enabled?: boolean;
+            usedMinor?: number;
+            limitMinor?: number;
+            exponent?: number;
+            percent?: number;
+            severity?: string;
+          };
+        };
         // CRITICAL: Detect fake/unverified responses.
         // The proxy sets `unverified: true` when it has a token but
         // can't actually verify quota (Anthropic has no public API).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const isUnverified = (claude as any).unverified === true;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const warning = (claude as any).warning as string | undefined;
+        const isUnverified = extendedClaude.unverified === true;
+        const warning = extendedClaude.warning;
+        const spend = extendedClaude.spend;
 
-        if (isUnverified || (!claude.primaryWindow && !claude.secondaryWindow)) {
+        if (
+          isUnverified ||
+          (!claude.primaryWindow && !claude.secondaryWindow)
+        ) {
           // Show as UNKNOWN — never fake a green status
           results.push({
             providerId: "claude-code",
@@ -116,19 +129,18 @@ export class UnifiedLimitsService {
             status: "unknown",
             limits: [],
             lastUpdated: claude.updatedAt,
-            error: warning ?? "Quota cannot be verified — check claude.ai/settings",
+            error:
+              warning ?? "Quota cannot be verified — check claude.ai/settings",
           });
         } else {
-          const primaryRemaining =
-            claude.primaryWindow?.remainingPercent ?? 0;
+          const primaryRemaining = claude.primaryWindow?.remainingPercent ?? 0;
           results.push({
             providerId: "claude-code",
-            displayName:
-              claude.planType?.toLowerCase().includes("team")
-                ? "Claude Team"
-                : claude.planType?.toLowerCase().includes("max")
-                  ? "Claude Max"
-                  : "Claude Pro",
+            displayName: claude.planType?.toLowerCase().includes("team")
+              ? "Claude Team"
+              : claude.planType?.toLowerCase().includes("max")
+                ? "Claude Max"
+                : "Claude Pro",
             icon: "claude-code",
             category: "subscription-acp",
             source: "auto",
@@ -156,19 +168,14 @@ export class UnifiedLimitsService {
                     },
                   ]
                 : []),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ...((claude as any).spend?.enabled
+              ...(spend?.enabled
                 ? [
                     {
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      label: `Credits ($${(((claude as any).spend.usedMinor ?? 0) / Math.pow(10, (claude as any).spend.exponent ?? 2)).toFixed(2)} / $${(((claude as any).spend.limitMinor ?? 0) / Math.pow(10, (claude as any).spend.exponent ?? 2)).toFixed(2)})`,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      usedPercent: (claude as any).spend.percent ?? 0,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      remainingPercent: 100 - ((claude as any).spend.percent ?? 0),
+                      label: `Credits ($${((spend.usedMinor ?? 0) / Math.pow(10, spend.exponent ?? 2)).toFixed(2)} / $${((spend.limitMinor ?? 0) / Math.pow(10, spend.exponent ?? 2)).toFixed(2)})`,
+                      usedPercent: spend.percent ?? 0,
+                      remainingPercent: 100 - (spend.percent ?? 0),
                       resetAt: null,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      limitReached: ((claude as any).spend.severity === "critical"),
+                      limitReached: spend.severity === "critical",
                     },
                   ]
                 : []),
@@ -185,8 +192,7 @@ export class UnifiedLimitsService {
     try {
       const codex = await CodexUsageService.getUsage(false);
       if (codex) {
-        const primaryRemaining =
-          codex.primaryWindow?.remainingPercent ?? 100;
+        const primaryRemaining = codex.primaryWindow?.remainingPercent ?? 100;
         results.push({
           providerId: "codex",
           displayName:
@@ -232,15 +238,39 @@ export class UnifiedLimitsService {
       // Codex unavailable
     }
 
+    // --- Cursor (user API key; Cloud Agent token totals only) ---
+    try {
+      const cursor = await CursorApiService.getUsage(false);
+      if (cursor) {
+        results.push({
+          providerId: "cursor",
+          displayName: "Cursor",
+          icon: "cursor",
+          category: "subscription-acp",
+          source: "auto",
+          status: "unknown",
+          limits: [],
+          usage: {
+            ...cursor.totalUsage,
+            agentCount: cursor.agentCount,
+            runCount: cursor.runCount,
+            scope: cursor.scope,
+          },
+          lastUpdated: cursor.updatedAt,
+          note: "Cloud Agent token usage. Cursor user API keys do not expose remaining plan quota or reset time.",
+        });
+      }
+    } catch {
+      // Cursor unavailable or unconfigured
+    }
+
     // --- OpenRouter (API provider) ---
     try {
       const balance = await LLMBalanceService.getBalance();
       if (balance) {
         results.push({
           providerId: "openrouter",
-          displayName: balance.isFreeTier
-            ? "OpenRouter (Free)"
-            : "OpenRouter",
+          displayName: balance.isFreeTier ? "OpenRouter (Free)" : "OpenRouter",
           icon: "openrouter",
           category: "api",
           source: "auto",
@@ -261,9 +291,7 @@ export class UnifiedLimitsService {
 
     // --- Vercel AI Gateway (API gateway) ---
     try {
-      const vercel = await VercelGatewayService.getCredits(
-        vercelKey,
-      );
+      const vercel = await VercelGatewayService.getCredits(vercelKey);
       if (vercel) {
         results.push({
           providerId: "vercel-gateway",
