@@ -22,6 +22,7 @@ set -euo pipefail
 
 # ── Defaults ──
 BASE_URL=""
+API_URL=""
 API_KEY=""
 LLM_KEY=""
 MODEL="openrouter/openai/gpt-5.6-luna"
@@ -33,6 +34,7 @@ CLEANUP=true
 while [[ $# -gt 0 ]]; do
   case $1 in
     --url)       BASE_URL="$2"; shift 2 ;;
+    --api-url)   API_URL="$2"; shift 2 ;;
     --api-key)   API_KEY="$2"; shift 2 ;;
     --llm-key)   LLM_KEY="$2"; shift 2 ;;
     --model)     MODEL="$2"; shift 2 ;;
@@ -49,6 +51,16 @@ fi
 
 # Strip trailing slash
 BASE_URL="${BASE_URL%/}"
+# Cloudflare Pages serves the SPA. API / WebSockets live on grok-api.
+# Hitting grok.beenex.org/api/* returns HTML and every backend check fails.
+if [[ -z "$API_URL" ]]; then
+  if [[ "$BASE_URL" == "https://grok.beenex.org" || "$BASE_URL" == "https://grokbot.pages.dev" ]]; then
+    API_URL="https://grok-api.beenex.org"
+  else
+    API_URL="$BASE_URL"
+  fi
+fi
+API_URL="${API_URL%/}"
 
 # ── Helpers ──
 PASS=0
@@ -75,7 +87,7 @@ api() {
     -H "X-Session-API-Key: $API_KEY" \
     -H "Content-Type: application/json" \
     "$@" \
-    "$BASE_URL$path"
+    "$API_URL$path"
 }
 
 cleanup_conversation() {
@@ -89,14 +101,15 @@ trap cleanup_conversation EXIT
 echo "═══════════════════════════════════════════════════"
 echo "  GrokBot Smoke Test"
 echo "  Target: $BASE_URL"
+echo "  API:    $API_URL"
 echo "  Model:  $MODEL"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
 # ── 1. Health Check ──
 echo "📋 Step 1: Health check..."
-HEALTH=$(curl -sf --max-time 10 "$BASE_URL/health" 2>/dev/null) || HEALTH=""
-check "Health endpoint" "$([[ -n "$HEALTH" ]] && echo true || echo false)" "$HEALTH"
+HEALTH=$(curl -sf --max-time 10 "$API_URL/health" 2>/dev/null) || HEALTH=""
+check "Backend health endpoint" "$([[ "$HEALTH" == *'"status":"ok"'* || "$HEALTH" == *'"ok"'* ]] && echo true || echo false)" "$HEALTH"
 
 # ── 1a. Frontend HTML Check ──
 echo "📋 Step 1a: Frontend HTML check..."
@@ -113,6 +126,12 @@ if [[ -n "$ASSET_PATH" ]]; then
 else
   check "Static asset loads" "false" "No /assets/ script found in HTML"
 fi
+
+# ── 1c. Job board ──
+echo "📋 Step 1c: Job board API..."
+JOBS_RESP=$(curl -sf --max-time 10 "$API_URL/api/jobs" 2>/dev/null) || JOBS_RESP=""
+JOBS_OK=$(echo "$JOBS_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if isinstance(d.get('jobs'), list) else 'false')" 2>/dev/null) || JOBS_OK="false"
+check "Job board API lists jobs" "$JOBS_OK"
 
 # ── 2. Datadog Status ──
 echo "📋 Step 2: Datadog status..."

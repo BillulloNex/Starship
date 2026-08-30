@@ -54,6 +54,24 @@ vi.mock("#/hooks/mutation/use-create-conversation", () => ({
   useCreateConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("#/hooks/query/use-unified-limits", () => ({
+  useUnifiedLimits: () => ({
+    limits: [
+      {
+        providerId: "claude-code",
+        displayName: "Claude",
+        status: "available",
+      },
+    ],
+    bestAvailable: {
+      providerId: "claude-code",
+      displayName: "Claude",
+      status: "available",
+    },
+    isAnyExhausted: false,
+  }),
+}));
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
   return { ...actual, useNavigate: () => vi.fn() };
@@ -79,5 +97,7 @@ describe("JobsScreen", () => {
     expect(screen.getByText("Continue the factory")).toBeInTheDocument();
     expect(screen.getByText(/Thomas/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run next ready" })).toBeInTheDocument();
+    expect(screen.getByTestId("job-board-fuel")).toHaveTextContent("Claude");
   });
 });

@@ -26,6 +26,7 @@ import {
   useUpdateJobBoardSettings,
 } from "#/hooks/query/use-jobs";
 import { useCreateConversation } from "#/hooks/mutation/use-create-conversation";
+import { useUnifiedLimits } from "#/hooks/query/use-unified-limits";
 import {
   displayErrorToast,
   displaySuccessToast,
@@ -247,6 +248,7 @@ export default function JobsScreen() {
   const deleteJob = useDeleteJob();
   const updateSettings = useUpdateJobBoardSettings();
   const createConversation = useCreateConversation();
+  const { limits, bestAvailable, isAnyExhausted } = useUnifiedLimits();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -362,6 +364,17 @@ export default function JobsScreen() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {grouped.ready.length > 0 ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => handleStart(grouped.ready[grouped.ready.length - 1])}
+                className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-200 hover:bg-amber-500/20 disabled:opacity-40"
+              >
+                <Play className="size-3" />
+                Run next ready
+              </button>
+            ) : null}
             <label className="inline-flex items-center gap-2 rounded-md border border-[var(--oh-border)] px-2.5 py-1.5 text-xs text-[var(--oh-text-secondary)]">
               <input
                 type="checkbox"
@@ -390,6 +403,39 @@ export default function JobsScreen() {
             </button>
           </div>
         </div>
+
+        {limits.length > 0 ? (
+          <div
+            data-testid="job-board-fuel"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--oh-border)] bg-black/20 px-3 py-2 text-xs"
+          >
+            <span className="text-[var(--oh-muted)]">Quota</span>
+            {limits.slice(0, 6).map((limit) => (
+              <span
+                key={limit.providerId}
+                className={
+                  limit.status === "available"
+                    ? "text-emerald-300"
+                    : limit.status === "exhausted"
+                      ? "text-red-300"
+                      : "text-amber-300"
+                }
+              >
+                {limit.displayName}: {limit.status}
+              </span>
+            ))}
+            {bestAvailable ? (
+              <span className="text-[var(--oh-muted)]">
+                Best available: {bestAvailable.displayName}
+              </span>
+            ) : null}
+            {isAnyExhausted ? (
+              <span className="text-red-300">
+                Someone is exhausted — post a handoff job instead of pushing.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-[var(--oh-muted)]">

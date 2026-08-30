@@ -84,7 +84,7 @@ jobs:
         run: |
           echo "Waiting for Coolify to finish deploying..."
           for i in $(seq 1 30); do
-            HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://grok.beenex.org/health 2>/dev/null || echo "000")
+            HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://grok-api.beenex.org/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ App is live (HTTP $HTTP_CODE)"
               break
@@ -96,12 +96,14 @@ jobs:
       - name: Run smoke test
         env:
           GROKBOT_URL: https://grok.beenex.org
+          GROKBOT_API_URL: https://grok-api.beenex.org
           SESSION_API_KEY: ${{ secrets.GROKBOT_SESSION_API_KEY }}
           LLM_API_KEY: ${{ secrets.GROKBOT_LLM_API_KEY }}
         run: |
           chmod +x scripts/smoke-test.sh
           ./scripts/smoke-test.sh \
             --url "$GROKBOT_URL" \
+            --api-url "$GROKBOT_API_URL" \
             --api-key "$SESSION_API_KEY" \
             --llm-key "$LLM_API_KEY" \
             --model "groq/qwen/qwen3.6-27b" \
