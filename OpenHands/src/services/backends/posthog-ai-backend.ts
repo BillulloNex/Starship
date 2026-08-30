@@ -30,12 +30,20 @@ export function buildPostHogGenerationProperties(
   }
 
   const modelProvider = getProviderFromModel(data.modelName);
+  const spanName = data.executionProvider
+    ? `${data.executionProvider}_generation`
+    : "llm_generation";
   const properties: Record<string, unknown> = {
     $ai_generation_id: data.generationId,
+    $ai_span_id: data.generationId,
+    $ai_span_name: spanName,
     $ai_model: data.modelName,
     $ai_provider: data.executionProvider || modelProvider,
     $ai_latency: latencySeconds,
     $ai_trace_id: data.conversationId,
+    $ai_session_id: data.conversationId,
+    $ai_is_error: false,
+    $insert_id: data.generationId,
     grokbot_execution_provider: data.executionProvider || modelProvider,
     grokbot_model_provider: modelProvider,
     grokbot_usage_available: data.usageAvailable !== false,
@@ -168,13 +176,21 @@ class PostHogAIBackend implements ObservabilityBackend {
   recordToolCall(data: ToolCallData): void {
     if (!this.enabled) return;
 
-    this.capture("$ai_tool_call", {
+    this.capture("$ai_span", {
+      $ai_trace_id: data.conversationId,
+      $ai_session_id: data.conversationId,
+      $ai_span_name: data.toolName,
+      $ai_span_id: `${data.conversationId}:${data.toolName}:${data.status ?? "done"}`,
+      $ai_input_state: data.input,
+      $ai_output_state: data.output,
+      $ai_latency: data.durationMs / 1000,
+      $ai_is_error: data.status === "ERROR",
+      $ai_error: data.errorMessage,
       tool_name: data.toolName,
       server_name: data.serverName,
       duration_ms: data.durationMs,
       status: data.status,
       error_message: data.errorMessage,
-      trace_id: data.conversationId,
     });
   }
 }

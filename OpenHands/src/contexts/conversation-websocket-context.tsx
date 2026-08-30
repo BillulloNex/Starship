@@ -40,6 +40,7 @@ import {
   isSwitchLLMObservationEvent,
   isCanvasUIActionEvent,
   isLaunchChildConversationActionEvent,
+  isACPToolCallEvent,
 } from "#/types/agent-server/type-guards";
 import { handleCanvasUIAction } from "#/services/canvas-ui";
 import { handleLaunchChildConversationAction } from "#/services/child-conversation-launch";
@@ -58,7 +59,10 @@ import EventService from "#/api/event-service/event-service.api";
 import { getAgentServerClientOptions } from "#/api/agent-server-client-options";
 import { useConversationStore } from "#/stores/conversation-store";
 import { trackError } from "#/utils/error-handler";
-import { fanoutGeneration } from "#/services/observability-fanout";
+import {
+  fanoutGeneration,
+  fanoutToolCall,
+} from "#/services/observability-fanout";
 import { useReadConversationFile } from "#/hooks/mutation/use-read-conversation-file";
 import useMetricsStore, { type MetricsState } from "#/stores/metrics-store";
 import { useConversationHistory } from "#/hooks/query/use-conversation-history";
@@ -123,6 +127,24 @@ function extractMessageEventText(
       .join("");
   }
   return "";
+}
+
+function resolveAcpExecutionProvider(
+  conversation?: AppConversation | null,
+): string | undefined {
+  if (conversation?.acp_server) return conversation.acp_server;
+  if (conversation?.tags?.acpserver) return conversation.tags.acpserver;
+  if (conversation?.agent_kind === "acp") return "acp";
+  return undefined;
+}
+
+function isAcpConversation(
+  conversation?: AppConversation | null,
+): boolean {
+  return (
+    conversation?.agent_kind === "acp" ||
+    !!resolveAcpExecutionProvider(conversation)
+  );
 }
 
 export function ConversationWebSocketProvider({
@@ -204,11 +226,12 @@ export function ConversationWebSocketProvider({
   // Stats are cumulative and may be replayed more than once. ACP response ids
   // give us a stable per-turn key so PostHog receives one generation per turn.
   const emittedGenerationIdsRef = useRef<Set<string>>(new Set());
+  // Cursor/ACP turns often never send a stats event. Once we emit for the
+  // current user turn, ignore later placeholder stats so PostHog gets one row.
+  const currentTurnEmittedRef = useRef(false);
 
-  const isCursorAcpConversation =
-    conversation?.agent_kind === "acp" &&
-    (conversation.acp_server === "cursor" ||
-      conversation.tags?.acpserver === "cursor");
+  const acpExecutionProvider = resolveAcpExecutionProvider(conversation);
+  const isAcpConversationActive = isAcpConversation(conversation);
 
   const emitGenerationOnce = useCallback(
     (data: import("#/services/observability-fanout").GenerationData) => {
@@ -219,6 +242,7 @@ export function ConversationWebSocketProvider({
         return;
       }
       fanoutGeneration(data);
+      currentTurnEmittedRef.current = true;
       if (data.generationId) {
         emittedGenerationIdsRef.current.add(data.generationId);
       }
@@ -227,22 +251,57 @@ export function ConversationWebSocketProvider({
   );
 
   const trackAssistantOutput = useCallback(
-    (assistantText: string | undefined) => {
+    (assistantText: string | undefined, generationId?: string) => {
       if (!assistantText) return;
       lastAssistantOutputRef.current = assistantText;
       // If stats arrived before the final output, dispatch the completed
       // generation now. Cursor ACP returns its final text as FinishAction;
       // direct LLM providers normally use an assistant MessageEvent.
-      for (const stats of Object.values(lastStatsMapRef.current)) {
-        emitGenerationOnce({
-          ...stats,
-          input: lastUserPromptRef.current,
-          output: assistantText,
-        });
+      const pendingStats = Object.values(lastStatsMapRef.current);
+      if (pendingStats.length > 0) {
+        for (const stats of pendingStats) {
+          emitGenerationOnce({
+            ...stats,
+            input: lastUserPromptRef.current,
+            output: assistantText,
+          });
+        }
+        lastStatsMapRef.current = {};
+        return;
       }
-      lastStatsMapRef.current = {};
+
+      // ACP providers (Cursor especially) commonly complete a turn without a
+      // live stats event. Still record the generation so PostHog AI obs is
+      // populated from the visible prompt/reply.
+      if (
+        !isAcpConversationActive ||
+        !conversationId ||
+        currentTurnEmittedRef.current
+      ) {
+        return;
+      }
+
+      emitGenerationOnce({
+        conversationId,
+        generationId,
+        modelName: conversation?.llm_model || "unknown",
+        executionProvider: acpExecutionProvider,
+        accumulatedCost: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        usageAvailable: false,
+        costAvailable: false,
+        input: lastUserPromptRef.current,
+        output: assistantText,
+      });
     },
-    [emitGenerationOnce],
+    [
+      acpExecutionProvider,
+      conversation?.llm_model,
+      conversationId,
+      emitGenerationOnce,
+      isAcpConversationActive,
+    ],
   );
 
   const isPlanFilePath = (path: string | null): boolean =>
@@ -404,6 +463,7 @@ export function ConversationWebSocketProvider({
     lastAssistantOutputRef.current = undefined;
     lastStatsMapRef.current = {};
     emittedGenerationIdsRef.current.clear();
+    currentTurnEmittedRef.current = false;
   }, [conversationId, clearEventsForConversation, resetBrowserStore]);
 
   useLayoutEffect(() => {
@@ -438,10 +498,10 @@ export function ConversationWebSocketProvider({
           consumeMatchingPendingMessage(conversationId, userText);
         }
         if (isMessageEvent(event) && event.llm_message.role === "assistant") {
-          trackAssistantOutput(extractMessageEventText(event));
+          trackAssistantOutput(extractMessageEventText(event), event.id);
         }
         if (isActionEvent(event) && event.action.kind === "FinishAction") {
-          trackAssistantOutput(event.action.message);
+          trackAssistantOutput(event.action.message, event.id);
         }
       }
     }
@@ -694,6 +754,7 @@ export function ConversationWebSocketProvider({
             // A new prompt starts a new observability turn. Never let the
             // previous turn's cumulative stats enrich this assistant reply.
             lastStatsMapRef.current = {};
+            currentTurnEmittedRef.current = false;
 
             if (conversationId) {
               consumeMatchingPendingMessage(conversationId, userText);
@@ -704,13 +765,32 @@ export function ConversationWebSocketProvider({
 
           // Track assistant messages for observability (PostHog AI output)
           if (isMessageEvent(event) && event.llm_message.role === "assistant") {
-            trackAssistantOutput(extractMessageEventText(event));
+            trackAssistantOutput(extractMessageEventText(event), event.id);
           }
 
           // ACP agents, including Cursor, publish their final response as a
           // FinishAction rather than an assistant MessageEvent.
           if (isActionEvent(event) && event.action.kind === "FinishAction") {
-            trackAssistantOutput(event.action.message);
+            trackAssistantOutput(event.action.message, event.id);
+          }
+
+          if (
+            isACPToolCallEvent(event) &&
+            conversationId &&
+            (event.status === "completed" || event.status === "failed")
+          ) {
+            fanoutToolCall({
+              conversationId,
+              toolName: event.title || event.tool_kind || "acp_tool",
+              serverName: acpExecutionProvider,
+              input: event.raw_input,
+              output: event.raw_output,
+              durationMs: 0,
+              status:
+                event.is_error || event.status === "failed"
+                  ? "ERROR"
+                  : "SUCCESS",
+            });
           }
 
           // Handle cache invalidation for ActionEvent
@@ -748,38 +828,41 @@ export function ConversationWebSocketProvider({
                     (tokenUsage.prompt_tokens > 0 ||
                       tokenUsage.completion_tokens > 0);
                   const lastLatency = metrics.response_latencies?.at(-1);
-                  // Cursor's ACP server currently omits both `usage_update`
-                  // and prompt-response usage. Its live WebSocket stats event
-                  // also omits `response_latencies` even though the persisted
-                  // conversation snapshot later includes them. Accept the
-                  // Cursor-specific zero-token placeholder here; emission is
-                  // still deferred until assistant output exists and deduped
-                  // by this stats event's ID.
-                  const isCompletedCursorTurnWithoutUsage =
-                    isCursorAcpConversation &&
+                  // ACP servers (Cursor especially) currently omit both
+                  // `usage_update` and prompt-response usage. Their live
+                  // WebSocket stats event also omits `response_latencies`
+                  // even though the persisted conversation snapshot later
+                  // includes them. Accept the zero-token placeholder here;
+                  // skip if this turn already emitted from the assistant
+                  // reply so PostHog does not get a second empty row.
+                  const isCompletedAcpTurnWithoutUsage =
+                    isAcpConversationActive &&
                     !!tokenUsage &&
                     !hasReportedUsage;
 
-                  if (hasReportedUsage || isCompletedCursorTurnWithoutUsage) {
+                  if (
+                    (hasReportedUsage || isCompletedAcpTurnWithoutUsage) &&
+                    !currentTurnEmittedRef.current
+                  ) {
                     const modelName =
                       metrics.model_name || tokenUsage.model || "unknown";
                     const genData = {
                       conversationId,
                       generationId:
-                        (isCompletedCursorTurnWithoutUsage
+                        (isCompletedAcpTurnWithoutUsage
                           ? event.id
                           : lastLatency?.response_id) ||
                         tokenUsage.response_id ||
                         undefined,
                       modelName,
-                      executionProvider: isCompletedCursorTurnWithoutUsage
-                        ? "cursor"
+                      executionProvider: isCompletedAcpTurnWithoutUsage
+                        ? acpExecutionProvider
                         : undefined,
                       accumulatedCost: metrics.accumulated_cost,
                       promptTokens: tokenUsage.prompt_tokens,
                       completionTokens: tokenUsage.completion_tokens,
-                      usageAvailable: !isCompletedCursorTurnWithoutUsage,
-                      costAvailable: !isCompletedCursorTurnWithoutUsage,
+                      usageAvailable: !isCompletedAcpTurnWithoutUsage,
+                      costAvailable: !isCompletedAcpTurnWithoutUsage,
                       cacheReadTokens: tokenUsage.cache_read_tokens,
                       cacheWriteTokens: tokenUsage.cache_write_tokens,
                       reasoningTokens: tokenUsage.reasoning_tokens,
@@ -906,7 +989,8 @@ export function ConversationWebSocketProvider({
       appendInput,
       appendOutput,
       updateMetricsFromStats,
-      isCursorAcpConversation,
+      acpExecutionProvider,
+      isAcpConversationActive,
       trackAssistantOutput,
       handleNonErrorEvent,
     ],

@@ -26,10 +26,14 @@ describe("buildPostHogGenerationProperties", () => {
 
     expect(properties).toMatchObject({
       $ai_generation_id: "cursor-response-1",
+      $ai_span_id: "cursor-response-1",
+      $ai_span_name: "cursor_generation",
       $ai_model: "grok-4.6[effort=high,fast=true]",
       $ai_provider: "cursor",
       $ai_latency: 23.5,
       $ai_trace_id: "conv-cursor",
+      $ai_session_id: "conv-cursor",
+      $insert_id: "cursor-response-1",
       grokbot_execution_provider: "cursor",
       grokbot_model_provider: "xai",
       grokbot_usage_available: false,
