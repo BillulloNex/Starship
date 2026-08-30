@@ -17,6 +17,7 @@ import {
 } from "#/api/conversation-metadata-store";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import type { MessageEvent } from "#/types/agent-server/core";
+import { fanoutGeneration } from "#/services/observability-fanout";
 
 type CapturedWebSocketOptions = {
   onMessage?: (event: { data: string }) => void;
@@ -56,6 +57,9 @@ vi.mock("#/hooks/use-websocket", () => ({
 vi.mock("#/hooks/query/use-user-conversation", () => ({
   useUserConversation: vi.fn(),
 }));
+vi.mock("#/services/observability-fanout", () => ({
+  fanoutGeneration: vi.fn(),
+}));
 
 const AGENT_REPLY_ID = "evt-agent-reply";
 
@@ -70,6 +74,54 @@ const makeAgentReply = (): MessageEvent => ({
   activated_microagents: [],
   extended_content: [],
 });
+
+const makeStatsEvent = (
+  id: string,
+  responseId: string,
+  promptTokens = 0,
+  completionTokens = 0,
+) => ({
+  id,
+  timestamp: new Date().toISOString(),
+  source: "environment",
+  kind: "ConversationStateUpdateEvent",
+  key: "stats",
+  value: {
+    usage_to_metrics: {
+      default: {
+        model_name: "grok-4.6[effort=high,fast=true]",
+        accumulated_cost: 0,
+        max_budget_per_task: null,
+        accumulated_token_usage: {
+          model: "grok-4.6[effort=high,fast=true]",
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          reasoning_tokens: 0,
+          context_window: 0,
+          per_turn_token: 0,
+          response_id: responseId,
+        },
+        costs: [],
+        response_latencies: [
+          {
+            model: "grok-4.6[effort=high,fast=true]",
+            latency: 23.5,
+            response_id: responseId,
+          },
+        ],
+        token_usages: [],
+      },
+    },
+  },
+});
+
+const cursorConversation = {
+  agent_kind: "acp",
+  acp_server: "cursor",
+  tags: { acpserver: "cursor" },
+} as unknown as AppConversation;
 
 const eventIds = () => useEventStore.getState().events.map((event) => event.id);
 
@@ -108,6 +160,7 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
     useMetricsStore.getState().resetMetrics();
     useCommandStore.setState({ commands: [] });
     useErrorMessageStore.getState().removeErrorMessage();
+    vi.mocked(fanoutGeneration).mockReset();
 
     vi.mocked(useUserConversation).mockReturnValue({
       data: { conversation_url: "http://localhost/api", session_api_key: null },
@@ -523,6 +576,93 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
     // ...and the re-seed deduped against the existing user message rather than
     // appending a second copy — exactly two events, no double-insertion.
     expect(eventIds()).toHaveLength(2);
+  });
+
+  describe("Cursor ACP observability", () => {
+    const renderCursorProvider = async () => {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <ConversationWebSocketProvider
+            conversationId="conv-cursor"
+            conversation={cursorConversation}
+            conversationUrl="http://localhost/api"
+          >
+            <div />
+          </ConversationWebSocketProvider>
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(wsCapture.mainOnMessage).not.toBeNull());
+    };
+
+    const deliver = (event: unknown) =>
+      act(() => {
+        wsCapture.mainOnMessage!({ data: JSON.stringify(event) });
+      });
+
+    it("records a completed Cursor turn when ACP omits token usage", async () => {
+      await renderCursorProvider();
+
+      deliver(createUserMessageEvent("cursor-user-1"));
+      deliver(makeAgentReply());
+      deliver(makeStatsEvent("cursor-stats-1", "cursor-response-1"));
+
+      expect(fanoutGeneration).toHaveBeenCalledTimes(1);
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv-cursor",
+          generationId: "cursor-response-1",
+          modelName: "grok-4.6[effort=high,fast=true]",
+          executionProvider: "cursor",
+          usageAvailable: false,
+          costAvailable: false,
+          promptTokens: 0,
+          completionTokens: 0,
+          input: "User message",
+          output: "Hi!",
+        }),
+      );
+    });
+
+    it("waits for assistant output and deduplicates replayed Cursor stats", async () => {
+      await renderCursorProvider();
+
+      deliver(createUserMessageEvent("cursor-user-2"));
+      deliver(makeStatsEvent("cursor-stats-2", "cursor-response-2"));
+      expect(fanoutGeneration).not.toHaveBeenCalled();
+
+      deliver(makeAgentReply());
+      deliver(makeStatsEvent("cursor-stats-2-replay", "cursor-response-2"));
+
+      expect(fanoutGeneration).toHaveBeenCalledTimes(1);
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationId: "cursor-response-2",
+          input: "User message",
+          output: "Hi!",
+        }),
+      );
+    });
+
+    it("still ignores zero-token stats from non-Cursor conversations", async () => {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <ConversationWebSocketProvider
+            conversationId="conv-direct"
+            conversation={{ agent_kind: "openhands" } as AppConversation}
+            conversationUrl="http://localhost/api"
+          >
+            <div />
+          </ConversationWebSocketProvider>
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(wsCapture.mainOnMessage).not.toBeNull());
+
+      deliver(createUserMessageEvent("direct-user-1"));
+      deliver(makeAgentReply());
+      deliver(makeStatsEvent("direct-stats-1", "direct-response-1"));
+
+      expect(fanoutGeneration).not.toHaveBeenCalled();
+    });
   });
 
   it("consumes the optimistic pending bubble when the echoed user message arrives via REST preload", async () => {

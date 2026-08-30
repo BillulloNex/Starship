@@ -172,10 +172,14 @@ export function recordGeneration({
 
 export interface RecordStatsGenerationOptions {
   conversationId: string;
+  generationId?: string;
   modelName: string;
+  executionProvider?: string;
   accumulatedCost: number;
   promptTokens: number;
   completionTokens: number;
+  usageAvailable?: boolean;
+  costAvailable?: boolean;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;
@@ -197,10 +201,14 @@ export interface RecordStatsGenerationOptions {
  */
 export function recordStatsGeneration({
   conversationId,
+  generationId,
   modelName,
+  executionProvider,
   accumulatedCost,
   promptTokens,
   completionTokens,
+  usageAvailable,
+  costAvailable,
   cacheReadTokens,
   cacheWriteTokens,
   reasoningTokens,
@@ -212,7 +220,9 @@ export function recordStatsGeneration({
   if (!client) return;
 
   try {
-    const traceId = `${conversationId}-stats-${Date.now()}`;
+    const traceId = generationId
+      ? `${conversationId}-stats-${generationId}`
+      : `${conversationId}-stats-${Date.now()}`;
     const trace = client.trace({
       id: traceId,
       sessionId: conversationId,
@@ -220,6 +230,9 @@ export function recordStatsGeneration({
       metadata: {
         client: "GrokBot Agent Canvas",
         source: "websocket_stats_event",
+        executionProvider,
+        usageAvailable: usageAvailable !== false,
+        costAvailable: costAvailable !== false,
       },
     });
 
@@ -236,13 +249,19 @@ export function recordStatsGeneration({
     trace.generation({
       name: "LLM Generation",
       model: modelName,
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens: promptTokens + completionTokens,
-      },
+      usage:
+        usageAvailable === false
+          ? undefined
+          : {
+              promptTokens,
+              completionTokens,
+              totalTokens: promptTokens + completionTokens,
+            },
       metadata: {
-        accumulatedCost,
+        accumulatedCost: costAvailable === false ? undefined : accumulatedCost,
+        executionProvider,
+        usageAvailable: usageAvailable !== false,
+        costAvailable: costAvailable !== false,
         cacheReadTokens,
         cacheWriteTokens,
         reasoningTokens,

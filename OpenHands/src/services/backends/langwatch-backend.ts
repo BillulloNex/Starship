@@ -88,15 +88,21 @@ class LangwatchBackend implements ObservabilityBackend {
     this.enqueueSpan(data.conversationId, {
       type: "llm",
       span_id: spanId,
-      vendor: getProviderFromModel(data.modelName),
+      vendor: data.executionProvider || getProviderFromModel(data.modelName),
       model: data.modelName,
       input: { type: "text", value: data.input || "Agent generation" },
       output: { type: "text", value: data.output || "Generation completed" },
       metrics: {
-        prompt_tokens: data.promptTokens,
-        completion_tokens: data.completionTokens,
-        tokens_estimated: false,
-        cost: data.accumulatedCost,
+        ...(data.usageAvailable === false
+          ? {}
+          : {
+              prompt_tokens: data.promptTokens,
+              completion_tokens: data.completionTokens,
+              tokens_estimated: false,
+            }),
+        ...(data.costAvailable === false ? {} : { cost: data.accumulatedCost }),
+        usage_available: data.usageAvailable !== false,
+        cost_available: data.costAvailable !== false,
       },
       timestamps: {
         started_at: startMs,

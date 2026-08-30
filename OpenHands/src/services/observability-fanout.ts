@@ -15,10 +15,22 @@
 
 export interface GenerationData {
   conversationId: string;
+  /** Stable provider response id used to deduplicate repeated stats updates. */
+  generationId?: string;
   modelName: string;
+  /**
+   * Agent/runtime that executed the generation (for example `cursor`). This is
+   * intentionally separate from the underlying model vendor inferred from
+   * `modelName` (for example `xai` for a Cursor-selected Grok model).
+   */
+  executionProvider?: string;
   accumulatedCost: number;
   promptTokens: number;
   completionTokens: number;
+  /** False when the provider completed the turn without reporting usage. */
+  usageAvailable?: boolean;
+  /** False when the provider completed the turn without reporting cost. */
+  costAvailable?: boolean;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   reasoningTokens?: number;

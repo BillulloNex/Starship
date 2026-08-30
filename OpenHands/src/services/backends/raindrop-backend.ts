@@ -71,7 +71,9 @@ export class RaindropBackend implements ObservabilityBackend {
         localStorage.setItem("grokbot-user-id", anon);
         return anon;
       }
-    } catch {}
+    } catch {
+      // Browser storage may be unavailable in privacy-restricted contexts.
+    }
     return "anonymous-user";
   }
 
@@ -96,10 +98,19 @@ export class RaindropBackend implements ObservabilityBackend {
           output: data.output || "Generation completed",
           convoId: data.conversationId,
           properties: {
-            cost: data.accumulatedCost,
-            promptTokens: data.promptTokens,
-            completionTokens: data.completionTokens,
-            totalTokens: data.promptTokens + data.completionTokens,
+            ...(data.costAvailable === false
+              ? {}
+              : { cost: data.accumulatedCost }),
+            ...(data.usageAvailable === false
+              ? {}
+              : {
+                  promptTokens: data.promptTokens,
+                  completionTokens: data.completionTokens,
+                  totalTokens: data.promptTokens + data.completionTokens,
+                }),
+            executionProvider: data.executionProvider,
+            usageAvailable: data.usageAvailable !== false,
+            costAvailable: data.costAvailable !== false,
             cacheReadTokens: data.cacheReadTokens,
             cacheWriteTokens: data.cacheWriteTokens,
             reasoningTokens: data.reasoningTokens,

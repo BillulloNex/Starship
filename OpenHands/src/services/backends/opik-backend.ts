@@ -104,7 +104,12 @@ class OpikBackend implements ObservabilityBackend {
         ? { prompt: data.input, conversationId: data.conversationId }
         : { conversationId: data.conversationId },
       output: data.output ? { response: data.output } : {},
-      metadata: { cost: data.accumulatedCost },
+      metadata: {
+        cost: data.costAvailable === false ? undefined : data.accumulatedCost,
+        execution_provider: data.executionProvider,
+        usage_available: data.usageAvailable !== false,
+        cost_available: data.costAvailable !== false,
+      },
       tags: [],
     });
 
@@ -116,12 +121,18 @@ class OpikBackend implements ObservabilityBackend {
       start_time: now,
       end_time: now,
       model: data.modelName,
-      usage: {
-        prompt_tokens: data.promptTokens,
-        completion_tokens: data.completionTokens,
-        total_tokens: data.promptTokens + data.completionTokens,
-      },
+      usage:
+        data.usageAvailable === false
+          ? undefined
+          : {
+              prompt_tokens: data.promptTokens,
+              completion_tokens: data.completionTokens,
+              total_tokens: data.promptTokens + data.completionTokens,
+            },
       metadata: {
+        execution_provider: data.executionProvider,
+        usage_available: data.usageAvailable !== false,
+        cost_available: data.costAvailable !== false,
         cache_read_tokens: data.cacheReadTokens,
         cache_write_tokens: data.cacheWriteTokens,
         reasoning_tokens: data.reasoningTokens,

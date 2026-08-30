@@ -28,10 +28,14 @@ class LangfuseBackend implements ObservabilityBackend {
   recordGeneration(data: GenerationData): void {
     recordStatsGeneration({
       conversationId: data.conversationId,
+      generationId: data.generationId,
       modelName: data.modelName,
+      executionProvider: data.executionProvider,
       accumulatedCost: data.accumulatedCost,
       promptTokens: data.promptTokens,
       completionTokens: data.completionTokens,
+      usageAvailable: data.usageAvailable,
+      costAvailable: data.costAvailable,
       cacheReadTokens: data.cacheReadTokens,
       cacheWriteTokens: data.cacheWriteTokens,
       reasoningTokens: data.reasoningTokens,

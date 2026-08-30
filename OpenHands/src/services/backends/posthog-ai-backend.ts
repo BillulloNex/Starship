@@ -20,6 +20,55 @@ function getProviderFromModel(modelName: string): string {
   return "unknown";
 }
 
+export function buildPostHogGenerationProperties(
+  data: GenerationData,
+): Record<string, unknown> {
+  let latencySeconds: number | undefined;
+  if (data.responseLatencies && data.responseLatencies.length > 0) {
+    const last = data.responseLatencies[data.responseLatencies.length - 1];
+    latencySeconds = last.latency;
+  }
+
+  const modelProvider = getProviderFromModel(data.modelName);
+  const properties: Record<string, unknown> = {
+    $ai_generation_id: data.generationId,
+    $ai_model: data.modelName,
+    $ai_provider: data.executionProvider || modelProvider,
+    $ai_latency: latencySeconds,
+    $ai_trace_id: data.conversationId,
+    grokbot_execution_provider: data.executionProvider || modelProvider,
+    grokbot_model_provider: modelProvider,
+    grokbot_usage_available: data.usageAvailable !== false,
+    grokbot_cost_available: data.costAvailable !== false,
+  };
+
+  // Cursor's ACP server currently completes turns without emitting ACP usage
+  // data. Omit standard token/cost properties in that case so PostHog does
+  // not interpret "unknown" as a measured zero.
+  if (data.usageAvailable !== false) {
+    properties.$ai_input_tokens = data.promptTokens;
+    properties.$ai_output_tokens = data.completionTokens;
+    properties.cache_read_tokens = data.cacheReadTokens;
+    properties.cache_write_tokens = data.cacheWriteTokens;
+    properties.reasoning_tokens = data.reasoningTokens;
+  }
+  if (data.costAvailable !== false) {
+    properties.$ai_total_cost_usd = data.accumulatedCost;
+  }
+
+  if (data.input) {
+    properties.$ai_input = [{ role: "user", content: data.input }];
+  }
+  if (data.output) {
+    properties.$ai_output_choices = [
+      { role: "assistant", content: data.output },
+    ];
+    properties.$ai_output = data.output;
+  }
+
+  return properties;
+}
+
 /**
  * Observability backend adapter for PostHog AI.
  * Captures events via the shared PostHog client when telemetry is enabled.
@@ -107,45 +156,7 @@ class PostHogAIBackend implements ObservabilityBackend {
     // trace nodes in PostHog AI.
     if (!data.input && !data.output) return;
 
-    let latencySeconds: number | undefined;
-    if (data.responseLatencies && data.responseLatencies.length > 0) {
-      const last = data.responseLatencies[data.responseLatencies.length - 1];
-      latencySeconds = last.latency; // already in seconds from agent-server
-    }
-
-    const properties: Record<string, unknown> = {
-      $ai_model: data.modelName,
-      $ai_provider: getProviderFromModel(data.modelName),
-      $ai_input_tokens: data.promptTokens,
-      $ai_output_tokens: data.completionTokens,
-      $ai_total_cost_usd: data.accumulatedCost,
-      $ai_latency: latencySeconds,
-      $ai_trace_id: data.conversationId,
-      cache_read_tokens: data.cacheReadTokens,
-      cache_write_tokens: data.cacheWriteTokens,
-      reasoning_tokens: data.reasoningTokens,
-    };
-
-    if (data.input) {
-      // PostHog AI conversation view expects $ai_input as an array of messages
-      properties.$ai_input = [
-        {
-          role: "user",
-          content: data.input,
-        },
-      ];
-    }
-
-    if (data.output) {
-      // PostHog AI conversation view expects $ai_output_choices or $ai_output
-      properties.$ai_output_choices = [
-        {
-          role: "assistant",
-          content: data.output,
-        },
-      ];
-      properties.$ai_output = data.output;
-    }
+    const properties = buildPostHogGenerationProperties(data);
 
     this.capture("$ai_generation", properties);
   }

@@ -128,6 +128,7 @@ function extractMessageEventText(
 export function ConversationWebSocketProvider({
   children,
   conversationId,
+  conversation,
   conversationUrl,
   sessionApiKey,
   subConversations,
@@ -135,6 +136,7 @@ export function ConversationWebSocketProvider({
 }: {
   children: React.ReactNode;
   conversationId?: string;
+  conversation?: AppConversation | null;
   conversationUrl?: string | null;
   sessionApiKey?: string | null;
   subConversations?: AppConversation[];
@@ -199,6 +201,30 @@ export function ConversationWebSocketProvider({
   const lastStatsMapRef = useRef<
     Record<string, import("#/services/observability-fanout").GenerationData>
   >({});
+  // Stats are cumulative and may be replayed more than once. ACP response ids
+  // give us a stable per-turn key so PostHog receives one generation per turn.
+  const emittedGenerationIdsRef = useRef<Set<string>>(new Set());
+
+  const isCursorAcpConversation =
+    conversation?.agent_kind === "acp" &&
+    (conversation.acp_server === "cursor" ||
+      conversation.tags?.acpserver === "cursor");
+
+  const emitGenerationOnce = useCallback(
+    (data: import("#/services/observability-fanout").GenerationData) => {
+      if (
+        data.generationId &&
+        emittedGenerationIdsRef.current.has(data.generationId)
+      ) {
+        return;
+      }
+      fanoutGeneration(data);
+      if (data.generationId) {
+        emittedGenerationIdsRef.current.add(data.generationId);
+      }
+    },
+    [],
+  );
 
   const isPlanFilePath = (path: string | null): boolean =>
     path?.toUpperCase().endsWith("PLAN.MD") ?? false;
@@ -355,6 +381,10 @@ export function ConversationWebSocketProvider({
     // conversation's meter until fresh WS stats arrive — and a brand-new
     // conversation sends none, so the stale figure stuck indefinitely.
     useMetricsStore.getState().resetMetrics();
+    lastUserPromptRef.current = undefined;
+    lastAssistantOutputRef.current = undefined;
+    lastStatsMapRef.current = {};
+    emittedGenerationIdsRef.current.clear();
   }, [conversationId, clearEventsForConversation, resetBrowserStore]);
 
   useLayoutEffect(() => {
@@ -641,6 +671,9 @@ export function ConversationWebSocketProvider({
             const userText = extractMessageEventText(event);
             lastUserPromptRef.current = userText;
             lastAssistantOutputRef.current = undefined;
+            // A new prompt starts a new observability turn. Never let the
+            // previous turn's cumulative stats enrich this assistant reply.
+            lastStatsMapRef.current = {};
 
             if (conversationId) {
               consumeMatchingPendingMessage(conversationId, userText);
@@ -656,12 +689,13 @@ export function ConversationWebSocketProvider({
             // If stats were already recorded for this conversation, dispatch the
             // complete generation with both prompt and completion text.
             for (const stats of Object.values(lastStatsMapRef.current)) {
-              fanoutGeneration({
+              emitGenerationOnce({
                 ...stats,
                 input: lastUserPromptRef.current,
                 output: assistantText,
               });
             }
+            lastStatsMapRef.current = {};
           }
 
           // Handle cache invalidation for ActionEvent
@@ -694,22 +728,40 @@ export function ConversationWebSocketProvider({
                   event.value.usage_to_metrics,
                 )) {
                   const tokenUsage = metrics.accumulated_token_usage;
-                  // Skip entries with no actual token usage (e.g. condenser
-                  // that hasn't fired yet) to avoid creating empty 0-token
-                  // generations in Langfuse alongside the real ones.
-                  if (
-                    tokenUsage &&
+                  const hasReportedUsage =
+                    !!tokenUsage &&
                     (tokenUsage.prompt_tokens > 0 ||
-                      tokenUsage.completion_tokens > 0)
-                  ) {
+                      tokenUsage.completion_tokens > 0);
+                  const lastLatency = metrics.response_latencies.at(-1);
+                  // Cursor's ACP server currently omits both `usage_update`
+                  // and prompt-response usage. The agent server still emits a
+                  // completed stats record with model + response latency, so
+                  // accept that exact shape without also admitting unrelated
+                  // zero-token entries such as an unfired condenser.
+                  const isCompletedCursorTurnWithoutUsage =
+                    isCursorAcpConversation &&
+                    !!tokenUsage &&
+                    !hasReportedUsage &&
+                    !!lastLatency?.response_id;
+
+                  if (hasReportedUsage || isCompletedCursorTurnWithoutUsage) {
                     const modelName =
                       metrics.model_name || tokenUsage.model || "unknown";
                     const genData = {
                       conversationId,
+                      generationId:
+                        lastLatency?.response_id ||
+                        tokenUsage.response_id ||
+                        undefined,
                       modelName,
+                      executionProvider: isCompletedCursorTurnWithoutUsage
+                        ? "cursor"
+                        : undefined,
                       accumulatedCost: metrics.accumulated_cost,
                       promptTokens: tokenUsage.prompt_tokens,
                       completionTokens: tokenUsage.completion_tokens,
+                      usageAvailable: !isCompletedCursorTurnWithoutUsage,
+                      costAvailable: !isCompletedCursorTurnWithoutUsage,
                       cacheReadTokens: tokenUsage.cache_read_tokens,
                       cacheWriteTokens: tokenUsage.cache_write_tokens,
                       reasoningTokens: tokenUsage.reasoning_tokens,
@@ -718,7 +770,13 @@ export function ConversationWebSocketProvider({
                       output: lastAssistantOutputRef.current,
                     };
                     lastStatsMapRef.current[modelName] = genData;
-                    fanoutGeneration(genData);
+                    // If the assistant message arrived first, the generation
+                    // is already complete. Otherwise defer until that message
+                    // arrives so PostHog never gets a duplicate partial event.
+                    if (genData.output) {
+                      emitGenerationOnce(genData);
+                      delete lastStatsMapRef.current[modelName];
+                    }
                   }
                 }
               }
@@ -830,6 +888,8 @@ export function ConversationWebSocketProvider({
       appendInput,
       appendOutput,
       updateMetricsFromStats,
+      emitGenerationOnce,
+      isCursorAcpConversation,
       handleNonErrorEvent,
     ],
   );

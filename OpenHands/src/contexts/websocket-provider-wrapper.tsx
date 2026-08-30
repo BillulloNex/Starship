@@ -35,6 +35,7 @@ export function WebSocketProviderWrapper({
   return (
     <ConversationWebSocketProvider
       conversationId={conversationId}
+      conversation={conversation}
       conversationUrl={conversationUrl}
       sessionApiKey={conversation?.session_api_key}
       subConversationIds={conversation?.sub_conversation_ids}
