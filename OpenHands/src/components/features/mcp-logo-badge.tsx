@@ -2,6 +2,9 @@ import type { ComponentType, ReactNode, SVGProps } from "react";
 import { Bot } from "lucide-react";
 import type { IntegrationCatalogEntry } from "@openhands/extensions/integrations";
 import SlackIcon from "#/icons/slack.svg?react";
+import FirebaseIcon from "#/icons/firebase.svg?react";
+import GoogleCloudIcon from "#/icons/google-cloud.svg?react";
+import CoolifyIcon from "#/icons/coolify.svg?react";
 import { cn } from "#/utils/utils";
 
 type McpLogoEntry = Pick<
@@ -33,6 +36,9 @@ const LOCAL_LOGO_ICONS: Record<
   ComponentType<SVGProps<SVGSVGElement>>
 > = {
   slack: SlackIcon,
+  firebase: FirebaseIcon,
+  "google-cloud": GoogleCloudIcon,
+  coolify: CoolifyIcon,
 };
 
 export function McpLogoBadge({

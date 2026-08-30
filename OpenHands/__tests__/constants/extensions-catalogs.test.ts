@@ -90,4 +90,77 @@ describe("OpenHands extensions catalogs", () => {
       shipped.map((automation) => automation.id),
     );
   });
+
+  // ── Grokbot builtin MCP integrations ──────────────────────────────────
+
+  it("hydrates Firebase into the MCP marketplace with stdio transport", () => {
+    const catalog = getMcpMarketplaceCatalog(INTEGRATION_CATALOG);
+    const firebase = catalog.find((entry) => entry.id === "firebase")!;
+    expect(firebase).toBeDefined();
+    expect(firebase.name).toBe("Firebase");
+
+    const option = getInstallableMcpConnectionOption(firebase)!;
+    expect(option.transport?.kind).toBe("stdio");
+    if (option.transport?.kind !== "stdio") throw new Error("expected stdio");
+    expect(option.transport.command).toBe("npx");
+    expect(option.transport.args).toContain("firebase-tools@latest");
+    expect(option.transport.args).toContain("mcp");
+    expect(option.transport.serverName).toBe("firebase");
+
+    // FIREBASE_TOKEN is optional
+    const tokenField = option.transport.envFields?.find(
+      (f) => f.key === "FIREBASE_TOKEN",
+    );
+    expect(tokenField).toBeDefined();
+    expect(tokenField!.required).toBe(false);
+    expect(tokenField!.type).toBe("password");
+  });
+
+  it("hydrates Google Cloud into the MCP marketplace with stdio transport", () => {
+    const catalog = getMcpMarketplaceCatalog(INTEGRATION_CATALOG);
+    const gcloud = catalog.find((entry) => entry.id === "google-cloud")!;
+    expect(gcloud).toBeDefined();
+    expect(gcloud.name).toBe("Google Cloud");
+
+    const option = getInstallableMcpConnectionOption(gcloud)!;
+    expect(option.transport?.kind).toBe("stdio");
+    if (option.transport?.kind !== "stdio") throw new Error("expected stdio");
+    expect(option.transport.command).toBe("npx");
+    expect(option.transport.args).toContain("@google-cloud/gcloud-mcp");
+    expect(option.transport.serverName).toBe("gcloud");
+
+    // GOOGLE_APPLICATION_CREDENTIALS is optional
+    const credField = option.transport.envFields?.find(
+      (f) => f.key === "GOOGLE_APPLICATION_CREDENTIALS",
+    );
+    expect(credField).toBeDefined();
+    expect(credField!.required).toBe(false);
+  });
+
+  it("hydrates Coolify into the MCP marketplace with required env fields", () => {
+    const catalog = getMcpMarketplaceCatalog(INTEGRATION_CATALOG);
+    const coolify = catalog.find((entry) => entry.id === "coolify")!;
+    expect(coolify).toBeDefined();
+    expect(coolify.name).toBe("Coolify");
+
+    const option = getInstallableMcpConnectionOption(coolify)!;
+    expect(option.transport?.kind).toBe("stdio");
+    if (option.transport?.kind !== "stdio") throw new Error("expected stdio");
+    expect(option.transport.command).toBe("npx");
+    expect(option.transport.args).toContain("@masonator/coolify-mcp@latest");
+    expect(option.transport.serverName).toBe("coolify");
+
+    // Both Coolify env fields are required
+    const baseUrl = option.transport.envFields?.find(
+      (f) => f.key === "COOLIFY_BASE_URL",
+    );
+    const token = option.transport.envFields?.find(
+      (f) => f.key === "COOLIFY_ACCESS_TOKEN",
+    );
+    expect(baseUrl).toBeDefined();
+    expect(baseUrl!.required).toBe(true);
+    expect(token).toBeDefined();
+    expect(token!.required).toBe(true);
+    expect(token!.type).toBe("password");
+  });
 });
