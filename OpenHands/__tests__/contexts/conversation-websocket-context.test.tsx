@@ -16,7 +16,7 @@ import {
   setStoredConversationMetadata,
 } from "#/api/conversation-metadata-store";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
-import type { MessageEvent } from "#/types/agent-server/core";
+import type { MessageEvent, OpenHandsEvent } from "#/types/agent-server/core";
 import { fanoutGeneration } from "#/services/observability-fanout";
 
 type CapturedWebSocketOptions = {
@@ -76,17 +76,19 @@ const makeAgentReply = (): MessageEvent => ({
   extended_content: [],
 });
 
-const makeCursorFinishAction = () => ({
-  id: "evt-cursor-finish",
-  timestamp: new Date(Date.now() + 1000).toISOString(),
-  source: "agent",
-  thought: [],
-  thinking_blocks: [],
-  action: { kind: "FinishAction", message: "Cursor done!" },
-  tool_name: "finish",
-  tool_call_id: "cursor-finish-call",
-  kind: "ActionEvent",
-});
+const makeCursorFinishAction = (): OpenHandsEvent =>
+  ({
+    id: "evt-cursor-finish",
+    timestamp: new Date(Date.now() + 1000).toISOString(),
+    source: "agent",
+    thought: [],
+    thinking_blocks: [],
+    action: { kind: "FinishAction", message: "Cursor done!" },
+    tool_name: "finish",
+    tool_call_id: "cursor-finish-call",
+    kind: "ActionEvent",
+  }) as unknown as OpenHandsEvent;
+
 
 const makeStatsEvent = (
   id: string,

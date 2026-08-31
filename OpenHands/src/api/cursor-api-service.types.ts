@@ -36,3 +36,13 @@ export interface CursorUsageSnapshot {
   /** Always false for a user API key; Cursor exposes plan quota in its dashboard. */
   planQuotaAvailable: false;
 }
+
+export interface CursorProUsageEstimate {
+  category: "cursor-models" | "other-models";
+  categoryLabel: string;
+  effectiveTokens: number;
+  percentUsed: number;
+  percentRemaining: number;
+  isLimitReached: boolean;
+}
+

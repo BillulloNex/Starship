@@ -1,14 +1,28 @@
 /* eslint-disable i18next/no-literal-string */
-import { Database, Layers, RefreshCw } from "lucide-react";
+import { Database, Layers, RefreshCw, Sparkles } from "lucide-react";
 import type { MetricsState } from "#/stores/metrics-store";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useCursorUsage } from "#/hooks/query/use-cursor-usage";
+import { estimateCursorProUsagePercentage } from "#/api/cursor-api-service";
 import { AgentBrandIcon } from "#/components/shared/agent-brand-icon";
 import { formatCompactTokenCount } from "#/utils/format-token-count";
 import { cn } from "#/utils/utils";
 
 interface CursorUsageCardProps {
   currentUsage: MetricsState["usage"];
+}
+
+function getToneClass(remainingPercent: number): {
+  bar: string;
+  text: string;
+} {
+  if (remainingPercent < 15) {
+    return { bar: "bg-red-500", text: "text-red-400" };
+  }
+  if (remainingPercent <= 40) {
+    return { bar: "bg-amber-500", text: "text-amber-400" };
+  }
+  return { bar: "bg-emerald-500", text: "text-emerald-400" };
 }
 
 export function CursorUsageCard({ currentUsage }: CursorUsageCardProps) {
@@ -33,6 +47,20 @@ export function CursorUsageCard({ currentUsage }: CursorUsageCardProps) {
     currentInput + currentOutput + currentCacheRead + currentCacheWrite;
   const accountTotal = accountUsage?.totalUsage.totalTokens ?? 0;
 
+  const activeModel = conversation?.llm_model ?? "cursor-grok-4.6";
+  const estimate = accountUsage
+    ? estimateCursorProUsagePercentage(accountUsage.totalUsage, activeModel)
+    : estimateCursorProUsagePercentage(
+        {
+          inputTokens: currentInput,
+          cacheReadTokens: currentCacheRead,
+          outputTokens: currentOutput,
+        },
+        activeModel,
+      );
+
+  const tone = getToneClass(estimate.percentRemaining);
+
   return (
     <div
       data-testid="cursor-usage-card"
@@ -41,11 +69,14 @@ export function CursorUsageCard({ currentUsage }: CursorUsageCardProps) {
       <div className="flex items-center justify-between pb-1 border-b border-[var(--oh-border-subtle)]">
         <div className="flex items-center gap-2">
           <AgentBrandIcon kind="cursor" size={16} />
-          <span className="font-semibold text-sm">Cursor usage</span>
+          <span className="font-semibold text-sm">Cursor Pro usage</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded bg-surface-base px-2 py-0.5 text-xs font-medium text-[var(--oh-muted)] border border-[var(--oh-border)]">
-            API key
+          <span className="inline-flex items-center gap-1 rounded bg-surface-base px-2 py-0.5 text-xs font-medium text-sky-300 border border-[var(--oh-border)]">
+            <Sparkles className="size-3 text-sky-400" />
+            {estimate.category === "cursor-models"
+              ? "Cursor Models"
+              : "Other Models"}
           </span>
           <button
             type="button"
@@ -59,6 +90,36 @@ export function CursorUsageCard({ currentUsage }: CursorUsageCardProps) {
               className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
             />
           </button>
+        </div>
+      </div>
+
+      {/* Estimated Pro Quota Progress Bar */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-[var(--oh-foreground)]">
+            Estimated Pro Quota
+          </span>
+          <span className={cn("font-semibold", tone.text)}>
+            {estimate.percentRemaining}% remaining
+          </span>
+        </div>
+
+        <div className="relative h-2 w-full rounded-full bg-tertiary overflow-hidden">
+          <div
+            data-testid="cursor-quota-bar"
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              tone.bar,
+            )}
+            style={{
+              width: `${Math.max(0, Math.min(100, estimate.percentRemaining))}%`,
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] text-[var(--oh-muted)]">
+          <span>{estimate.percentUsed}% used</span>
+          <span>{estimate.categoryLabel}</span>
         </div>
       </div>
 
@@ -110,9 +171,10 @@ export function CursorUsageCard({ currentUsage }: CursorUsageCardProps) {
       )}
 
       <div className="rounded bg-surface-base border border-[var(--oh-border)] p-2 text-[10px] leading-tight text-[var(--oh-muted)]">
-        Cursor reports token totals for API-created Cloud Agents. Its user API
-        does not expose remaining plan allowance or reset time.
+        Estimated from cumulative token volume and cache discounts against
+        Cursor Pro limits.
       </div>
     </div>
   );
 }
+

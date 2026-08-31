@@ -48,7 +48,7 @@ describe("job-board.mjs", () => {
       { title: "Ship job board", reviewer: "Codex", status: "ready" },
       jobsPath,
     );
-    const claimed = await claimJob(
+    const claimed: any = await claimJob(
       created.id,
       { kind: "agent", name: "Claude" },
       jobsPath,
@@ -56,7 +56,7 @@ describe("job-board.mjs", () => {
     expect(claimed.status).toBe("in_progress");
     expect(claimed.assignee).toBe("Claude");
 
-    const completed = await completeJob(
+    const completed: any = await completeJob(
       created.id,
       { actor: { kind: "agent", name: "Claude" }, result: "PR opened" },
       jobsPath,
@@ -64,7 +64,7 @@ describe("job-board.mjs", () => {
     expect(completed.status).toBe("review");
     expect(completed.completedBy).toBe("Claude");
 
-    const accepted = await reviewJob(
+    const accepted: any = await reviewJob(
       created.id,
       { actor: { kind: "agent", name: "Codex" }, decision: "accept" },
       jobsPath,
@@ -80,7 +80,7 @@ describe("job-board.mjs", () => {
     );
     await claimJob(created.id, { kind: "agent", name: "Claude" }, jobsPath);
     await completeJob(created.id, { actor: { kind: "agent", name: "Claude" } }, jobsPath);
-    const rejected = await reviewJob(
+    const rejected: any = await reviewJob(
       created.id,
       {
         actor: { kind: "agent", name: "Codex" },
@@ -93,6 +93,9 @@ describe("job-board.mjs", () => {
     expect(rejected.assignee).toBeNull();
     expect(rejected.result).toContain("Add tests");
   });
+
+
+
 
   it("serves list/create over HTTP", async () => {
     const created = await addJob({ title: "From store" }, jobsPath);

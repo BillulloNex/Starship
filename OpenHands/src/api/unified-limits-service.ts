@@ -1,6 +1,9 @@
-import { ClaudeUsageService } from "./claude-usage-service";
+// import { ClaudeUsageService } from "./claude-usage-service";
 import { CodexUsageService } from "./codex-usage-service";
-import { CursorApiService } from "./cursor-api-service";
+import {
+  CursorApiService,
+  estimateCursorProUsagePercentage,
+} from "./cursor-api-service";
 import { VercelGatewayService } from "./vercel-gateway-service";
 import LLMBalanceService from "./llm-balance-service";
 import type {
@@ -93,6 +96,8 @@ export class UnifiedLimitsService {
     }
 
     // --- Claude (ACP subscription) ---
+    // DISABLED: Claude Code quota not working reliably.
+    /*
     try {
       const claude = await ClaudeUsageService.getUsage(false);
       if (claude) {
@@ -187,6 +192,7 @@ export class UnifiedLimitsService {
     } catch {
       // Claude unavailable — silently omit
     }
+    */
 
     // --- Codex / ChatGPT (ACP subscription) ---
     try {
@@ -238,18 +244,30 @@ export class UnifiedLimitsService {
       // Codex unavailable
     }
 
-    // --- Cursor (user API key; Cloud Agent token totals only) ---
+    // --- Cursor (user API key with calibrated Pro usage estimation) ---
     try {
       const cursor = await CursorApiService.getUsage(false);
       if (cursor) {
+        const estimate = estimateCursorProUsagePercentage(
+          cursor.totalUsage,
+          "cursor-grok",
+        );
         results.push({
           providerId: "cursor",
-          displayName: "Cursor",
+          displayName: "Cursor Pro",
           icon: "cursor",
           category: "subscription-acp",
           source: "auto",
-          status: "unknown",
-          limits: [],
+          status: statusFromPercent(estimate.percentRemaining),
+          limits: [
+            {
+              label: `${estimate.categoryLabel}`,
+              usedPercent: estimate.percentUsed,
+              remainingPercent: estimate.percentRemaining,
+              resetAt: null,
+              limitReached: estimate.isLimitReached,
+            },
+          ],
           usage: {
             ...cursor.totalUsage,
             agentCount: cursor.agentCount,
@@ -257,12 +275,13 @@ export class UnifiedLimitsService {
             scope: cursor.scope,
           },
           lastUpdated: cursor.updatedAt,
-          note: "Cloud Agent token usage. Cursor user API keys do not expose remaining plan quota or reset time.",
+          note: `Estimated Cursor Pro quota: ${estimate.percentRemaining}% remaining based on ${cursor.totalUsage.totalTokens.toLocaleString()} cumulative tokens.`,
         });
       }
     } catch {
       // Cursor unavailable or unconfigured
     }
+
 
     // --- OpenRouter (API provider) ---
     try {
