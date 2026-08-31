@@ -200,6 +200,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==1.6.0"
 
+# Guard: telemetry failures must not abort watchdog cleanup (incident 2026-08-30)
+COPY patches/guard-watchdog-telemetry.py /tmp/guard-watchdog-telemetry.py
+RUN python3 /tmp/guard-watchdog-telemetry.py && rm /tmp/guard-watchdog-telemetry.py
+
 # ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
