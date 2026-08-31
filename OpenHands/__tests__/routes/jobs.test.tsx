@@ -54,6 +54,21 @@ vi.mock("#/hooks/mutation/use-create-conversation", () => ({
   useCreateConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("#/hooks/query/use-agent-profiles", () => ({
+  useAgentProfiles: () => ({
+    data: {
+      profiles: [
+        {
+          id: "prof-claude",
+          name: "Claude",
+          agent_kind: "acp",
+          acp_server: "claude-code",
+        },
+      ],
+    },
+  }),
+}));
+
 vi.mock("#/hooks/query/use-unified-limits", () => ({
   useUnifiedLimits: () => ({
     limits: [
@@ -99,5 +114,8 @@ describe("JobsScreen", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run next ready" })).toBeInTheDocument();
     expect(screen.getByTestId("job-board-fuel")).toHaveTextContent("Claude");
+    expect(screen.getByTestId("job-board-fuel")).toHaveTextContent(
+      "starts as Claude",
+    );
   });
 });

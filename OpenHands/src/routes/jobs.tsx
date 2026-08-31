@@ -27,6 +27,8 @@ import {
 } from "#/hooks/query/use-jobs";
 import { useCreateConversation } from "#/hooks/mutation/use-create-conversation";
 import { useUnifiedLimits } from "#/hooks/query/use-unified-limits";
+import { useAgentProfiles } from "#/hooks/query/use-agent-profiles";
+import { pickProfileForQuota } from "#/utils/job-board-routing";
 import {
   displayErrorToast,
   displaySuccessToast,
@@ -249,6 +251,11 @@ export default function JobsScreen() {
   const updateSettings = useUpdateJobBoardSettings();
   const createConversation = useCreateConversation();
   const { limits, bestAvailable, isAnyExhausted } = useUnifiedLimits();
+  const { data: agentProfiles } = useAgentProfiles();
+  const routedProfile = useMemo(
+    () => pickProfileForQuota(agentProfiles?.profiles, limits),
+    [agentProfiles?.profiles, limits],
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -310,7 +317,44 @@ export default function JobsScreen() {
     }
   };
 
+  const launchWithProfile = (job: JobRecord, agentProfileId?: string) => {
+    createConversation.mutate(
+      {
+        query: buildJobPrompt(job),
+        workingDir: job.workspace || undefined,
+        entryPoint: "job_board",
+        agentProfileId,
+      },
+      {
+        onSuccess: async (result) => {
+          await claimJob.mutateAsync({
+            id: job.id,
+            actor: {
+              kind: "human",
+              name: routedProfile?.name || sourceName || "human",
+            },
+          });
+          displaySuccessToast(
+            routedProfile?.name
+              ? `Started with ${routedProfile.name}`
+              : "Agent started",
+          );
+          navigate(`/conversations/${result.conversation_id}`);
+        },
+        onError: (err) => {
+          displayErrorToast(
+            err instanceof Error ? err.message : "Failed to start job",
+          );
+        },
+      },
+    );
+  };
+
   const handleStart = async (job: JobRecord) => {
+    if (routedProfile?.id) {
+      launchWithProfile(job, routedProfile.id);
+      return;
+    }
     try {
       const started = await startJob.mutateAsync({
         id: job.id,
@@ -322,28 +366,7 @@ export default function JobsScreen() {
         navigate(`/conversations/${conversationId}`);
       }
     } catch {
-      createConversation.mutate(
-        {
-          query: buildJobPrompt(job),
-          workingDir: job.workspace || undefined,
-          entryPoint: "job_board",
-        },
-        {
-          onSuccess: async (result) => {
-            await claimJob.mutateAsync({
-              id: job.id,
-              actor: { kind: "human", name: sourceName || "human" },
-            });
-            displaySuccessToast("Agent started");
-            navigate(`/conversations/${result.conversation_id}`);
-          },
-          onError: (err) => {
-            displayErrorToast(
-              err instanceof Error ? err.message : "Failed to start job",
-            );
-          },
-        },
-      );
+      launchWithProfile(job);
     }
   };
 
@@ -427,6 +450,9 @@ export default function JobsScreen() {
             {bestAvailable ? (
               <span className="text-[var(--oh-muted)]">
                 Best available: {bestAvailable.displayName}
+                {routedProfile?.name
+                  ? ` → starts as ${routedProfile.name}`
+                  : ""}
               </span>
             ) : null}
             {isAnyExhausted ? (
