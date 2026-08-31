@@ -104,6 +104,7 @@ export function useCreateJob() {
       status?: JobStatus;
       workspace?: string;
       reviewer?: string;
+      conversationId?: string | null;
       source?: JobActor;
     }) =>
       fetch(jobsUrl(), {

@@ -52,6 +52,10 @@ vi.mock("#/components/features/conversation/right-panel-toggle", () => ({
   RightPanelToggle: () => null,
 }));
 
+vi.mock("#/components/features/job-board/handoff-to-job-board-button", () => ({
+  HandoffToJobBoardButton: () => null,
+}));
+
 vi.mock("react-i18next", async () => {
   const actual = await vi.importActual("react-i18next");
   return {
