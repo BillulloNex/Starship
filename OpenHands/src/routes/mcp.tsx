@@ -17,6 +17,7 @@ import {
   INTEGRATION_CATALOG as MCP_MARKETPLACE,
   type IntegrationCatalogEntry as MarketplaceEntry,
 } from "@openhands/extensions/integrations";
+import { Code2, Plus } from "lucide-react";
 import { MCPServerConfig } from "#/types/mcp-server";
 import { flattenMcpConfig } from "#/utils/mcp-installed-servers";
 import {
@@ -25,6 +26,7 @@ import {
   MarketplaceSection,
   InstallServerModal,
   CustomServerEditor,
+  McpJsonImportModal,
   type McpSectionFilter,
 } from "#/components/features/mcp-page";
 
@@ -39,6 +41,7 @@ export default function MCPPage() {
     React.useState<MarketplaceEntry | null>(null);
   const [editingServer, setEditingServer] =
     React.useState<MCPServerConfig | null>(null);
+  const [isRawJsonOpen, setIsRawJsonOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sectionFilter, setSectionFilter] =
     React.useState<McpSectionFilter>("all");
@@ -108,15 +111,27 @@ export default function MCPPage() {
               {t(I18nKey.MCP$PAGE_DESCRIPTION)}
             </div>
           </div>
-          <BrandButton
-            type="button"
-            variant="secondary"
-            testId="mcp-add-custom-server"
-            className="flex-shrink-0 whitespace-nowrap"
-            onClick={() => setEditingServer({ id: "", type: "sse" })}
-          >
-            {t(I18nKey.MCP$ADD_CUSTOM)}
-          </BrandButton>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <BrandButton
+              type="button"
+              variant="secondary"
+              testId="mcp-paste-json-button"
+              className="flex-shrink-0 whitespace-nowrap inline-flex items-center gap-1.5"
+              onClick={() => setIsRawJsonOpen(true)}
+            >
+              <Code2 className="size-3.5" />
+              <span>Paste JSON</span>
+            </BrandButton>
+            <BrandButton
+              type="button"
+              variant="secondary"
+              testId="mcp-add-custom-server"
+              className="flex-shrink-0 whitespace-nowrap"
+              onClick={() => setEditingServer({ id: "", type: "sse" })}
+            >
+              {t(I18nKey.MCP$ADD_CUSTOM)}
+            </BrandButton>
+          </div>
         </div>
       </div>
 
@@ -165,6 +180,14 @@ export default function MCPPage() {
           server={editingServer}
           existingServers={allServers}
           onClose={() => setEditingServer(null)}
+        />
+      )}
+
+      {/* Pure JSON Importer / Editor Modal */}
+      {isRawJsonOpen && (
+        <McpJsonImportModal
+          existingServers={allServers}
+          onClose={() => setIsRawJsonOpen(false)}
         />
       )}
     </div>

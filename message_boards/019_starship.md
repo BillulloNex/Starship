@@ -49,9 +49,9 @@ Below are a list of tasks we need to do. I will add a few of my own, and feel fr
     - [x] Web Apps tab - useless
     - [x] Comment out the Macros - tbh I dont see the value in it besides to skills
     
-- [ ] Quality of life improvements: There are things I would like improved, list below:
-    - MCP Servers: add in ability to add pure json
-    - Agent Context: Be able to view agent context memory to read
+- [x] Quality of life improvements: There are things I would like improved, list below:
+    - [x] MCP Servers: add in ability to add pure json
+    - [x] Agent Context: Be able to view agent context memory to read
 - [ ] UI design: we will go thru a design session to establish a new and proper branding guideline & design. we will work a lot on paper.design - lets work on the project 'Starship' page 'Design'. The process is as follows:
     - You create 1:1 design frames of the app on paper.design
     - I will have comments on the layouts, deleting or moving items on the page, etc
