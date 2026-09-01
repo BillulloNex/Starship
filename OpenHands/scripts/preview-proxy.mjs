@@ -145,7 +145,7 @@ export function createPreviewHostMatcher(
         if (match) {
           const appName = match[1].toLowerCase();
           // Skip if it looks like grok or grok-api main service
-          if (appName === "grok" || appName === "grok-api") return null;
+          if (appName === "grok" || appName === "grok-api" || appName === "ship" || appName === "ship-api") return null;
 
           // If it starts with p + digits, treat as port
           if (/^p\d+$/.test(appName)) {
@@ -171,7 +171,7 @@ export function createPreviewHostMatcher(
       const appMatch = defaultAppRegex.exec(hostname);
       if (appMatch) {
         const appName = appMatch[1].toLowerCase();
-        if (appName === "grok" || appName === "grok-api") return null;
+        if (appName === "grok" || appName === "grok-api" || appName === "ship" || appName === "ship-api") return null;
 
         if (/^p\d+$/.test(appName)) {
           const port = Number.parseInt(appName.slice(1), 10);
