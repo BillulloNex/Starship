@@ -52,16 +52,22 @@ Below are a list of tasks we need to do. I will add a few of my own, and feel fr
 - [x] Quality of life improvements: There are things I would like improved, list below:
     - [x] MCP Servers: add in ability to add pure json
     - [x] Agent Context: Be able to view agent context memory to read
-    - Adapt the design of the board to that of deep_dive/019/assets/devin-board.jpeg
+    - [ ] Adapt the design of the board to that of deep_dive/019/assets/devin-board.jpeg
+    
 - [ ] UI design: we will go thru a design session to establish a new and proper branding guideline & design. we will work a lot on paper.design - lets work on the project 'Starship' page 'Design'. The process is as follows:
-    - You create 1:1 design frames of the app on paper.design
-    - I will have comments on the layouts, deleting or moving items on the page, etc
-    - We will analyze the inspo and potential assets
-    - We go thru iterations on paper.design on how that will look like
-    - Until when I am happy, we wont apply the changes
+    - [ ] You create 1:1 design frames of the app on paper.design
+    - [ ] I will have comments on the layouts, deleting or moving items on the page, etc
+    
+    - [ ] We will analyze the inspo and potential assets
+    - [ ] We go thru iterations on paper.design on how that will look like
+    - [ ] Until when I am happy, we wont apply the changes
+
 
 -  Improved user experience:
     - Right now the onboarding experience involves adding a backend, thats cool, but what if instead, we can do a user/pw login instead? Gotta brainstorm more to ensure a balance between the way the app works and the user experience
+- Power User Functionality:
+    - [ ] Have a file/folder viewer and editor like an IDE
+    - [ ] Get CLI better, I know as its a Docker Image, the terminal experience feels a little different.
 
 ## AI list
 - [ ] **Autonomous Verification Lever (`starship-verify` CLI)**: Headless verification loop (lint, typecheck, health, DOM/screenshot snapshotting) inspired by pstack/poteto so cloud agents verify their own work before declaring done.
