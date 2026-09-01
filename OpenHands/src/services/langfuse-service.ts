@@ -90,7 +90,7 @@ export function startTrace({
       userId,
       metadata: {
         ...metadata,
-        client: "GrokBot Agent Canvas",
+        client: "Starship Agent Canvas",
       },
     });
     return trace;
@@ -228,7 +228,7 @@ export function recordStatsGeneration({
       sessionId: conversationId,
       name: "Agent Stats Update",
       metadata: {
-        client: "GrokBot Agent Canvas",
+        client: "Starship Agent Canvas",
         source: "websocket_stats_event",
         executionProvider,
         usageAvailable: usageAvailable !== false,

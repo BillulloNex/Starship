@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "OmniFactory": {
+      "url": "https://api.arcade.dev/mcp/gw_3IfcjTWJETkXWORv5D4B5eub3U4",
+      "headers": {
+        "Authorization": "Bearer arc_proj14MpvxYtwajfQj4Nm4YogqW98d8VYcrL842mTYXroDZvK79TXvk",
+        "Arcade-User-ID": "thomas@billullo.com"
+      }
+    }
+  }
+}

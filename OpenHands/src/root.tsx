@@ -129,7 +129,7 @@ const PRE_HYDRATION_ERROR_HANDLER = `(function(){
       var d=document.createElement('div');
       d.id='grokbot-recovery-banner';
       d.style.cssText='position:fixed;inset:0;background:#090d16;color:#f0f6fc;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;z-index:999999;padding:24px;text-align:center;';
-      d.innerHTML='<div style="max-width:420px;padding:32px;background:#151b23;border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,0.6);"><h2 style="font-size:20px;font-weight:700;margin:0 0 12px 0;color:#fff;">Update Available</h2><p style="font-size:14px;color:#8b949e;line-height:1.5;margin:0 0 24px 0;">A new version of GrokBot was deployed. Refresh to update.</p><button onclick="try{sessionStorage.removeItem(\\x27'+K+'\\x27);}catch(e){}window.location.reload();" style="background:#238636;color:#fff;font-weight:600;font-size:14px;padding:10px 24px;border-radius:8px;border:none;cursor:pointer;">Reload Page</button></div>';
+      d.innerHTML='<div style="max-width:420px;padding:32px;background:#151b23;border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,0.6);"><h2 style="font-size:20px;font-weight:700;margin:0 0 12px 0;color:#fff;">Update Available</h2><p style="font-size:14px;color:#8b949e;line-height:1.5;margin:0 0 24px 0;">A new version of Starship was deployed. Refresh to update.</p><button onclick="try{sessionStorage.removeItem(\\x27'+K+'\\x27);}catch(e){}window.location.reload();" style="background:#238636;color:#fff;font-weight:600;font-size:14px;padding:10px 24px;border-radius:8px;border:none;cursor:pointer;">Reload Page</button></div>';
       if(document.body){document.body.appendChild(d);}
       else{document.addEventListener('DOMContentLoaded',function(){if(document.body)document.body.appendChild(d);});}
     }
@@ -311,7 +311,7 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "OpenHands" },
+  { title: "Starship" },
   { name: "description", content: "Let's Start Building!" },
 ];
 

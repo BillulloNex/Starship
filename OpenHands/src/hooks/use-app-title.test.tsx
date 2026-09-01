@@ -39,7 +39,7 @@ describe("useAppTitle", () => {
   it("returns the OSS app title outside conversations", async () => {
     const { result } = renderAppTitleHook();
 
-    await waitFor(() => expect(result.current).toBe("GrokBot"));
+    await waitFor(() => expect(result.current).toBe("Starship"));
   });
 
   it("returns the conversation title with the OSS app name", async () => {
@@ -52,7 +52,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("My Conversation | GrokBot"),
+      expect(result.current).toBe("My Conversation | Starship"),
     );
   });
 
@@ -63,17 +63,17 @@ describe("useAppTitle", () => {
 
     const { result } = renderAppTitleHook();
 
-    await waitFor(() => expect(result.current).toBe("GrokBot"));
+    await waitFor(() => expect(result.current).toBe("Starship"));
   });
 
   it.each([
-    [ExecutionStatus.RUNNING, "🟢 My Conversation | GrokBot"],
-    [ExecutionStatus.FINISHED, "My Conversation | GrokBot"],
-    [ExecutionStatus.IDLE, "My Conversation | GrokBot"],
-    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "My Conversation | GrokBot"],
-    [ExecutionStatus.PAUSED, "⚪ My Conversation | GrokBot"],
-    [ExecutionStatus.ERROR, "🔴 My Conversation | GrokBot"],
-    [ExecutionStatus.STUCK, "🔴 My Conversation | GrokBot"],
+    [ExecutionStatus.RUNNING, "🟢 My Conversation | Starship"],
+    [ExecutionStatus.FINISHED, "My Conversation | Starship"],
+    [ExecutionStatus.IDLE, "My Conversation | Starship"],
+    [ExecutionStatus.WAITING_FOR_CONFIRMATION, "My Conversation | Starship"],
+    [ExecutionStatus.PAUSED, "⚪ My Conversation | Starship"],
+    [ExecutionStatus.ERROR, "🔴 My Conversation | Starship"],
+    [ExecutionStatus.STUCK, "🔴 My Conversation | Starship"],
   ])(
     "formats the title correctly for execution status %s",
     async (status, expectedTitle) => {
@@ -103,7 +103,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("🟢 My Conversation | GrokBot"),
+      expect(result.current).toBe("🟢 My Conversation | Starship"),
     );
   });
 
@@ -117,7 +117,7 @@ describe("useAppTitle", () => {
     const { result } = renderAppTitleHook();
 
     await waitFor(() =>
-      expect(result.current).toBe("My Conversation | GrokBot"),
+      expect(result.current).toBe("My Conversation | Starship"),
     );
   });
 });
