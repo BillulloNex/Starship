@@ -44,10 +44,10 @@ Below are a list of tasks we need to do. I will add a few of my own, and feel fr
 
 ## Thomas list
 - [x] Rename the application: rename the folder & the github repo to Starship
-- [ ] Functional cut: We will delete things, I will say what to do here
-    - search commands - useless
-    - Web Apps tab - useless
-    - Comment out the Macros - tbh I dont see the value in it besides to skills
+- [x] Functional cut: We will delete things, I will say what to do here
+    - [x] search commands - useless
+    - [x] Web Apps tab - useless
+    - [x] Comment out the Macros - tbh I dont see the value in it besides to skills
     
 - [ ] Quality of life improvements: There are things I would like improved, list below:
     - MCP Servers: add in ability to add pure json

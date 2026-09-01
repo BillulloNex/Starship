@@ -34,11 +34,6 @@ const AlertBanner = React.lazy(() =>
     default: m.AlertBanner,
   })),
 );
-const CommandMenu = React.lazy(() =>
-  import("#/components/features/command-menu/command-menu").then((m) => ({
-    default: m.CommandMenu,
-  })),
-);
 
 import {
   isChunkLoadError,
@@ -155,7 +150,6 @@ export default function MainApp() {
         </div>
         <React.Suspense fallback={null}>
           <EnvironmentSwitchOverlay />
-          <CommandMenu />
         </React.Suspense>
         {showOnboardingPreview ? <OnboardingHost /> : null}
       </SidebarMobileNavProvider>

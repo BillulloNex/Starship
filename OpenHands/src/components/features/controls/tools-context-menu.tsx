@@ -15,11 +15,11 @@ import PuzzleIcon from "#/icons/u-puzzle-piece.svg?react";
 import FishingHookIcon from "#/icons/fishing-hook.svg?react";
 import ToolsIcon from "#/icons/u-tools.svg?react";
 import RobotIcon from "#/icons/u-robot.svg?react";
-import SettingsIcon from "#/icons/settings.svg?react";
+// import SettingsIcon from "#/icons/settings.svg?react";
 import CarretRightFillIcon from "#/icons/carret-right-fill.svg?react";
 import { ToolsContextMenuIconText } from "./tools-context-menu-icon-text";
 import { GitToolsSubmenu } from "./git-tools-submenu";
-import { MacrosSubmenu } from "./macros-submenu";
+// import { MacrosSubmenu } from "./macros-submenu";
 import { ChatInputProfileMenuContent } from "#/components/features/chat/components/chat-input-profile-picker";
 import { ArchivedDisabledTooltip } from "../context-menu/archived-disabled-tooltip";
 import { useIsArchivedConversation } from "#/hooks/use-is-archived-conversation";
@@ -169,7 +169,7 @@ export function ToolsContextMenu({
         </div>
       )}
 
-      {/* Macros */}
+      {/* Macros (Commented out in Starship)
       <div className="relative group/macros">
         <ArchivedDisabledTooltip isDisabled={isArchivedConversation}>
           <ContextMenuListItem
@@ -198,6 +198,7 @@ export function ToolsContextMenu({
           </div>
         )}
       </div>
+      */}
 
       {shouldShowAgentTools && <Divider inset="menu" />}
 

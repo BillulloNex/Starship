@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns3,
-  Globe,
   Plus,
   Server,
   Settings,
@@ -23,7 +22,6 @@ import { cn } from "#/utils/utils";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import { BackendSelector } from "#/components/features/backends/backend-selector";
 import { BackendStatusDot } from "#/components/features/backends/backend-status-dot";
-import { CommandMenuTrigger } from "#/components/features/command-menu/command-menu-trigger";
 import { AgentCanvasVersionTile } from "#/components/features/settings/agent-canvas-version-tile";
 import { GrokbotVersionBadge } from "./grokbot-version-badge";
 import { SidebarConversationList } from "./sidebar-conversation-list";
@@ -164,7 +162,6 @@ export function SidebarRailBody({
       </div>
 
       <nav className={sidebarNavListClassName(collapsed)}>
-        <CommandMenuTrigger collapsed={collapsed} />
         <SidebarNavLink
           to="/conversations"
           end
@@ -188,13 +185,6 @@ export function SidebarRailBody({
           testId="sidebar-observability-link"
           collapsed={collapsed}
           icon={<Activity width={ICON_SIZE} height={ICON_SIZE} />}
-        />
-        <SidebarNavLink
-          to="/apps"
-          label="Web Apps"
-          testId="sidebar-apps-link"
-          collapsed={collapsed}
-          icon={<Globe width={ICON_SIZE} height={ICON_SIZE} />}
         />
         <SidebarNavLink
           to="/jobs"
