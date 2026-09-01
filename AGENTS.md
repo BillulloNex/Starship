@@ -35,54 +35,42 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 - `/projects/Grokbot` is the persisted clone (keep work here, not ephemeral workspace).
 - `OpenHands/` is the upstream agent-canvas app (frontend + services). Grokbot customizations live alongside upstream code.
 - `Dockerfile` builds the backend image (agent-server + automation) deployed via Coolify.
-- `scripts/deploy-frontend.sh` builds the Vite SPA and deploys it to **Cloudflare Pages**.
+- `scripts/deploy-frontend.sh` builds the Vite SPA and deploys it to Cloudflare Pages (legacy fallback only).
 - `OpenHands/config/defaults.json` holds version pins; `OpenHands/package.json` is the upstream npm version — do not confuse with Grokbot's `VERSION`.
 
-## Deployment Workflow (CRITICAL — Frontend vs Backend)
+## Deployment Workflow (CRITICAL — Unified Coolify)
 
-Grokbot has a **split deployment**: the frontend and backend deploy separately.
+Starship uses a **unified deployment**: the Docker container serves both the frontend
+(via `scripts/static-server.mjs` on port 8000) and the backend (agent-server on 18000,
+automation on 18001). The static server injects the session API key, proxies API calls,
+and handles WebSockets — all on a single origin.
 
-### Frontend → Cloudflare Pages (MANDATORY for all UI/frontend changes)
+### Primary URL: `https://ship.beenex.org`
 
-- **Any change under `OpenHands/src/`, `OpenHands/public/`, or any file that affects the Vite build MUST be deployed via Cloudflare Pages.**
-- **How to deploy frontend:**
-  ```bash
-  ./scripts/deploy-frontend.sh
-  ```
-  This runs `npm --prefix OpenHands run build` then `npx wrangler pages deploy` to push the static build globally.
-- **DO NOT rely on the Coolify Docker build to deploy frontend changes.** The production frontend is served from Cloudflare Pages, not from the Docker container.
-- Run `npm --prefix OpenHands run lint` / `build` before deploying to catch errors early.
-
-### Backend → Coolify (auto-deploy on push to main)
-
-- **Pushing or merging to `main` automatically triggers Coolify deployment** for the backend Docker container (agent-server, automation server). Coolify is connected via the GitHub App.
-- **NEVER call the manual Coolify `deploy` tool after pushing to `main`.** Doing so creates a duplicate deployment of the exact same commit.
-- **How to monitor and verify backend deployment:**
-  1. Commit and push/merge to `main`.
-  2. Coolify will automatically start building within ~5 seconds.
-  3. Use `list_deployments` or `deployment(action: "get")` (read-only monitoring) to watch the build until status is `finished`.
-  4. Verify backend production health via `curl -fsS https://grok-api.beenex.org/health`.
-- **MANDATORY: Always monitor deployments to completion.** Never tell the user "once the build finishes…" or "check Coolify yourself." The agent MUST poll `deployment(action: "get", uuid: "<id>")` every 2–3 minutes until status is `finished` or `failed`, then report the result. If the build fails, read the logs and diagnose immediately. The definition of "deployed" is a `finished` status AND a passing health check — not "I pushed, it should work."
-- `https://grok-api.beenex.org/health` is the backend health endpoint. `https://grok.beenex.org/` is the Cloudflare Pages frontend.
-- **Do not treat `https://grok.beenex.org/health` returning HTTP 200 as backend proof.** The frontend SPA fallback can return HTML for unknown routes.
-
-### Combined changes (frontend + backend)
-
-When a change touches both frontend and backend code:
-1. Commit and push to `main` (triggers Coolify backend deploy automatically).
-2. Run `./scripts/deploy-frontend.sh` to deploy the frontend to Cloudflare Pages.
-3. Verify both are live.
+- **Pushing or merging to `main` automatically triggers Coolify deployment** for the
+  entire stack (frontend + backend). Coolify is connected via the GitHub App.
+- **NEVER call the manual Coolify `deploy` tool after pushing to `main`.**
+- **How to verify deployment:**
+  1. Commit and push to `main`.
+  2. Use `list_deployments` or `deployment(action: "get")` to watch the build.
+  3. Verify health: `curl -fsS https://ship.beenex.org/health`.
+  4. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`.
+- **MANDATORY: Always monitor deployments to completion.** The definition of
+  "deployed" is a `finished` status AND a passing health check.
+- `https://grok.beenex.org` and `https://grok-api.beenex.org` also work as
+  aliases but `ship.beenex.org` is the canonical production URL.
+- Run `npm --prefix OpenHands run lint` / `build` before pushing to catch errors early.
 
 ## Environment Variables (Coolify as Source of Truth)
 
 - **Coolify is the single source of truth for production configuration and secrets.**
-- **Never commit secrets, tokens, or environment values to Git.** (`.env.local` is strictly for local machine testing and is git-ignored).
+- **Never commit secrets, tokens, or environment values to Git.**
 - **Managing Environment Variables:**
-  - **Runtime Variables** (backend API keys, server settings, ports): Configure in Coolify under `grokbot` $\rightarrow$ Environment Variables with **Build-Time: No**. Updating these requires a container restart/redeploy.
-  - **Build-Time Variables** (frontend `VITE_*` variables): These are baked in at build time by `scripts/deploy-frontend.sh`. Set them in the environment before running the deploy script, or configure them in Cloudflare Pages dashboard.
+  - **Runtime Variables** (API keys, server settings): Configure in Coolify with **Build-Time: No**.
+  - **Build-Time Variables** (frontend `VITE_*`): Configure in Coolify as Build-Time variables.
 - **Introducing New Variables in Code:**
-  1. Frontend: Access via `import.meta.env.VITE_*`. Ensure the variable is available at build time when running `deploy-frontend.sh`.
-  2. Backend: Access via `process.env.*` or `os.environ.get(*)`. Set the value in Coolify.
+  1. Frontend: `import.meta.env.VITE_*`. Set in Coolify as Build-Time.
+  2. Backend: `process.env.*`. Set in Coolify.
   3. Bump version, commit code changes to Git.
 
 ## External CLI & ACP Provider Integrations (MANDATORY)
