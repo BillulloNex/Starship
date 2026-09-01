@@ -195,10 +195,15 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
     fi
 
 # Install automation server via pip (version pinned from config/defaults.json).
+# Pin fastmcp<4.0.0: fastmcp 4.0.0 (2026-08-31) requires mcp>=2.0 which
+# reorganised internal modules (mcp.shared.session removed), breaking the
+# openhands-sdk import chain.  openhands-sdk==1.40.1 specifies fastmcp>=3.0.0
+# (unbounded upper), so without this pin pip resolves to 4.0.0 and the
+# automation uvicorn process crashes on startup with ModuleNotFoundError.
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system "openhands-automation==1.6.0" 2>/dev/null \
-    || pip install --no-cache-dir "openhands-automation==1.6.0"
+    uv pip install --system "openhands-automation==1.6.0" "fastmcp>=3.0.0,<4.0.0" 2>/dev/null \
+    || pip install --no-cache-dir "openhands-automation==1.6.0" "fastmcp>=3.0.0,<4.0.0"
 
 # Guard: telemetry failures must not abort watchdog cleanup (incident 2026-08-30)
 COPY patches/guard-watchdog-telemetry.py /tmp/guard-watchdog-telemetry.py

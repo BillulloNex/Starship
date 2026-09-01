@@ -106,8 +106,9 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
 # Shared deps (openhands-sdk, fastapi, uvicorn, pydantic, httpx, …) are
 # already satisfied by the agent-server base image, so only automation-
 # specific packages (asyncpg, sqlalchemy, boto3, gcloud, …) are added.
-RUN uv pip install --system "openhands-automation==${AUTOMATION_VERSION}" 2>/dev/null \
-    || pip install --no-cache-dir "openhands-automation==${AUTOMATION_VERSION}"
+# Pin fastmcp<4.0.0: see root Dockerfile comment for rationale.
+RUN uv pip install --system "openhands-automation==${AUTOMATION_VERSION}" "fastmcp>=3.0.0,<4.0.0" 2>/dev/null \
+    || pip install --no-cache-dir "openhands-automation==${AUTOMATION_VERSION}" "fastmcp>=3.0.0,<4.0.0"
 
 # ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
 RUN uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
