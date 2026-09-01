@@ -186,6 +186,7 @@ export function getAgentServerBaseUrl(): string | null {
     const hostname = window.location.hostname.toLowerCase();
     if (
       hostname === "grok.beenex.org" ||
+      hostname === "ship.beenex.org" ||
       hostname === "grokbot.pages.dev" ||
       hostname.endsWith(".grokbot.pages.dev")
     ) {
