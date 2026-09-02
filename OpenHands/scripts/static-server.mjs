@@ -412,6 +412,22 @@ function makeConfigInjectionScript(
     "VITE_RAINDROP_PROJECT_ID",
     "RAINDROP_PROJECT_ID",
     "VITE_RAINDROP_BASE_URL",
+    // Datadog credentials — injected so the Settings > Observability
+    // credentials view can show "Configured (env)" status.
+    // NOTE: Only the existence is checked client-side, not the values.
+    "DD_API_KEY",
+    "DD_APP_KEY",
+    "DD_SITE",
+    "VITE_DD_SITE",
+    "VITE_DD_APPLICATION_ID",
+    "VITE_DD_CLIENT_TOKEN",
+    // Langfuse credentials
+    "LANGFUSE_PUBLIC_KEY",
+    "VITE_LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY",
+    "VITE_LANGFUSE_SECRET_KEY",
+    "LANGFUSE_BASE_URL",
+    "VITE_LANGFUSE_BASE_URL",
   ];
   for (const key of obsKeys) {
     if (process.env[key]) obsConfig[key] = process.env[key];

@@ -33,6 +33,30 @@ interface CredentialField {
   description: string;
   /** Whether this is a "secret" (masked by default). */
   isSensitive: boolean;
+  /**
+   * Env var keys to check at runtime (via window.__OBSERVABILITY_CONFIG__
+   * or import.meta.env). If any of these have a truthy value, the field
+   * is treated as "configured via environment".
+   */
+  runtimeEnvKeys?: string[];
+}
+
+/** Check if a credential is set via Coolify runtime env injection. */
+function hasRuntimeEnvValue(keys: string[] | undefined): boolean {
+  if (!keys || keys.length === 0) return false;
+  for (const key of keys) {
+    // 1. Runtime injection from static-server.mjs
+    if (
+      typeof window !== "undefined" &&
+      window.__OBSERVABILITY_CONFIG__?.[key]
+    ) {
+      return true;
+    }
+    // 2. Vite build-time env
+    const envVal = import.meta.env[key] as string | undefined;
+    if (envVal && envVal.length > 0) return true;
+  }
+  return false;
 }
 
 interface PlatformConfig {
@@ -62,6 +86,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "Enter your Datadog API key",
         description: "Found in Organization Settings → API Keys",
         isSensitive: true,
+        runtimeEnvKeys: ["DD_API_KEY", "VITE_DD_API_KEY"],
       },
       {
         secretName: "DD_APP_KEY",
@@ -69,6 +94,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "Enter your Datadog Application key",
         description: "Found in Organization Settings → Application Keys",
         isSensitive: true,
+        runtimeEnvKeys: ["DD_APP_KEY", "VITE_DD_APP_KEY"],
       },
       {
         secretName: "DD_SITE",
@@ -76,6 +102,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "us5.datadoghq.com",
         description: "Your Datadog site (e.g. us5.datadoghq.com, datadoghq.eu)",
         isSensitive: false,
+        runtimeEnvKeys: ["DD_SITE", "VITE_DD_SITE"],
       },
     ],
   },
@@ -94,6 +121,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "pk-lf-...",
         description: "Project → Settings → API Keys → Public Key",
         isSensitive: false,
+        runtimeEnvKeys: ["LANGFUSE_PUBLIC_KEY", "VITE_LANGFUSE_PUBLIC_KEY"],
       },
       {
         secretName: "LANGFUSE_SECRET_KEY",
@@ -101,6 +129,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "sk-lf-...",
         description: "Project → Settings → API Keys → Secret Key",
         isSensitive: true,
+        runtimeEnvKeys: ["LANGFUSE_SECRET_KEY", "VITE_LANGFUSE_SECRET_KEY"],
       },
       {
         secretName: "LANGFUSE_HOST",
@@ -108,6 +137,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "https://cloud.langfuse.com",
         description: "Self-hosted URL or https://cloud.langfuse.com",
         isSensitive: false,
+        runtimeEnvKeys: ["LANGFUSE_BASE_URL", "VITE_LANGFUSE_BASE_URL", "LANGFUSE_HOST"],
       },
     ],
   },
@@ -126,6 +156,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "phc_...",
         description: "Project → Settings → Project API Key",
         isSensitive: true,
+        runtimeEnvKeys: ["POSTHOG_API_KEY", "VITE_POSTHOG_API_KEY"],
       },
       {
         secretName: "POSTHOG_HOST",
@@ -133,6 +164,7 @@ const PLATFORMS: PlatformConfig[] = [
         placeholder: "https://app.posthog.com",
         description: "PostHog instance URL (cloud or self-hosted)",
         isSensitive: false,
+        runtimeEnvKeys: ["POSTHOG_HOST", "VITE_POSTHOG_HOST"],
       },
     ],
   },
@@ -274,7 +306,7 @@ function PlatformCredentialCard({ platform }: { platform: PlatformConfig }) {
           <h3 className={cn("text-sm font-semibold", platform.color)}>
             {platform.name}
           </h3>
-          {platform.fields.every((f) => existingSecretNames.has(f.secretName)) && (
+          {platform.fields.every((f) => existingSecretNames.has(f.secretName) || hasRuntimeEnvValue(f.runtimeEnvKeys)) && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-700/40">
               <CheckCircle2 className="size-2.5" />
               All configured
@@ -298,7 +330,9 @@ function PlatformCredentialCard({ platform }: { platform: PlatformConfig }) {
       {/* Credential fields */}
       <div className="space-y-3">
         {platform.fields.map((field) => {
-          const exists = existingSecretNames.has(field.secretName);
+          const inSecrets = existingSecretNames.has(field.secretName);
+          const inEnv = hasRuntimeEnvValue(field.runtimeEnvKeys);
+          const exists = inSecrets || inEnv;
           const isEditing = field.secretName in editValues;
           const isSaving = savingFields.has(field.secretName);
           const justSaved = savedFields.has(field.secretName);
@@ -318,7 +352,7 @@ function PlatformCredentialCard({ platform }: { platform: PlatformConfig }) {
                   {exists && !isEditing && (
                     <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
                       <CheckCircle2 className="size-2.5" />
-                      Configured
+                      {inEnv && !inSecrets ? "Configured (env)" : "Configured"}
                     </span>
                   )}
                   {!exists && !isEditing && (
