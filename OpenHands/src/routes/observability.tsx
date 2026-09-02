@@ -5,7 +5,6 @@ import { useDatadogStatus } from "#/hooks/query/use-datadog-observability";
 import {
   LlmObservabilityView,
   DatadogObservabilityView,
-  ObservabilityCredentialsView,
 } from "#/components/features/settings/observability-settings";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
@@ -13,7 +12,7 @@ import { Info } from "lucide-react";
 
 export const handle = { hideTitle: true };
 
-export type ObservabilityTab = "llm" | "datadog" | "credentials";
+export type ObservabilityTab = "llm" | "datadog";
 
 export function ObservabilityScreen() {
   const { t } = useTranslation("openhands");
@@ -21,7 +20,7 @@ export function ObservabilityScreen() {
 
   const tabParam = searchParams.get("tab");
   const initialTab: ObservabilityTab =
-    tabParam === "datadog" ? "datadog" : tabParam === "credentials" ? "credentials" : "llm";
+    tabParam === "datadog" ? "datadog" : "llm";
 
   const [activeTab, setActiveTab] = useState<ObservabilityTab>(initialTab);
 
@@ -86,30 +85,14 @@ export function ObservabilityScreen() {
             >
               Infrastructure & Datadog
             </button>
-
-            <button
-              type="button"
-              data-testid="observability-tab-credentials"
-              onClick={() => handleTabChange("credentials")}
-              className={cn(
-                "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer",
-                activeTab === "credentials"
-                  ? "bg-surface-raised text-foreground shadow-xs border border-[var(--oh-border)]"
-                  : "text-[var(--oh-muted)] hover:text-foreground",
-              )}
-            >
-              Credentials & Logs
-            </button>
           </div>
         </div>
 
         {/* View Switching */}
         {activeTab === "llm" ? (
           <LlmObservabilityView site={site} />
-        ) : activeTab === "datadog" ? (
-          <DatadogObservabilityView site={site} service={service} />
         ) : (
-          <ObservabilityCredentialsView />
+          <DatadogObservabilityView site={site} service={service} />
         )}
       </div>
     </main>
