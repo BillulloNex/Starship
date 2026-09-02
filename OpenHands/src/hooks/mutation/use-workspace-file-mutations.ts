@@ -236,3 +236,50 @@ export function useRenameWorkspacePath() {
     },
   });
 }
+
+export function useDuplicateWorkspacePath() {
+  const queryClient = useQueryClient();
+  const { conversationUrl, sessionApiKey, workingDir } = useWorkspaceContext();
+  const bumpWorkspaceMutationCounter = useWorkspaceMutationCounter(
+    (state) => state.bump,
+  );
+
+  return useMutation({
+    mutationFn: async ({
+      sourcePath,
+      targetPath,
+    }: {
+      sourcePath: string;
+      targetPath: string;
+    }) => {
+      const cleanSource = sourcePath.trim().replace(/^\/+/, "");
+      const cleanTarget = targetPath.trim().replace(/^\/+/, "");
+      if (!cleanSource || !cleanTarget) throw new Error("Path cannot be empty");
+
+      const result = await WorkspaceFileOperationsService.duplicatePath(
+        conversationUrl,
+        sessionApiKey,
+        workingDir,
+        cleanSource,
+        cleanTarget,
+      );
+
+      if (result.exit_code !== 0) {
+        throw new Error(result.stderr?.trim() || "Failed to duplicate path");
+      }
+
+      return { sourcePath: cleanSource, targetPath: cleanTarget };
+    },
+    onSuccess: ({ targetPath }) => {
+      queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace-file-content"] });
+      queryClient.invalidateQueries({ queryKey: ["file_changes"] });
+      queryClient.invalidateQueries({ queryKey: ["file_diff"] });
+      bumpWorkspaceMutationCounter();
+      toast.success(`Duplicated to ${targetPath}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to duplicate file");
+    },
+  });
+}

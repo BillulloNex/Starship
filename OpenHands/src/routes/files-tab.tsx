@@ -22,6 +22,11 @@ import { FileQuickRow } from "#/components/features/files-tab/file-quick-row";
 import { FileTreeView } from "#/components/features/files-tab/file-tree-view";
 import { FileContentViewer } from "#/components/features/files-tab/file-content-viewer";
 import { SegmentedToggle } from "#/components/features/files-tab/segmented-toggle";
+import { EditorTabBar } from "#/components/features/files-tab/editor-tab-bar";
+import { EditorBreadcrumbs } from "#/components/features/files-tab/editor-breadcrumbs";
+import { EditorStatusBar } from "#/components/features/files-tab/editor-status-bar";
+import { ResizableSplitter } from "#/components/features/files-tab/resizable-splitter";
+import { QuickFileSearchModal } from "#/components/features/files-tab/quick-file-search-modal";
 import type { ViewMode } from "#/components/features/files-tab/view-mode";
 import RefreshIcon from "#/icons/u-refresh.svg?react";
 import LinkExternalIcon from "#/icons/link-external.svg?react";
@@ -37,22 +42,8 @@ function FilesTab() {
 
   const { hasAttachedSource, isLoading: isAttachedSourceLoading } =
     useHasAttachedSource();
-  // A workspace with zero commits has no diff base to compare against, so
-  // the diff view would just be empty / misleading. Only probe when we
-  // already believe the user attached a source — saves a workspace round
-  // trip on every plain (no-attachment) conversation.
   const { hasCommits } = useHasGitCommits({ enabled: hasAttachedSource });
 
-  // Diff view defaults to ON when the user attached a source (repo or
-  // local workspace) *and* there's at least one commit, OFF otherwise
-  // (no attachment, or attachment with no commits yet).
-  //
-  // While the attachment / commit probes are still resolving we stay
-  // optimistic — most attached conversations live in a real repo, so
-  // defaulting to diff during the brief loading window avoids a
-  // "files → diff" flash on initial load. We only flip to files-view
-  // once `hasAttachedSource` *or* `hasCommits` definitively resolves
-  // false. The user's persisted choice always wins.
   const { conversationId } = useOptionalConversationId();
   const {
     state: persistedState,
@@ -65,11 +56,6 @@ function FilesTab() {
   const diffViewEnabled = persistedState.filesTabDiffView ?? diffViewDefault;
   const contentViewMode = persistedState.filesTabContentViewMode;
 
-  // Commit history gets a third toggle segment, offered only when the
-  // agent server supports the commits API (older servers 404 → the toggle
-  // stays two-way and the tab looks exactly as it did before). The
-  // selection is session-local; the persisted diff/files preference is
-  // untouched so falling out of the commits view restores it.
   const { isSuccess: commitsIsSuccess, isUnsupported: commitsUnsupported } =
     useUnifiedGitCommits();
   const showCommitsOption = commitsIsSuccess && !commitsUnsupported;
@@ -77,9 +63,9 @@ function FilesTab() {
   let activeView: "on" | "off" | "commits" = diffViewEnabled ? "on" : "off";
   if (commitsViewSelected && showCommitsOption) activeView = "commits";
 
-  // Collapsed by default — the quick-access pill row at the top is usually
-  // enough; the user can expand the tree on demand.
+  // Sidebar tree visibility
   const [isTreeVisible, setIsTreeVisible] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   const filesQuery = useWorkspaceFiles();
   const paths = useMemo(() => filesQuery.data ?? [], [filesQuery.data]);
@@ -89,25 +75,21 @@ function FilesTab() {
     (s) => s.selectedConversationId,
   );
   const setSelectedPath = useFilesTabStore((s) => s.setSelectedPath);
+  const sidebarWidth = useFilesTabStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useFilesTabStore((s) => s.setSidebarWidth);
+  const isSidebarCollapsed = useFilesTabStore((s) => s.isSidebarCollapsed);
+  const setSidebarCollapsed = useFilesTabStore((s) => s.setSidebarCollapsed);
+  const closeTab = useFilesTabStore((s) => s.closeTab);
 
-  // A selection is scoped to the conversation it was made in. Ignore a path
-  // that belongs to a different conversation so we never try to open a file
-  // that only exists in the previous conversation's workspace (issue #1350).
-  // The auto-select effect below then picks this conversation's top file.
+  // A selection is scoped to the conversation it was made in.
   const selectedPath =
     selectedConversationId === conversationId ? storedSelectedPath : null;
 
-  // Tag every selection with the active conversation so it can't leak into
-  // the next one. FileQuickRow / FileTreeView call this with just the path.
   const handleSelectFile = useCallback(
     (path: string) => setSelectedPath(path, conversationId),
     [conversationId, setSelectedPath],
   );
 
-  // Pre-fetch the selected file's content here too so the toolbar's
-  // "open in new window" link can reach for its `staticUrl`. react-query
-  // dedupes against `FileContentViewer`'s identical call, so this costs
-  // nothing extra.
   const selectedFileContent = useWorkspaceFileContent(selectedPath);
   const mutationCounter = useWorkspaceMutationCounter((state) => state.count);
   const selectedFileStaticUrl = withWorkspaceCacheBuster(
@@ -115,13 +97,17 @@ function FilesTab() {
     mutationCounter,
   );
 
+  // Sync isTreeVisible with store
+  useEffect(() => {
+    setIsTreeVisible(!isSidebarCollapsed);
+  }, [isSidebarCollapsed]);
+
   useEffect(() => {
     if (selectedConversationId === conversationId) return;
     setSelectedPath(null, conversationId);
   }, [selectedConversationId, conversationId, setSelectedPath]);
 
-  // Auto-select the highest-priority file the first time we load the list,
-  // so users see something useful immediately.
+  // Auto-select the highest-priority file on initial mount
   useEffect(() => {
     if (selectedPath || paths.length === 0) return;
     const regularFiles = paths.filter((p) => !p.endsWith("/"));
@@ -129,10 +115,26 @@ function FilesTab() {
     if (first) setSelectedPath(first, conversationId);
   }, [paths, selectedPath, conversationId, setSelectedPath]);
 
-  // Refresh button: covers the diff view (git changes) and the file viewer
-  // (workspace listing + cached file contents). Lives in this toolbar — not
-  // in the outer ConversationTabs bar — so it sits with the other
-  // files-tab-local controls.
+  // Keyboard shortcut listener for Cmd+P (Search) and Cmd+W (Close tab)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd+P or Ctrl+P: Quick file open
+      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+        e.preventDefault();
+        setIsSearchModalOpen((prev) => !prev);
+      }
+      // Cmd+W or Ctrl+W: Close active tab
+      if ((e.metaKey || e.ctrlKey) && e.key === "w" && selectedPath) {
+        // Prevent browser from closing window if focused within files tab
+        e.preventDefault();
+        closeTab(selectedPath);
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [selectedPath, closeTab]);
+
   const queryClient = useQueryClient();
   const { refetch: refetchGitChanges, isFetching: isFetchingGitChanges } =
     useUnifiedGetGitChanges();
@@ -143,14 +145,20 @@ function FilesTab() {
     queryClient.invalidateQueries({ queryKey: ["git_commits"] });
   };
 
+  const handleSidebarResize = useCallback(
+    (clientX: number) => {
+      setSidebarWidth(clientX);
+    },
+    [setSidebarWidth],
+  );
+
   return (
     <main
-      className="h-full w-full flex flex-col items-stretch"
+      className="h-full w-full flex flex-col items-stretch bg-[var(--oh-surface)]"
       data-testid="files-tab"
     >
-      {/* Top toolbar: diff/files + rich/plain/edit toggles (left-aligned) plus
-          the refresh button on the right. */}
-      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[var(--oh-border)]">
+      {/* Top toolbar: diff/files + rich/plain/edit toggles plus refresh */}
+      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[var(--oh-border)] shrink-0">
         <SegmentedToggle<"on" | "off" | "commits">
           ariaLabel={t(I18nKey.FILES$DIFF_VIEW)}
           testId="files-tab-diff-toggle"
@@ -192,9 +200,6 @@ function FilesTab() {
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          {/* Open the currently-selected file in a new browser tab. Only
-              meaningful while we're showing a file (not the diff view) and
-              we've resolved its staticUrl from the workspace fileserver. */}
           {activeView === "off" && selectedFileStaticUrl && (
             <a
               href={selectedFileStaticUrl}
@@ -250,34 +255,63 @@ function FilesTab() {
                 selectedPath={selectedPath}
                 onSelectFile={handleSelectFile}
                 isTreeVisible={isTreeVisible}
-                onToggleTree={() => setIsTreeVisible((prev) => !prev)}
+                onToggleTree={() => {
+                  const nextState = !isTreeVisible;
+                  setIsTreeVisible(nextState);
+                  setSidebarCollapsed(!nextState);
+                }}
               />
-              <div className="flex h-full min-h-0 flex-1">
+              <div className="flex h-full min-h-0 flex-1 relative">
+                {/* File Explorer Sidebar */}
                 {isTreeVisible && (
-                  <aside
-                    className="w-64 shrink-0 border-r border-[var(--oh-border)] overflow-hidden"
-                    data-testid="files-tab-tree"
-                  >
-                    <FileTreeView
-                      paths={paths}
-                      selectedPath={selectedPath}
-                      onSelectFile={handleSelectFile}
-                      onEditFile={(path) => {
-                        handleSelectFile(path);
-                        setFilesTabContentViewMode("edit");
-                      }}
+                  <>
+                    <aside
+                      style={{ width: `${sidebarWidth}px` }}
+                      className="shrink-0 border-r border-[var(--oh-border)] overflow-hidden flex flex-col"
+                      data-testid="files-tab-tree"
+                    >
+                      <FileTreeView
+                        paths={paths}
+                        selectedPath={selectedPath}
+                        onSelectFile={handleSelectFile}
+                        onEditFile={(path) => {
+                          handleSelectFile(path);
+                          setFilesTabContentViewMode("edit");
+                        }}
+                      />
+                    </aside>
+                    <ResizableSplitter
+                      onResize={handleSidebarResize}
+                      onReset={() => setSidebarWidth(260)}
                     />
-                  </aside>
+                  </>
                 )}
+
+                {/* Main IDE Editor / Viewer Area */}
                 <section
-                  className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
+                  className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[#141414]"
                   data-testid="files-tab-content"
                 >
+                  <EditorTabBar
+                    onOpenSearchModal={() => setIsSearchModalOpen(true)}
+                    onRefresh={refreshFiles}
+                    isRefreshing={isFetchingGitChanges}
+                  />
+
                   {selectedPath ? (
-                    <FileContentViewer
-                      path={selectedPath}
-                      viewMode={contentViewMode}
-                    />
+                    <>
+                      <EditorBreadcrumbs
+                        path={selectedPath}
+                        onSelectPath={handleSelectFile}
+                      />
+                      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+                        <FileContentViewer
+                          path={selectedPath}
+                          viewMode={contentViewMode}
+                        />
+                      </div>
+                      <EditorStatusBar path={selectedPath} />
+                    </>
                   ) : (
                     <NoFileSelectedMessage />
                   )}
@@ -287,6 +321,14 @@ function FilesTab() {
           )}
         </div>
       )}
+
+      {/* Quick Search Modal */}
+      <QuickFileSearchModal
+        isOpen={isSearchModalOpen}
+        paths={paths}
+        onClose={() => setIsSearchModalOpen(false)}
+        onSelectFile={handleSelectFile}
+      />
     </main>
   );
 }

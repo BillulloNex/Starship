@@ -128,4 +128,28 @@ export class WorkspaceFileOperationsService {
       15,
     );
   }
+
+  /**
+   * Duplicates a file or directory from `sourcePath` to `targetPath`.
+   */
+  static async duplicatePath(
+    conversationUrl: string | null | undefined,
+    sessionApiKey: string | null | undefined,
+    workingDir: string | undefined,
+    sourcePath: string,
+    targetPath: string,
+  ): Promise<CommandResult> {
+    const b64Src = toBase64(sourcePath);
+    const b64Dst = toBase64(targetPath);
+
+    const script = `python3 -c "import base64, pathlib, shutil; src = pathlib.Path(base64.b64decode('${b64Src}').decode('utf-8')); dst = pathlib.Path(base64.b64decode('${b64Dst}').decode('utf-8')); dst.parent.mkdir(parents=True, exist_ok=True); shutil.copytree(src, dst) if src.is_dir() else shutil.copy2(src, dst)"`;
+
+    return AgentServerRuntimeService.executeCommand(
+      conversationUrl,
+      sessionApiKey,
+      script,
+      workingDir,
+      15,
+    );
+  }
 }

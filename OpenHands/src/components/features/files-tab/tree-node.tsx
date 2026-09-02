@@ -8,12 +8,13 @@ import {
   Copy,
   Folder,
   FolderOpen,
-  FileCode,
+  Files,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { FileTreeNode } from "#/utils/file-tree";
 import { cn } from "#/utils/utils";
+import { FileTypeIcon } from "./file-type-icon";
 
 export interface TreeNodeActionCallbacks {
   onSelectFile: (path: string) => void;
@@ -21,7 +22,13 @@ export interface TreeNodeActionCallbacks {
   onCreateFile?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
   onRename?: (path: string, isDirectory: boolean) => void;
+  onDuplicate?: (path: string) => void;
   onDelete?: (path: string, isDirectory: boolean) => void;
+  onContextMenu?: (
+    e: React.MouseEvent,
+    path: string,
+    isDirectory: boolean,
+  ) => void;
 }
 
 interface TreeNodeProps extends TreeNodeActionCallbacks {
@@ -41,7 +48,9 @@ export function TreeNode({
   onCreateFile,
   onCreateFolder,
   onRename,
+  onDuplicate,
   onDelete,
+  onContextMenu,
 }: TreeNodeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const effectiveOpen = expandedAll !== undefined ? expandedAll : isOpen;
@@ -53,6 +62,14 @@ export function TreeNode({
     toast.success(`Copied path: ${node.path}`);
   };
 
+  const handleRightClick = (e: React.MouseEvent) => {
+    if (onContextMenu) {
+      e.preventDefault();
+      e.stopPropagation();
+      onContextMenu(e, node.path, node.isDirectory);
+    }
+  };
+
   if (node.isDirectory) {
     return (
       <li className="group/tree-item">
@@ -60,10 +77,11 @@ export function TreeNode({
           data-testid={`file-tree-dir-${node.path}`}
           className={cn(
             "flex w-full items-center justify-between py-1 pr-2 text-left text-xs text-white",
-            "hover:bg-tertiary cursor-pointer group",
+            "hover:bg-[var(--oh-surface-raised)] cursor-pointer group select-none",
           )}
           style={{ paddingLeft: `${indentPx}px` }}
           onClick={() => setIsOpen((prev) => !prev)}
+          onContextMenu={handleRightClick}
         >
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span
@@ -97,7 +115,7 @@ export function TreeNode({
                   setIsOpen(true);
                   onCreateFile(node.path);
                 }}
-                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
               >
                 <FilePlus className="w-3 h-3" />
               </button>
@@ -111,7 +129,7 @@ export function TreeNode({
                   setIsOpen(true);
                   onCreateFolder(node.path);
                 }}
-                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
               >
                 <FolderPlus className="w-3 h-3" />
               </button>
@@ -122,7 +140,7 @@ export function TreeNode({
                 title="Rename folder"
                 aria-label="Rename folder"
                 onClick={() => onRename(node.path, true)}
-                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+                className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
               >
                 <Pencil className="w-3 h-3" />
               </button>
@@ -133,7 +151,7 @@ export function TreeNode({
                 title="Delete folder"
                 aria-label="Delete folder"
                 onClick={() => onDelete(node.path, true)}
-                className="p-1 rounded text-[var(--oh-muted)] hover:text-red-400 hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+                className="p-1 rounded text-[var(--oh-muted)] hover:text-red-400 hover:bg-[var(--oh-surface)] cursor-pointer"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -155,7 +173,9 @@ export function TreeNode({
                 onCreateFile={onCreateFile}
                 onCreateFolder={onCreateFolder}
                 onRename={onRename}
+                onDuplicate={onDuplicate}
                 onDelete={onDelete}
+                onContextMenu={onContextMenu}
               />
             ))}
           </ul>
@@ -170,17 +190,18 @@ export function TreeNode({
       <div
         data-testid={`file-tree-file-${node.path}`}
         className={cn(
-          "flex w-full items-center justify-between py-1 pr-2 text-left text-xs",
-          "hover:bg-tertiary cursor-pointer group",
+          "flex w-full items-center justify-between py-1 pr-2 text-left text-xs select-none",
+          "hover:bg-[var(--oh-surface-raised)] cursor-pointer group transition-colors",
           isSelected
-            ? "bg-[var(--oh-interactive-hover)] text-white"
+            ? "bg-[var(--oh-interactive-hover)] text-white font-medium"
             : "text-[var(--oh-text-tertiary)]",
         )}
         style={{ paddingLeft: `${indentPx + 14}px` }}
         onClick={() => onSelectFile(node.path)}
+        onContextMenu={handleRightClick}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <FileCode className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+          <FileTypeIcon path={node.path} className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate">{node.name}</span>
         </div>
 
@@ -195,9 +216,20 @@ export function TreeNode({
               title="Edit file"
               aria-label="Edit file"
               onClick={() => onEditFile(node.path)}
-              className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+              className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
             >
               <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {onDuplicate && (
+            <button
+              type="button"
+              title="Duplicate file"
+              aria-label="Duplicate file"
+              onClick={() => onDuplicate(node.path)}
+              className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
+            >
+              <Files className="w-3 h-3" />
             </button>
           )}
           <button
@@ -205,7 +237,7 @@ export function TreeNode({
             title="Copy path"
             aria-label="Copy path"
             onClick={handleCopyPath}
-            className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+            className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
           >
             <Copy className="w-3 h-3" />
           </button>
@@ -215,7 +247,7 @@ export function TreeNode({
               title="Rename file"
               aria-label="Rename file"
               onClick={() => onRename(node.path, false)}
-              className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+              className="p-1 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface)] cursor-pointer"
             >
               <Pencil className="w-3 h-3" />
             </button>
@@ -226,7 +258,7 @@ export function TreeNode({
               title="Delete file"
               aria-label="Delete file"
               onClick={() => onDelete(node.path, false)}
-              className="p-1 rounded text-[var(--oh-muted)] hover:text-red-400 hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+              className="p-1 rounded text-[var(--oh-muted)] hover:text-red-400 hover:bg-[var(--oh-surface)] cursor-pointer"
             >
               <Trash2 className="w-3 h-3" />
             </button>

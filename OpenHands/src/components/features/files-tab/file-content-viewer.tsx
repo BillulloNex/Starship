@@ -1,3 +1,4 @@
+import React from "react";
 import { useTranslation } from "react-i18next";
 
 import { I18nKey } from "#/i18n/declaration";
@@ -8,6 +9,7 @@ import {
 } from "#/stores/use-workspace-mutation-counter";
 import { MarkdownRenderer } from "#/components/features/markdown/markdown-renderer";
 import { isMarkdownFilePath } from "#/utils/is-markdown-file-path";
+import { useFilesTabStore } from "#/stores/files-tab-store";
 import { FileCodeEditor } from "./file-code-editor";
 import { HighlightedSourceView } from "./highlighted-source-view";
 import type { ViewMode } from "./view-mode";
@@ -65,15 +67,15 @@ function UnpreviewableFallback({ path }: { path: string }) {
  * an iframe / <img> straight at the agent server's static workspace
  * fileserver for HTML / SVG / images / PDFs, so relative asset references
  * load naturally. In `plain` mode we always show the raw bytes as text (or
- * a fallback message for binaries).
+ * a fallback message for binaries). In `edit` mode we show the Monaco editor.
  */
 export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   const { t } = useTranslation("openhands");
   const query = useWorkspaceFileContent(path);
+  const previewModes = useFilesTabStore((s) => s.previewModes);
   // Subscribe to the workspace mutation counter so the iframe / <img> src
   // changes after every agent-side edit, forcing a fresh fetch even when
-  // the *path* hasn't moved (e.g. agent rewrote `style.css` referenced by
-  // the currently-displayed `index.html`).
+  // the *path* hasn't moved.
   const mutationCounter = useWorkspaceMutationCounter((state) => state.count);
 
   if (query.isLoading) {
@@ -85,12 +87,6 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   }
 
   if (query.isError || !query.data) {
-    // Show a load-error message rather than the binary-fallback string —
-    // these are completely different failure modes (couldn't even fetch
-    // the file vs. fetched fine but the bytes aren't previewable) and
-    // mixing them up hides real backend failures behind a misleading
-    // "Binary file" label. Prefer the underlying error's own message when
-    // we have one; fall back to the generic translated string otherwise.
     return (
       <div
         className="flex h-full w-full items-center justify-center text-sm text-[var(--oh-muted)]"
@@ -104,6 +100,7 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
 
   const { kind, text, staticUrl, mimeType } = query.data;
   const bustedStaticUrl = withWorkspaceCacheBuster(staticUrl, mutationCounter);
+  const filePreviewMode = previewModes[path] || "code";
 
   // ----- Edit mode: editable Monaco code editor with save functionality. -----
   if (viewMode === "edit") {
@@ -114,9 +111,7 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   }
 
   // ----- Plain mode: raw source bytes, syntax-highlighted when we can
-  // recognize the grammar (falls through to a `<pre>` otherwise). This
-  // includes "plain" view of markdown / HTML, where the point is to see
-  // the markup behind the rich preview.
+  // recognize the grammar (falls through to a `<pre>` otherwise).
   if (viewMode === "plain") {
     if (kind === "text" && text !== null) {
       return (
@@ -128,6 +123,45 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
       );
     }
     return <UnpreviewableFallback path={path} />;
+  }
+
+  // ----- Split View Mode: Side-by-side code editor and live preview -----
+  if (filePreviewMode === "split" && kind === "text" && text !== null) {
+    const isMarkdown = isMarkdownFilePath(path);
+    const isHtml =
+      mimeType === "text/html" || HTML_LIKE_EXTS.has(getExtension(path));
+
+    return (
+      <div className="flex h-full w-full min-h-0 divide-x divide-[var(--oh-border)]">
+        <div className="flex-1 h-full min-h-0 min-w-0">
+          <FileCodeEditor path={path} initialContent={text} />
+        </div>
+        <div className="flex-1 h-full min-h-0 min-w-0 overflow-auto bg-[var(--oh-surface)] custom-scrollbar-always">
+          {isMarkdown ? (
+            <div
+              data-testid="file-content-viewer-markdown"
+              className="h-full w-full overflow-auto bg-[var(--oh-surface)] text-white custom-scrollbar-always [--oh-scroll-fade-from:var(--oh-surface)]"
+            >
+              <div className="prose prose-sm prose-invert max-w-none p-6 [--tw-prose-body:#fff] [--tw-prose-bold:#fff] [--tw-prose-headings:#fff] [--tw-prose-lead:#fff] [--tw-prose-counters:#fff] [--tw-prose-quotes:#fff] [--tw-prose-quote-borders:var(--oh-border-subtle)] [--tw-prose-bullets:var(--oh-muted)] [--tw-prose-hr:var(--oh-border-subtle)] [--tw-prose-captions:var(--oh-muted)] [--tw-prose-kbd:#fff]">
+                <MarkdownRenderer
+                  content={text ?? ""}
+                  includeStandard
+                  includeHeadings
+                />
+              </div>
+            </div>
+          ) : isHtml ? (
+            <iframe
+              title={path}
+              src={bustedStaticUrl}
+              sandbox="allow-same-origin"
+              data-testid="file-content-viewer-iframe"
+              className="h-full w-full bg-white"
+            />
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   // ----- Rich mode: render HTML, markdown, images, PDFs from staticUrl. ----
@@ -147,14 +181,6 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   }
 
   if (kind === "pdf") {
-    // PDFs can carry embedded JavaScript (AcroForm, OpenAction…). Even
-    // though `staticUrl` lives on the agent server origin, the PDF
-    // viewer's scripting capability isn't worth the risk for a file
-    // preview, so we sandbox the iframe. `allow-same-origin` lets the
-    // browser's built-in PDF viewer load the underlying bytes without
-    // tripping cross-origin restrictions; we omit `allow-scripts`
-    // because no PDF preview we care about needs to run JS in the
-    // parent's origin.
     return (
       <iframe
         title={path}
@@ -170,37 +196,8 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
     return <UnpreviewableFallback path={path} />;
   }
 
-  // Text-like content.
-  if (mimeType === "text/html" || HTML_LIKE_EXTS.has(getExtension(path))) {
-    // Sandbox the preview iframe: `allow-same-origin` keeps the frame on
-    // the workspace fileserver's origin so relative `<link href="…">`,
-    // `<img src="…">`, etc. continue to resolve, while the absence of
-    // `allow-scripts` means any `<script>` (or `onerror=…`, inline event
-    // handler, …) inside the previewed file is inert. This is exactly
-    // the safe-preview posture we want — users can look at their HTML
-    // without it executing in the canvas's context.
-    return (
-      <iframe
-        title={path}
-        src={bustedStaticUrl}
-        sandbox="allow-same-origin"
-        data-testid="file-content-viewer-iframe"
-        className="h-full w-full bg-white"
-      />
-    );
-  }
-
+  // Text-like content: Markdown
   if (kind === "text" && isMarkdownFilePath(path)) {
-    // Match the right-pane chrome color so the rich-rendered markdown
-    // blends with the surrounding files tab instead of painting a stark
-    // white card. `--oh-scroll-fade-from` keeps wide-table edge fades on
-    // the same surface (otherwise they default to `--oh-color-base`).
-    // We use `prose-invert` (typography plugin's dark-theme variant) and
-    // then layer arbitrary CSS-variable overrides on top to pin body /
-    // bold / quote text to pure white — the user specifically asked for
-    // every text element (not just headings) to read as white. The custom
-    // heading components in `markdown/headings.tsx` already hard-code
-    // `text-white`, so headers stay white through this change.
     return (
       <div
         data-testid="file-content-viewer-markdown"
@@ -217,12 +214,21 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
     );
   }
 
-  // Rich mode for actual source code (.ts, .py, .yaml, .css, …): there
-  // is no other "rich" rendering to fall back to, so highlighted source
-  // IS the rich view. Identical to the plain-mode treatment — keeping
-  // both branches reuse `HighlightedSourceView` means the toggle has the
-  // same visual identity for source files in both modes (which is the
-  // honest answer: source IS rendered code).
+  // Text-like content: HTML
+  if (mimeType === "text/html" || HTML_LIKE_EXTS.has(getExtension(path))) {
+    return (
+      <iframe
+        title={path}
+        src={bustedStaticUrl}
+        sandbox="allow-same-origin"
+        data-testid="file-content-viewer-iframe"
+        className="h-full w-full bg-white"
+      />
+    );
+  }
+
+  // Rich mode for actual source code (.ts, .py, .yaml, .css, …):
+  // Render syntax-highlighted source view for plain inspection
   if (kind === "text" && text !== null) {
     return (
       <HighlightedSourceView
@@ -233,7 +239,5 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
     );
   }
 
-  // Truly unknown / empty payload — show a fallback so the pane is never
-  // blank.
   return <UnpreviewableFallback path={path} />;
 }

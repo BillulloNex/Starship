@@ -93,7 +93,7 @@ export default function AgentContextSettingsScreen() {
           agent_context: {
             ...agentContext,
             system_message_suffix: customSuffix.trim() || undefined,
-          },
+          } as any,
         },
       });
       displaySuccessToast("Agent context custom instructions saved!");
@@ -103,8 +103,8 @@ export default function AgentContextSettingsScreen() {
   };
 
   const systemInstructions =
-    activeProfile?.system_prompt ||
-    settings?.agent_settings?.system_prompt ||
+    (activeProfile as any)?.system_prompt ||
+    (settings?.agent_settings as any)?.system_prompt ||
     "You are Starship, an autonomous AI software engineer and system harness. You have full terminal, file, and browser tool execution capabilities to implement user objectives autonomously.";
 
   const runtimeServicesPreview = `<RUNTIME_SERVICES>
@@ -396,8 +396,8 @@ agent_harness: Starship Sovereign Cloud Harness
               </span>
               <span className="rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1">
                 Model:{" "}
-                {activeProfile?.llm_model ||
-                  settings?.agent_settings?.llm?.model ||
+                {(activeProfile as any)?.llm_model ||
+                  (settings?.agent_settings as any)?.llm?.model ||
                   "Default"}
               </span>
             </div>

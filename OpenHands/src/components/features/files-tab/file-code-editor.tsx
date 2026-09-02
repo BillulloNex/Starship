@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Editor, type Monaco } from "@monaco-editor/react";
 import { editor as editor_t } from "monaco-editor";
 
@@ -7,6 +7,7 @@ import { useSaveWorkspaceFile } from "#/hooks/mutation/use-workspace-file-mutati
 import { getLanguageFromPath } from "#/utils/get-language-from-path";
 import { BrandButton } from "#/components/features/settings/brand-button";
 import { LoadingSpinner } from "#/components/shared/loading-spinner";
+import { useFilesTabStore } from "#/stores/files-tab-store";
 
 interface FileCodeEditorProps {
   path: string;
@@ -24,6 +25,9 @@ const EDITOR_OPTIONS: editor_t.IEditorOptions = {
   fontSize: 13,
   lineHeight: 20,
   wordWrap: "off",
+  cursorBlinking: "smooth",
+  smoothScrolling: true,
+  bracketPairColorization: { enabled: true },
 };
 
 export function FileCodeEditor({
@@ -33,22 +37,32 @@ export function FileCodeEditor({
 }: FileCodeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const saveMutation = useSaveWorkspaceFile();
+  const setFileDirty = useFilesTabStore((s) => s.setFileDirty);
+  const setCursorPosition = useFilesTabStore((s) => s.setCursorPosition);
+  const editorRef = useRef<editor_t.IStandaloneCodeEditor | null>(null);
 
   // Reset content when path or initialContent changes from outside
   useEffect(() => {
     setContent(initialContent);
-  }, [path, initialContent]);
+    setFileDirty(path, false);
+  }, [path, initialContent, setFileDirty]);
 
   const isDirty = content !== initialContent;
+
+  useEffect(() => {
+    setFileDirty(path, isDirty);
+  }, [path, isDirty, setFileDirty]);
 
   const handleSave = useCallback(async () => {
     if (!isDirty || saveMutation.isPending) return;
     await saveMutation.mutateAsync({ path, content });
+    setFileDirty(path, false);
     onSave?.(path);
-  }, [isDirty, saveMutation, path, content, onSave]);
+  }, [isDirty, saveMutation, path, content, setFileDirty, onSave]);
 
   const handleReset = () => {
     setContent(initialContent);
+    setFileDirty(path, false);
   };
 
   // Keyboard shortcut: Cmd+S / Ctrl+S
@@ -78,10 +92,25 @@ export function FileCodeEditor({
     });
   };
 
+  const handleOnMount = (editor: editor_t.IStandaloneCodeEditor) => {
+    editorRef.current = editor;
+    const pos = editor.getPosition();
+    if (pos) {
+      setCursorPosition({ line: pos.lineNumber, column: pos.column });
+    }
+
+    editor.onDidChangeCursorPosition((e) => {
+      setCursorPosition({
+        line: e.position.lineNumber,
+        column: e.position.column,
+      });
+    });
+  };
+
   return (
     <div className="flex flex-col h-full w-full bg-[#141414] min-h-0">
       {/* Editor toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--oh-border)] bg-[var(--oh-surface)]">
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-[var(--oh-border)] bg-[var(--oh-surface)]">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-mono text-white truncate">{path}</span>
           {isDirty && (
@@ -134,6 +163,7 @@ export function FileCodeEditor({
           onChange={(val) => setContent(val ?? "")}
           theme="grokbot-dark"
           beforeMount={handleBeforeMount}
+          onMount={handleOnMount}
           options={EDITOR_OPTIONS}
         />
       </div>

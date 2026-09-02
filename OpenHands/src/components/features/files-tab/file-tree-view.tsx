@@ -6,6 +6,7 @@ import { FilePlus, FolderPlus, Search, X, ChevronsUpDown } from "lucide-react";
 import { I18nKey } from "#/i18n/declaration";
 import { buildFileTree, filterFileTree } from "#/utils/file-tree";
 import { TreeNode } from "./tree-node";
+import { FileContextMenu } from "./file-context-menu";
 import {
   CreateEntryModal,
   RenameEntryModal,
@@ -16,6 +17,7 @@ import {
   useCreateWorkspaceFolder,
   useDeleteWorkspacePath,
   useRenameWorkspacePath,
+  useDuplicateWorkspacePath,
 } from "#/hooks/mutation/use-workspace-file-mutations";
 
 interface FileTreeViewProps {
@@ -38,6 +40,14 @@ export function FileTreeView({
   const [expandedAll, setExpandedAll] = useState<boolean | undefined>(
     undefined,
   );
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    path: string;
+    isDirectory: boolean;
+  } | null>(null);
 
   // Modals state
   const [createModal, setCreateModal] = useState<{
@@ -75,6 +85,7 @@ export function FileTreeView({
   const createFolderMutation = useCreateWorkspaceFolder();
   const deleteMutation = useDeleteWorkspacePath();
   const renameMutation = useRenameWorkspacePath();
+  const duplicateMutation = useDuplicateWorkspacePath();
 
   const rawTree = useMemo(() => buildFileTree(paths), [paths]);
   const root = useMemo(() => {
@@ -119,12 +130,40 @@ export function FileTreeView({
     }
   };
 
+  const handleDuplicate = async (sourcePath: string) => {
+    const parts = sourcePath.split(".");
+    let targetPath = `${sourcePath}-copy`;
+    if (parts.length > 1) {
+      const ext = parts.pop();
+      targetPath = `${parts.join(".")}-copy.${ext}`;
+    }
+    await duplicateMutation.mutateAsync({
+      sourcePath,
+      targetPath,
+    });
+    onSelectFile(targetPath);
+  };
+
   const toggleExpandCollapse = () => {
     setExpandedAll((prev) => (prev ? false : true));
   };
 
+  const handleBackgroundContextMenu = (e: React.MouseEvent) => {
+    if (readOnly) return;
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      path: "",
+      isDirectory: true,
+    });
+  };
+
   return (
-    <div className="flex flex-col h-full w-full min-h-0 bg-[var(--oh-surface)]">
+    <div
+      className="flex flex-col h-full w-full min-h-0 bg-[var(--oh-surface)]"
+      onContextMenu={handleBackgroundContextMenu}
+    >
       {/* Explorer Header */}
       {!readOnly && (
         <div className="flex flex-col border-b border-[var(--oh-border)] p-2 gap-2 shrink-0">
@@ -245,6 +284,7 @@ export function FileTreeView({
                           isDirectory,
                         })
                 }
+                onDuplicate={readOnly ? undefined : handleDuplicate}
                 onDelete={
                   readOnly
                     ? undefined
@@ -255,11 +295,60 @@ export function FileTreeView({
                           isDirectory,
                         })
                 }
+                onContextMenu={(e, path, isDirectory) => {
+                  if (readOnly) return;
+                  setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    path,
+                    isDirectory,
+                  });
+                }}
               />
             ))}
           </ul>
         )}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <FileContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          path={contextMenu.path}
+          isDirectory={contextMenu.isDirectory}
+          onClose={() => setContextMenu(null)}
+          onCreateFile={(parentPath) =>
+            setCreateModal({
+              isOpen: true,
+              type: "file",
+              parentPath,
+            })
+          }
+          onCreateFolder={(parentPath) =>
+            setCreateModal({
+              isOpen: true,
+              type: "folder",
+              parentPath,
+            })
+          }
+          onRename={(path, isDirectory) =>
+            setRenameModal({
+              isOpen: true,
+              path,
+              isDirectory,
+            })
+          }
+          onDuplicate={handleDuplicate}
+          onDelete={(path, isDirectory) =>
+            setDeleteModal({
+              isOpen: true,
+              path,
+              isDirectory,
+            })
+          }
+        />
+      )}
 
       {/* Modals */}
       <CreateEntryModal
