@@ -21,6 +21,8 @@ export default [
     route("mcp", "routes/mcp-redirect.tsx"),
 
     route("jobs", "routes/jobs.tsx"),
+    route("files", "routes/files-explorer.tsx"),
+    route("terminal", "routes/terminal-console.tsx"),
     route("settings", "routes/settings.tsx", [
       index("routes/settings-index.tsx"),
       route("agents", "routes/agent-profiles-settings.tsx"),

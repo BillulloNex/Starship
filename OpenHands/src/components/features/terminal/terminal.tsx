@@ -7,12 +7,14 @@ import { cn } from "#/utils/utils";
 import { WaitingForRuntimeMessage } from "../chat/waiting-for-runtime-message";
 import { useAgentState } from "#/hooks/use-agent-state";
 import { useCommandStore } from "#/stores/command-store";
-import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useBashCommandRunner } from "#/hooks/use-bash-command-runner";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
+
+const FALLBACK_WORKING_DIR = "/root/workspace";
 
 function Terminal() {
   const { curAgentState } = useAgentState();
-  const sessions = useCommandStore((state) => state.sessions);
+  const allSessions = useCommandStore((state) => state.sessions);
   const activeSessionId = useCommandStore((state) => state.activeSessionId);
   const setActiveSessionId = useCommandStore(
     (state) => state.setActiveSessionId,
@@ -21,24 +23,41 @@ function Terminal() {
   const closeSession = useCommandStore((state) => state.closeSession);
   const clearTerminal = useCommandStore((state) => state.clearTerminal);
 
+  const {
+    isStandalone,
+    conversationUrl,
+    sessionApiKey,
+    workingDir: runtimeWorkingDir,
+    isReady,
+  } = useWorkspaceRuntime();
+  const workingDir = runtimeWorkingDir || FALLBACK_WORKING_DIR;
+
+  const sessions = React.useMemo(
+    () =>
+      isStandalone ? allSessions.filter((s) => !s.isAgentOnly) : allSessions,
+    [allSessions, isStandalone],
+  );
+
   const activeSession =
     sessions.find((s) => s.id === activeSessionId) || sessions[0];
   const isAgentSession = activeSession?.isAgentOnly ?? false;
   const commands = activeSession?.commands || [];
   const isExecuting = activeSession?.isExecuting || false;
 
-  const { data: conversation } = useActiveConversation();
-  const conversationUrl = conversation?.conversation_url;
-  const sessionApiKey = conversation?.session_api_key;
-  const workingDir =
-    conversation?.workspace?.working_dir?.trim() || "/root/workspace";
+  React.useEffect(() => {
+    if (activeSession && activeSession.id !== activeSessionId) {
+      setActiveSessionId(activeSession.id);
+    }
+  }, [activeSession, activeSessionId, setActiveSessionId]);
 
-  const isRuntimeInactive = RUNTIME_INACTIVE_STATES.includes(curAgentState);
+  const isRuntimeInactive = isStandalone
+    ? !isReady
+    : RUNTIME_INACTIVE_STATES.includes(curAgentState);
 
   const runBashCommand = useBashCommandRunner(
     conversationUrl,
     sessionApiKey,
-    !isRuntimeInactive && !!conversationUrl,
+    !isRuntimeInactive && (isStandalone || !!conversationUrl),
   );
 
   const activeTerminalRef = React.useRef<{

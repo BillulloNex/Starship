@@ -12,14 +12,9 @@ vi.mock("#/contexts/active-backend-context", () => ({
   useActiveBackend: () => useActiveBackendMock(),
 }));
 
-const useActiveConversationMock = vi.fn();
-vi.mock("#/hooks/query/use-active-conversation", () => ({
-  useActiveConversation: () => useActiveConversationMock(),
-}));
-
-const useRuntimeIsReadyMock = vi.fn();
-vi.mock("#/hooks/use-runtime-is-ready", () => ({
-  useRuntimeIsReady: () => useRuntimeIsReadyMock(),
+const useWorkspaceRuntimeMock = vi.fn();
+vi.mock("#/context/workspace-runtime-context", () => ({
+  useWorkspaceRuntime: () => useWorkspaceRuntimeMock(),
 }));
 
 const useUnifiedGetGitChangesMock = vi.fn();
@@ -65,13 +60,19 @@ function gitChangesResult(data: GitChange[], isLoading = false) {
 
 beforeEach(() => {
   useActiveBackendMock.mockReset();
-  useActiveConversationMock.mockReset();
-  useRuntimeIsReadyMock.mockReset();
+  useWorkspaceRuntimeMock.mockReset();
   useUnifiedGetGitChangesMock.mockReset();
   executeCommandSpy.mockReset();
 
-  useRuntimeIsReadyMock.mockReturnValue(true);
-  useActiveConversationMock.mockReturnValue({ data: conversation });
+  useWorkspaceRuntimeMock.mockReturnValue({
+    isStandalone: false,
+    conversationId: conversation.id,
+    workspaceKey: conversation.id,
+    conversationUrl: conversation.conversation_url,
+    sessionApiKey: conversation.session_api_key,
+    workingDir: conversation.workspace.working_dir,
+    isReady: true,
+  });
   useUnifiedGetGitChangesMock.mockReturnValue(gitChangesResult([]));
 });
 

@@ -2,15 +2,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { WorkspaceFileOperationsService } from "#/api/runtime-service/workspace-file-operations.service";
-import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
 import { useWorkspaceMutationCounter } from "#/stores/use-workspace-mutation-counter";
 
 function useWorkspaceContext() {
-  const { data: conversation } = useActiveConversation();
-  const conversationUrl = conversation?.conversation_url;
-  const sessionApiKey = conversation?.session_api_key;
-  const workingDir = conversation?.workspace?.working_dir?.trim();
-
+  const { conversationUrl, sessionApiKey, workingDir } = useWorkspaceRuntime();
   return { conversationUrl, sessionApiKey, workingDir };
 }
 

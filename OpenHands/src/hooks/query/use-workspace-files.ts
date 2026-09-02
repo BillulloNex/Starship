@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import AgentServerRuntimeService from "#/api/runtime-service/agent-server-runtime-service";
 import { useActiveBackend } from "#/contexts/active-backend-context";
-import { useActiveConversation } from "#/hooks/query/use-active-conversation";
-import { useRuntimeIsReady } from "#/hooks/use-runtime-is-ready";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
 import { useUnifiedGetGitChanges } from "#/hooks/query/use-unified-get-git-changes";
 
 // Cap the number of files we render so a giant repo doesn't freeze the UI.
@@ -38,12 +37,11 @@ function buildListCommand(): string {
   const pruneExpr = EXCLUDED_DIRS.map((dir) => `-name '${dir}' -prune`).join(
     " -o ",
   );
-  return `find . \\( ${pruneExpr} \\) -o -type d -exec printf '%s/\\n' {} + -o -type f -print 2>/dev/null | sort | head -n ${MAX_FILES}`;
+  return `find . \\( ${pruneExpr} \\) -o -type d -exec printf '%s/\\n' {} + -o -type f -print 2>/dev/null | head -n ${MAX_FILES} | sort`;
 }
 
 function normalizePath(path: string): string {
-  // Strip a leading "./" so paths render cleanly in the UI.
-  let p = path.startsWith("./") ? path.slice(2) : path;
+  const p = path.startsWith("./") ? path.slice(2) : path;
   if (p === "." || p === "./" || p === "/") return "";
   return p;
 }
@@ -55,13 +53,13 @@ function normalizePath(path: string): string {
  * Returns paths relative to the working dir (e.g. `src/index.html` or `src/components/`).
  */
 function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
-  const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady();
-
-  const conversationId = conversation?.id;
-  const conversationUrl = conversation?.conversation_url;
-  const sessionApiKey = conversation?.session_api_key;
-  const workingDir = conversation?.workspace?.working_dir?.trim();
+  const {
+    conversationId,
+    conversationUrl,
+    sessionApiKey,
+    workingDir,
+    isReady,
+  } = useWorkspaceRuntime();
 
   const query = useQuery<string[]>({
     queryKey: [
@@ -93,10 +91,9 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
         .map(normalizePath)
         .filter(Boolean);
 
-      // Defensive: keep results unique and bounded.
       return Array.from(new Set(lines)).slice(0, MAX_FILES);
     },
-    enabled: enabled && runtimeIsReady && !!conversationId && !!workingDir,
+    enabled: enabled && isReady && !!workingDir,
     retry: false,
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,

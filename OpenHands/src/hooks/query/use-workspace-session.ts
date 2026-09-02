@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getActiveBackend } from "#/api/backend-registry/active-store";
 import { getAgentServerClientOptions } from "#/api/agent-server-client-options";
-import { useActiveConversation } from "#/hooks/query/use-active-conversation";
-import { useRuntimeIsReady } from "#/hooks/use-runtime-is-ready";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
 
 export interface WorkspaceSession {
   /**
@@ -49,15 +48,11 @@ export function useWorkspaceSession(): {
   isError: boolean;
   error: Error | null;
 } {
-  const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady();
-
-  const conversationId = conversation?.id;
-  const conversationUrl = conversation?.conversation_url;
-  const sessionApiKey = conversation?.session_api_key;
+  const { conversationId, conversationUrl, sessionApiKey, isReady } =
+    useWorkspaceRuntime();
   const isLocal = getActiveBackend().backend.kind === "local";
 
-  const enabled = runtimeIsReady && !!conversationId && isLocal;
+  const enabled = isReady && !!conversationId && isLocal;
 
   const query = useQuery<WorkspaceSession>({
     queryKey: [

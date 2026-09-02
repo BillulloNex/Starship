@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { readCloudConversationFile } from "#/api/cloud/conversation-service.api";
 import { getActiveBackend } from "#/api/backend-registry/active-store";
+import AgentServerRuntimeService from "#/api/runtime-service/agent-server-runtime-service";
 import { getGitPath } from "#/utils/get-git-path";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
-import { useRuntimeIsReady } from "#/hooks/use-runtime-is-ready";
 import {
   joinWorkspaceUrl,
   useWorkspaceSession,
@@ -140,8 +141,15 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * selected yet).
  */
 export function useWorkspaceFileContent(relativePath: string | null) {
+  const {
+    isStandalone,
+    conversationId,
+    conversationUrl,
+    sessionApiKey,
+    workingDir,
+    isReady,
+  } = useWorkspaceRuntime();
   const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady();
   const { data: workspaceSession } = useWorkspaceSession();
   // Bump on every agent-side file mutation so the query refetches the
   // currently-selected file's body even when the *path* hasn't changed.
@@ -153,23 +161,16 @@ export function useWorkspaceFileContent(relativePath: string | null) {
     (state) => state.count,
   );
 
-  const conversationId = conversation?.id;
-  const conversationUrl = conversation?.conversation_url;
-  const sessionApiKey = conversation?.session_api_key;
   const selectedRepository = conversation?.selected_repository;
-  const workingDir = conversation?.workspace?.working_dir?.trim();
   const baseUrl = workspaceSession?.baseUrl;
   const isCloud = getActiveBackend().backend.kind === "cloud";
 
-  // The cloud `/file` endpoint downloads via the runtime's
-  // `/api/file/download`, which rejects relative paths (400 → the cloud API
-  // swallows it and returns ""). Anchor the file against the working dir the
-  // same way the diff view builds its git-diff path (see use-unified-git-diff),
-  // then force a leading slash since `getGitPath`'s default is relative.
   const gitPath = getGitPath(selectedRepository, workingDir);
   const workspaceRoot = gitPath.startsWith("/") ? gitPath : `/${gitPath}`;
   const absoluteFilePath = relativePath
-    ? `${workspaceRoot}/${relativePath}`
+    ? isStandalone
+      ? `${workingDir?.replace(/\/+$/, "")}/${relativePath}`
+      : `${workspaceRoot}/${relativePath}`
     : null;
 
   return useQuery<WorkspaceFileContent>({
@@ -178,6 +179,7 @@ export function useWorkspaceFileContent(relativePath: string | null) {
       conversationId,
       conversationUrl,
       sessionApiKey,
+      isStandalone,
       isCloud ? "cloud" : baseUrl,
       relativePath,
       absoluteFilePath,
@@ -188,6 +190,36 @@ export function useWorkspaceFileContent(relativePath: string | null) {
 
       const kind = classifyKind(relativePath);
       const mimeType = guessMimeType(relativePath);
+
+      if (isStandalone) {
+        const buffer = await AgentServerRuntimeService.downloadFile(
+          conversationUrl,
+          sessionApiKey,
+          absoluteFilePath!,
+        );
+        const base64 = arrayBufferToBase64(buffer);
+
+        if (kind === "text" && isLikelyBinary(buffer)) {
+          return {
+            path: relativePath,
+            kind: "binary",
+            text: null,
+            staticUrl: `data:application/octet-stream;base64,${base64}`,
+            mimeType: "application/octet-stream",
+          };
+        }
+
+        return {
+          path: relativePath,
+          kind,
+          text:
+            kind === "text"
+              ? new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+              : null,
+          staticUrl: `data:${mimeType};base64,${base64}`,
+          mimeType,
+        };
+      }
 
       if (isCloud) {
         // Cloud: fetch through the cloud API's first-class runtime proxy
@@ -291,10 +323,9 @@ export function useWorkspaceFileContent(relativePath: string | null) {
       };
     },
     enabled:
-      runtimeIsReady &&
-      !!conversationId &&
+      isReady &&
       !!relativePath &&
-      (isCloud || !!baseUrl),
+      (isStandalone || (isCloud ? !!conversationId : !!baseUrl)),
     retry: false,
     staleTime: 1000 * 5,
     gcTime: 1000 * 60,
