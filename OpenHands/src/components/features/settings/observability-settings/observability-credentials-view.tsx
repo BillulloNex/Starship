@@ -44,19 +44,25 @@ interface CredentialField {
 /** Check if a credential is set via Coolify runtime env injection. */
 function hasRuntimeEnvValue(keys: string[] | undefined): boolean {
   if (!keys || keys.length === 0) return false;
+  return getRuntimeEnvValue(keys) !== null;
+}
+
+/** Get the actual runtime env value for display when toggling visibility. */
+function getRuntimeEnvValue(keys: string[] | undefined): string | null {
+  if (!keys || keys.length === 0) return null;
   for (const key of keys) {
     // 1. Runtime injection from static-server.mjs
     if (
       typeof window !== "undefined" &&
       window.__OBSERVABILITY_CONFIG__?.[key]
     ) {
-      return true;
+      return window.__OBSERVABILITY_CONFIG__[key];
     }
     // 2. Vite build-time env
     const envVal = import.meta.env[key] as string | undefined;
-    if (envVal && envVal.length > 0) return true;
+    if (envVal && envVal.length > 0) return envVal;
   }
-  return false;
+  return null;
 }
 
 interface PlatformConfig {
@@ -371,14 +377,14 @@ function PlatformCredentialCard({ platform }: { platform: PlatformConfig }) {
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <input
-                    type={
-                      field.isSensitive && !isVisible ? "password" : "text"
-                    }
+                    type="text"
                     value={
                       isEditing
                         ? editValues[field.secretName]
                         : exists
-                          ? "••••••••••••"
+                          ? isVisible
+                            ? (getRuntimeEnvValue(field.runtimeEnvKeys) ?? "••••••••••••")
+                            : "••••••••••••"
                           : ""
                     }
                     placeholder={field.placeholder}
