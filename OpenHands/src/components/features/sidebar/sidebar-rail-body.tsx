@@ -1,7 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
   ChevronLeft,
   ChevronRight,
   Columns3,
@@ -178,13 +177,6 @@ export function SidebarRailBody({
           testId="sidebar-automations-link"
           collapsed={collapsed}
           icon={<AutomationsIcon width={ICON_SIZE} height={ICON_SIZE} />}
-        />
-        <SidebarNavLink
-          to="/observability"
-          label={t(I18nKey.SETTINGS$NAV_OBSERVABILITY)}
-          testId="sidebar-observability-link"
-          collapsed={collapsed}
-          icon={<Activity width={ICON_SIZE} height={ICON_SIZE} />}
         />
         <SidebarNavLink
           to="/jobs"

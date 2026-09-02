@@ -55,9 +55,8 @@ Below are a list of tasks we need to do. I will add a few of my own, and feel fr
     - [ ] Adapt the design of the board to that of deep_dive/019/assets/devin-board.jpeg
     
 - [ ] UI design: we will go thru a design session to establish a new and proper branding guideline & design. we will work a lot on paper.design - lets work on the project 'Starship' page 'Design'. The process is as follows:
-    - [ ] You create 1:1 design frames of the app on paper.design
+    - [x] You create 1:1 design frames of the app on paper.design
     - [ ] I will have comments on the layouts, deleting or moving items on the page, etc
-    
     - [ ] We will analyze the inspo and potential assets
     - [ ] We go thru iterations on paper.design on how that will look like
     - [ ] Until when I am happy, we wont apply the changes

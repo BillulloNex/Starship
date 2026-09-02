@@ -1,4 +1,4 @@
-import { AppWindow, Brain, Fuel, Shield } from "lucide-react";
+import { Activity, AppWindow, Brain, Fuel, Shield } from "lucide-react";
 import KeyIcon from "#/icons/key.svg?react";
 import MemoryIcon from "#/icons/memory_icon.svg?react";
 import CircuitIcon from "#/icons/u-circuit.svg?react";
@@ -107,5 +107,11 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/app",
     text: "SETTINGS$NAV_APPLICATION",
     subtitle: "SETTINGS$PAGE_APPLICATION_SUBLINE",
+  },
+  {
+    icon: <Activity className="size-4" strokeWidth={2} aria-hidden />,
+    to: "/settings/observability",
+    text: "SETTINGS$NAV_OBSERVABILITY",
+    subtitle: "SETTINGS$PAGE_OBSERVABILITY_SUBLINE",
   },
 ];
