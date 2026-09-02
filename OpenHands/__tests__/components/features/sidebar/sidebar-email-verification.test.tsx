@@ -152,7 +152,7 @@ describe("Sidebar email verification", () => {
     for (const testId of [
       "sidebar-conversations-link",
       "sidebar-automations-link",
-      "sidebar-observability-link",
+      "sidebar-jobs-link",
     ]) {
       expect(screen.getByTestId(testId)).not.toHaveAttribute("aria-disabled");
     }

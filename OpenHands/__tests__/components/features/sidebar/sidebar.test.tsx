@@ -475,7 +475,6 @@ describe("Sidebar", () => {
     for (const testId of [
       "sidebar-conversations-link",
       "sidebar-automations-link",
-      "sidebar-observability-link",
       "sidebar-jobs-link",
     ]) {
       const link = screen.getByTestId(testId);
@@ -494,8 +493,8 @@ describe("Sidebar", () => {
     expect(screen.getByTestId("sidebar-automations-link")).toHaveTextContent(
       "Automate",
     );
-    expect(
-      screen.getByTestId("sidebar-observability-link"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-jobs-link")).toHaveTextContent(
+      "Job Board",
+    );
   });
 });

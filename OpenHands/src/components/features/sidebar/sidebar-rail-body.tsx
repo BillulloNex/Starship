@@ -37,8 +37,10 @@ import {
 } from "./sidebar-layout";
 
 const ICON_SIZE = 18;
-const SIDEBAR_LOGO_WIDTH = 34;
-const SIDEBAR_LOGO_HEIGHT = Math.round((SIDEBAR_LOGO_WIDTH * 30) / 46);
+const SIDEBAR_LOGO_WIDTH = 26;
+const SIDEBAR_LOGO_HEIGHT = Math.round(
+  (SIDEBAR_LOGO_WIDTH * 157.8125) / 166.77734375,
+);
 
 export interface SidebarRailBodyProps {
   collapsed: boolean;
