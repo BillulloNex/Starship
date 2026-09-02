@@ -60,10 +60,12 @@ vi.mock("#/contexts/active-backend-context", () => ({
     },
     setActive: vi.fn(),
   }),
-  useActiveBackend: () => ({
-    backend: { id: "local", name: "Local", kind: "local" },
-    orgId: null,
-  }),
+  useActiveBackend: () => activeBackendMock(),
+}));
+
+const activeBackendMock = vi.fn(() => ({
+  backend: { id: "local", name: "Local", kind: "local" as const },
+  orgId: null,
 }));
 
 vi.mock("#/hooks/query/use-backends-health", () => ({
@@ -242,6 +244,10 @@ describe("Sidebar", () => {
     // Zustand store is a module singleton; reset it so collapsed state from
     // a prior test doesn't bleed into this one.
     useSidebarStore.setState({ collapsed: false });
+    activeBackendMock.mockReturnValue({
+      backend: { id: "local", name: "Local", kind: "local" },
+      orgId: null,
+    });
   });
 
   afterEach(() => {
@@ -480,10 +486,41 @@ describe("Sidebar", () => {
       "sidebar-conversations-link",
       "sidebar-automations-link",
       "sidebar-jobs-link",
+      "sidebar-files-link",
+      "sidebar-terminal-link",
     ]) {
       const link = screen.getByTestId(testId);
       expect(link.querySelector("svg")).not.toBeNull();
     }
+  });
+
+  it("shows standalone Files and Terminal links on local backends", () => {
+    renderSidebar("/conversations");
+
+    expect(screen.getByTestId("sidebar-files-link")).toHaveTextContent("Files");
+    expect(screen.getByTestId("sidebar-terminal-link")).toHaveTextContent(
+      "Console",
+    );
+  });
+
+  it("hides standalone Files and Terminal links on cloud backends", () => {
+    activeBackendMock.mockReturnValue({
+      backend: {
+        id: "cloud",
+        name: "Cloud",
+        kind: "cloud",
+        host: "https://app.openhands.dev",
+        apiKey: "cloud-key",
+      },
+      orgId: "org-1",
+    });
+
+    renderSidebar("/conversations");
+
+    expect(screen.queryByTestId("sidebar-files-link")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("sidebar-terminal-link"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the renamed top-level nav labels", () => {

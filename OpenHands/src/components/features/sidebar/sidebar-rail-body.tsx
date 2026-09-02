@@ -26,7 +26,10 @@ import { BackendStatusDot } from "#/components/features/backends/backend-status-
 import { AgentCanvasVersionTile } from "#/components/features/settings/agent-canvas-version-tile";
 import { GrokbotVersionBadge } from "./grokbot-version-badge";
 import { SidebarConversationList } from "./sidebar-conversation-list";
-import { useSupportsStandaloneWorkspace } from "#/hooks/use-standalone-workspace-runtime";
+import {
+  useSupportsStandaloneFiles,
+  useSupportsStandaloneTerminal,
+} from "#/hooks/use-standalone-workspace-runtime";
 import AutomationsIcon from "#/icons/automations.svg?react";
 import {
   SIDEBAR_COLLAPSE_TOGGLE_OVERLAY_CLASS,
@@ -86,7 +89,8 @@ export function SidebarRailBody({
 }: SidebarRailBodyProps) {
   const { t } = useTranslation("openhands");
   const backendCloseTimerRef = collapsedBackendCloseTimer;
-  const supportsStandaloneWorkspace = useSupportsStandaloneWorkspace();
+  const supportsStandaloneFiles = useSupportsStandaloneFiles();
+  const supportsStandaloneTerminal = useSupportsStandaloneTerminal();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -191,23 +195,23 @@ export function SidebarRailBody({
           collapsed={collapsed}
           icon={<Columns3 width={ICON_SIZE} height={ICON_SIZE} />}
         />
-        {supportsStandaloneWorkspace ? (
-          <>
-            <SidebarNavLink
-              to="/files"
-              label={t(I18nKey.COMMON$FILES)}
-              testId="sidebar-files-link"
-              collapsed={collapsed}
-              icon={<FolderTree width={ICON_SIZE} height={ICON_SIZE} />}
-            />
-            <SidebarNavLink
-              to="/terminal"
-              label={t(I18nKey.TERMINAL$CONSOLE)}
-              testId="sidebar-terminal-link"
-              collapsed={collapsed}
-              icon={<SquareTerminal width={ICON_SIZE} height={ICON_SIZE} />}
-            />
-          </>
+        {supportsStandaloneFiles ? (
+          <SidebarNavLink
+            to="/files"
+            label={t(I18nKey.COMMON$FILES)}
+            testId="sidebar-files-link"
+            collapsed={collapsed}
+            icon={<FolderTree width={ICON_SIZE} height={ICON_SIZE} />}
+          />
+        ) : null}
+        {supportsStandaloneTerminal ? (
+          <SidebarNavLink
+            to="/terminal"
+            label={t(I18nKey.TERMINAL$CONSOLE)}
+            testId="sidebar-terminal-link"
+            collapsed={collapsed}
+            icon={<SquareTerminal width={ICON_SIZE} height={ICON_SIZE} />}
+          />
         ) : null}
       </nav>
 

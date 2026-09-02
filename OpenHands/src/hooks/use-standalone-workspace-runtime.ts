@@ -74,6 +74,16 @@ export function useStandaloneWorkspaceRuntime(): WorkspaceRuntime & {
   };
 }
 
-export function useSupportsStandaloneWorkspace(): boolean {
+export function useSupportsStandaloneFiles(): boolean {
   return useActiveBackend().backend.kind === "local";
+}
+
+/** Standalone shell sessions need a reachable local agent-server bash API. */
+export function useSupportsStandaloneTerminal(): boolean {
+  return useActiveBackend().backend.kind === "local";
+}
+
+/** @deprecated Use {@link useSupportsStandaloneFiles} or {@link useSupportsStandaloneTerminal}. */
+export function useSupportsStandaloneWorkspace(): boolean {
+  return useSupportsStandaloneFiles();
 }
