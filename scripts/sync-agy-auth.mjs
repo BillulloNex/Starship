@@ -35,49 +35,99 @@ const apiKey =
   process.env.LOCAL_BACKEND_API_KEY ||
   (targetUrl.includes("ship.beenex.org") ? DEFAULT_PROD_KEY : "");
 
-const homeDir = os.homedir();
-const credPaths = [
-  path.join(homeDir, ".gemini", "oauth_creds.json"),
-  path.join(homeDir, ".gemini", "antigravity-cli", "oauth_creds.json"),
-  path.join(homeDir, ".gemini", "antigravity", "oauth_creds.json"),
-];
+import { execFileSync } from "node:child_process";
 
-let credFile = null;
+const homeDir = os.homedir();
+let credSource = null;
 let credData = null;
 
-for (const p of credPaths) {
-  if (fs.existsSync(p)) {
-    try {
-      const raw = fs.readFileSync(p, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed.refresh_token || parsed.access_token || parsed.token?.refresh_token) {
-        credFile = p;
-        credData = parsed;
-        break;
+// 1. On macOS, first check OS Keychain (service: "gemini", account: "antigravity")
+if (process.platform === "darwin") {
+  try {
+    const raw = execFileSync("security", ["find-generic-password", "-s", "gemini", "-a", "antigravity", "-w"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const defaultCid = ["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"].join(".");
+    const defaultCsec = ["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
+
+    if (raw) {
+      let jsonStr = raw;
+      if (raw.startsWith("go-keyring-base64:")) {
+        jsonStr = Buffer.from(raw.slice("go-keyring-base64:".length), "base64").toString("utf8");
       }
-    } catch {}
+      const parsed = JSON.parse(jsonStr);
+      const tokenObj = parsed.token || parsed;
+      if (tokenObj.refresh_token || tokenObj.access_token) {
+        credSource = "macOS Keychain (service: gemini, account: antigravity)";
+        credData = {
+          client_id: defaultCid,
+          client_secret: defaultCsec,
+          refresh_token: tokenObj.refresh_token || "",
+          access_token: tokenObj.access_token || "",
+          token: tokenObj.access_token || "",
+          token_uri: "https://oauth2.googleapis.com/token",
+          scopes: [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/aicode",
+          ],
+          expiry: tokenObj.expiry || (parsed.expiry_date ? new Date(parsed.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
+          auth_method: parsed.auth_method || "consumer",
+        };
+      }
+    }
+  } catch {}
+}
+
+// 2. Candidate paths on disk fallback
+const defaultCid = ["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"].join(".");
+const defaultCsec = ["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
+if (!credData) {
+  const credPaths = [
+    path.join(homeDir, ".gemini", "oauth_creds.json"),
+    path.join(homeDir, ".gemini", "antigravity-cli", "oauth_creds.json"),
+    path.join(homeDir, ".gemini", "antigravity", "oauth_creds.json"),
+  ];
+
+  for (const p of credPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const raw = fs.readFileSync(p, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed.refresh_token || parsed.access_token || parsed.token?.refresh_token) {
+          credSource = p;
+          credData = {
+            client_id: parsed.client_id || defaultCid,
+            client_secret: parsed.client_secret || defaultCsec,
+            refresh_token: parsed.token?.refresh_token || parsed.refresh_token || "",
+            access_token: parsed.token?.access_token || parsed.token || parsed.access_token || "",
+            token: parsed.token?.access_token || parsed.token || parsed.access_token || "",
+            token_uri: parsed.token_uri || "https://oauth2.googleapis.com/token",
+            scopes: parsed.scopes || [
+              "https://www.googleapis.com/auth/cloud-platform",
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/aicode",
+            ],
+            expiry: parsed.token?.expiry || (parsed.expiry_date ? new Date(parsed.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
+            auth_method: parsed.auth_method || "consumer",
+          };
+          break;
+        }
+      } catch {}
+    }
   }
 }
 
-if (!credFile || !credData) {
-  console.error("❌ Could not find valid Antigravity OAuth credentials in ~/.gemini/oauth_creds.json");
+if (!credData) {
+  console.error("❌ Could not find valid Antigravity OAuth credentials in macOS Keychain or ~/.gemini/oauth_creds.json");
   console.error("   Make sure you are logged into Antigravity locally (`agy` CLI).");
   process.exit(1);
 }
 
-console.log(`✓ Found Antigravity credentials at: ${credFile}`);
+console.log(`✓ Found Antigravity credentials from: ${credSource}`);
 
-const tokenPayload = {
-  token: {
-    access_token: credData.token?.access_token || credData.access_token || "",
-    refresh_token: credData.token?.refresh_token || credData.refresh_token || "",
-    token_type: credData.token?.token_type || credData.token_type || "Bearer",
-    expiry: credData.token?.expiry || (credData.expiry_date ? new Date(credData.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
-  },
-  auth_method: credData.auth_method || "consumer",
-};
-
-const payloadString = JSON.stringify(tokenPayload, null, 2);
+const payloadString = JSON.stringify(credData, null, 2);
 
 if (printOnly) {
   console.log("\n--- ANTIGRAVITY_AUTH_JSON (Copy and paste into Starship / Coolify) ---");

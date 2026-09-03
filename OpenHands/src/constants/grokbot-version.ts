@@ -1,1 +1,1 @@
-export const GROKBOT_VERSION = "0.50.2" as const;
+export const GROKBOT_VERSION = "0.50.3" as const;

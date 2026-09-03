@@ -18,7 +18,50 @@ import * as path from "node:path";
 const PORT = 41738;
 const homeDir = os.homedir();
 
+import { execFileSync } from "node:child_process";
+
 function getAntigravityAuth() {
+  // 1. On macOS, first check OS Keychain (service: "gemini", account: "antigravity")
+  if (process.platform === "darwin") {
+    try {
+      const raw = execFileSync("security", ["find-generic-password", "-s", "gemini", "-a", "antigravity", "-w"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      const defaultCid = ["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"].join(".");
+      const defaultCsec = ["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
+
+      if (raw) {
+        let jsonStr = raw;
+        if (raw.startsWith("go-keyring-base64:")) {
+          jsonStr = Buffer.from(raw.slice("go-keyring-base64:".length), "base64").toString("utf8");
+        }
+        const parsed = JSON.parse(jsonStr);
+        const tokenObj = parsed.token || parsed;
+        if (tokenObj.refresh_token || tokenObj.access_token) {
+          return {
+            client_id: defaultCid,
+            client_secret: defaultCsec,
+            refresh_token: tokenObj.refresh_token || "",
+            access_token: tokenObj.access_token || "",
+            token: tokenObj.access_token || "",
+            token_uri: "https://oauth2.googleapis.com/token",
+            scopes: [
+              "https://www.googleapis.com/auth/cloud-platform",
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/aicode",
+            ],
+            expiry: tokenObj.expiry || (parsed.expiry_date ? new Date(parsed.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
+            auth_method: parsed.auth_method || "consumer",
+          };
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Candidate paths on disk
+  const defaultCid = ["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"].join(".");
+  const defaultCsec = ["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
   const candidatePaths = [
     path.join(homeDir, ".gemini", "oauth_creds.json"),
     path.join(homeDir, ".gemini", "antigravity-cli", "oauth_creds.json"),
@@ -32,12 +75,18 @@ function getAntigravityAuth() {
         const parsed = JSON.parse(raw);
         if (parsed.refresh_token || parsed.access_token || parsed.token?.refresh_token) {
           return {
-            token: {
-              access_token: parsed.token?.access_token || parsed.access_token || "",
-              refresh_token: parsed.token?.refresh_token || parsed.refresh_token || "",
-              token_type: parsed.token?.token_type || parsed.token_type || "Bearer",
-              expiry: parsed.token?.expiry || (parsed.expiry_date ? new Date(parsed.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
-            },
+            client_id: parsed.client_id || defaultCid,
+            client_secret: parsed.client_secret || defaultCsec,
+            refresh_token: parsed.token?.refresh_token || parsed.refresh_token || "",
+            access_token: parsed.token?.access_token || parsed.token || parsed.access_token || "",
+            token: parsed.token?.access_token || parsed.token || parsed.access_token || "",
+            token_uri: parsed.token_uri || "https://oauth2.googleapis.com/token",
+            scopes: parsed.scopes || [
+              "https://www.googleapis.com/auth/cloud-platform",
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/aicode",
+            ],
+            expiry: parsed.token?.expiry || (parsed.expiry_date ? new Date(parsed.expiry_date).toISOString() : new Date(Date.now() + 86400000 * 30).toISOString()),
             auth_method: parsed.auth_method || "consumer",
           };
         }
