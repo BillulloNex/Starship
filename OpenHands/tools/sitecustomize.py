@@ -224,6 +224,81 @@ def _init_llmobs():
         traceback.print_exc(file=sys.stderr)
 
 
+def _write_antigravity_credentials(value):
+    if not value or not isinstance(value, str) or not value.strip().startswith("{"):
+        return False
+    try:
+        import json
+        from pathlib import Path
+        parsed = json.loads(value.strip())
+        defaultCid = ".".join(["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"])
+        defaultCsec = "-".join(["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"])
+        clientId = parsed.get("client_id") or defaultCid
+        clientSecret = parsed.get("client_secret") or defaultCsec
+        refreshToken = parsed.get("token", {}).get("refresh_token") if isinstance(parsed.get("token"), dict) else (parsed.get("refresh_token") or "")
+        accessToken = parsed.get("token", {}).get("access_token") if isinstance(parsed.get("token"), dict) else (parsed.get("token") or parsed.get("access_token") or "")
+        scopes = parsed.get("scopes") or ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/aicode"]
+        tokenUri = parsed.get("token_uri") or "https://oauth2.googleapis.com/token"
+
+        token_dict = {
+            "client_id": clientId,
+            "client_secret": clientSecret,
+            "refresh_token": refreshToken,
+            "token": accessToken,
+            "token_uri": tokenUri,
+            "scopes": scopes,
+        }
+
+        agy_acp_dir = Path.home() / ".openhands" / "antigravity" / "antigravity-acp"
+        agy_acp_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        token_file = agy_acp_dir / "acp_token.json"
+        token_file.write_text(json.dumps(token_dict, indent=2), encoding="utf-8")
+        token_file.chmod(0o600)
+
+        settings_file = agy_acp_dir / "settings.json"
+        settings_file.write_text(json.dumps({"auth": {"type": "oauth-personal"}}, indent=2) + "\n", encoding="utf-8")
+        settings_file.chmod(0o600)
+
+        gemini_dir = Path.home() / ".gemini"
+        gemini_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        creds_file = gemini_dir / "oauth_creds.json"
+        creds_file.write_text(json.dumps({
+            "access_token": accessToken,
+            "refresh_token": refreshToken,
+            "client_id": clientId,
+            "client_secret": clientSecret,
+            "token_type": "Bearer",
+            "scope": " ".join(scopes) if isinstance(scopes, list) else scopes,
+        }, indent=2), encoding="utf-8")
+        creds_file.chmod(0o600)
+        print("[grokbot-sitecustomize] Materialized ANTIGRAVITY_AUTH_JSON to acp_token.json and oauth_creds.json", file=sys.stderr, flush=True)
+        return True
+    except Exception as e:
+        print(f"[grokbot-sitecustomize] Error writing credentials: {e}", file=sys.stderr, flush=True)
+        return False
+
+
+def _fetch_antigravity_secret():
+    import json
+    for port in (18000, 8000):
+        try:
+            import urllib.request
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON", headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                if resp.status == 200:
+                    data = resp.read().decode("utf-8")
+                    val = json.loads(data) if data.strip().startswith("{") else data
+                    if isinstance(val, dict):
+                        secret_val = val.get("value") or val.get("secret") or val.get("token") or (data if "refresh_token" in data else "")
+                    else:
+                        secret_val = val
+                    if secret_val and "refresh_token" in str(secret_val):
+                        return secret_val
+        except Exception:
+            pass
+    return None
+
+
 def _init_antigravity_acp():
     """Ensure OpenHands SDK recognizes and authenticates Google Antigravity ACP."""
     try:
@@ -237,6 +312,7 @@ def _init_antigravity_acp():
             ACP_PROVIDERS,
         )
         import openhands.sdk.agent.acp_agent as acp_agent_mod
+        import openhands.sdk.settings.agent_settings as ag_settings_mod
 
         # 1. Register 'antigravity' in ACP_PROVIDERS
         if "antigravity" not in ACP_PROVIDERS:
@@ -281,71 +357,62 @@ def _init_antigravity_acp():
             new_dict["antigravity"] = agy_info
             acp_providers_mod.ACP_PROVIDERS = MappingProxyType(new_dict)
 
-        # 2. Patch _select_auth_method to recognize Antigravity credentials
+        # 2. Patch ACPAgentSettings to transparently accept 'antigravity'
+        if hasattr(ag_settings_mod, "ACPAgentSettings"):
+            _orig_validate = ag_settings_mod.ACPAgentSettings.model_validate
+            @classmethod
+            def _patched_validate(cls, obj, *args, **kwargs):
+                if isinstance(obj, dict) and obj.get("acp_server") == "antigravity":
+                    obj = dict(obj)
+                    obj["acp_server"] = "custom"
+                    if not obj.get("acp_command"):
+                        obj["acp_command"] = ["agy-acp"]
+                return _orig_validate(obj, *args, **kwargs)
+            ag_settings_mod.ACPAgentSettings.model_validate = _patched_validate
+
+        # 3. Patch ACPAgent.__init__ to ensure ANTIGRAVITY_AUTH_JSON file secret is tracked
+        _orig_agent_init = acp_agent_mod.ACPAgent.__init__
+        def _patched_agent_init(self, *args, **kwargs):
+            _orig_agent_init(self, *args, **kwargs)
+            is_agy = (
+                getattr(self, "acp_server", "") == "antigravity"
+                or any("agy-acp" in str(t) for t in (getattr(self, "acp_command", []) or []))
+            )
+            if is_agy:
+                spec = ACPFileSecretSpec(
+                    secret_name="ANTIGRAVITY_AUTH_JSON",
+                    filename="auth.json",
+                    env_var="ANTIGRAVITY_AUTH_JSON",
+                    subdir="antigravity",
+                    env_points_to="file",
+                )
+                existing = list(getattr(self, "acp_file_secrets", []) or [])
+                if not any(getattr(s, "secret_name", "") == "ANTIGRAVITY_AUTH_JSON" for s in existing):
+                    existing.append(spec)
+                    self.acp_file_secrets = existing
+        acp_agent_mod.ACPAgent.__init__ = _patched_agent_init
+
+        # 4. Patch _select_auth_method to recognize Antigravity credentials
         _orig_select = acp_agent_mod._select_auth_method
         def _patched_select(auth_methods, env):
-            method_ids = {m.id for m in auth_methods}
+            method_ids = {m if isinstance(m, str) else getattr(m, "id", getattr(m, "name", str(m))) for m in auth_methods}
             if "oauth-personal" in method_ids:
-                if (
-                    env.get("ANTIGRAVITY_AUTH_JSON")
-                    or env.get("GEMINI_OAUTH_JSON")
-                    or (Path.home() / ".gemini" / "oauth_creds.json").is_file()
-                    or (Path.home() / ".openhands" / "antigravity" / "antigravity-acp" / "acp_token.json").is_file()
-                ):
+                if (Path.home() / ".openhands" / "antigravity" / "antigravity-acp" / "acp_token.json").is_file() and (Path.home() / ".gemini" / "oauth_creds.json").is_file():
+                    return "oauth-personal"
+                raw = env.get("ANTIGRAVITY_AUTH_JSON") or env.get("GEMINI_OAUTH_JSON")
+                if not raw:
+                    raw = _fetch_antigravity_secret()
+                if raw and _write_antigravity_credentials(raw):
                     return "oauth-personal"
             return _orig_select(auth_methods, env)
         acp_agent_mod._select_auth_method = _patched_select
 
-        # 3. Patch _materialise_file_secret to write required format to disk
+        # 5. Patch _materialise_file_secret to write required format to disk
         _orig_mat = acp_agent_mod.ACPAgent._materialise_file_secret
         def _patched_mat(self, spec, env, directory, target, value, *, replace_existing=False):
             _orig_mat(self, spec, env, directory, target, value, replace_existing=replace_existing)
             if spec.secret_name == "ANTIGRAVITY_AUTH_JSON" and value and value.strip().startswith("{"):
-                try:
-                    parsed = json.loads(value.strip())
-                    defaultCid = ".".join(["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"])
-                    defaultCsec = "-".join(["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"])
-                    clientId = parsed.get("client_id") or defaultCid
-                    clientSecret = parsed.get("client_secret") or defaultCsec
-                    refreshToken = parsed.get("token", {}).get("refresh_token") if isinstance(parsed.get("token"), dict) else (parsed.get("refresh_token") or "")
-                    accessToken = parsed.get("token", {}).get("access_token") if isinstance(parsed.get("token"), dict) else (parsed.get("token") or parsed.get("access_token") or "")
-                    scopes = parsed.get("scopes") or ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/aicode"]
-                    tokenUri = parsed.get("token_uri") or "https://oauth2.googleapis.com/token"
-
-                    token_dict = {
-                        "client_id": clientId,
-                        "client_secret": clientSecret,
-                        "refresh_token": refreshToken,
-                        "token": accessToken,
-                        "token_uri": tokenUri,
-                        "scopes": scopes,
-                    }
-
-                    agy_acp_dir = Path.home() / ".openhands" / "antigravity" / "antigravity-acp"
-                    agy_acp_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                    token_file = agy_acp_dir / "acp_token.json"
-                    token_file.write_text(json.dumps(token_dict, indent=2), encoding="utf-8")
-                    token_file.chmod(0o600)
-
-                    settings_file = agy_acp_dir / "settings.json"
-                    settings_file.write_text(json.dumps({"auth": {"type": "oauth-personal"}}, indent=2) + "\n", encoding="utf-8")
-                    settings_file.chmod(0o600)
-
-                    gemini_dir = Path.home() / ".gemini"
-                    gemini_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                    creds_file = gemini_dir / "oauth_creds.json"
-                    creds_file.write_text(json.dumps({
-                        "access_token": accessToken,
-                        "refresh_token": refreshToken,
-                        "client_id": clientId,
-                        "client_secret": clientSecret,
-                        "token_type": "Bearer",
-                        "scope": " ".join(scopes) if isinstance(scopes, list) else scopes,
-                    }, indent=2), encoding="utf-8")
-                    creds_file.chmod(0o600)
-                    print("[grokbot-sitecustomize] Materialized ANTIGRAVITY_AUTH_JSON to acp_token.json and oauth_creds.json", file=sys.stderr, flush=True)
-                except Exception as ex:
-                    print(f"[grokbot-sitecustomize] Warning: failed to parse ANTIGRAVITY_AUTH_JSON: {ex}", file=sys.stderr, flush=True)
+                _write_antigravity_credentials(value)
 
         acp_agent_mod.ACPAgent._materialise_file_secret = _patched_mat
         print("[grokbot-sitecustomize] Antigravity ACP integration loaded OK", file=sys.stderr, flush=True)

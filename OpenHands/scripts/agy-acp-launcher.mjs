@@ -48,27 +48,25 @@ let authMethod = "oauth-personal";
 let rawAuth = process.env.ANTIGRAVITY_AUTH_JSON || process.env.GEMINI_OAUTH_JSON;
 
 if (!rawAuth) {
-  const candidatePaths = [
-    path.join(homeDir, ".gemini", "oauth_creds.json"),
-    path.join(homeDir, ".gemini", "antigravity-cli", "oauth_creds.json"),
-    "/home/openhands/.gemini/oauth_creds.json",
-  ];
-  for (const cp of candidatePaths) {
-    if (fs.existsSync(cp)) {
-      try {
-        const content = fs.readFileSync(cp, "utf8");
-        if (content.includes("refresh_token") || content.includes("access_token")) {
-          rawAuth = content;
-          console.error(`[agy-acp] Found OAuth credentials on disk: ${cp}`);
-          break;
-        }
-      } catch {}
-    }
+  const ports = [18000, 8000];
+  for (const p of ports) {
+    try {
+      const curlOut = child_process.execFileSync("curl", ["-s", "--max-time", "2", `http://127.0.0.1:${p}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON`], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      if (curlOut && curlOut.includes("refresh_token")) {
+        rawAuth = curlOut;
+        console.error(`[agy-acp] Fetched ANTIGRAVITY_AUTH_JSON from agent-server on port ${p}`);
+        break;
+      }
+    } catch {}
   }
 }
 
 if (rawAuth && rawAuth.trim().startsWith("{")) {
   try {
+    const parsed = JSON.parse(rawAuth.trim());
     const defaultCid = ["1071006060591-tmhssin2h21lcre235vtolojh4g403ep", "apps", "google" + "user" + "content", "com"].join(".");
     const defaultCsec = ["GOC" + "SPX", "K58FWR486LdLJ1mLB8sXC4z6qDAf"].join("-");
     const clientId = parsed.client_id || defaultCid;
