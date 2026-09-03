@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink, Clipboard, Check } from "lucide-react";
+import { ExternalLink, Clipboard, Check, Upload } from "lucide-react";
 import { cn } from "#/utils/utils";
 import { formControlMultilineFieldClassName } from "#/utils/form-control-classes";
 import { SettingsInput } from "#/components/features/settings/settings-input";
@@ -101,6 +101,8 @@ export function AcpSecretField({
   const { t } = useTranslation("openhands");
   const [justPasted, setJustPasted] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   const placeholder = alreadySet
     ? t(I18nKey.ONBOARDING$ACP_SECRET_ALREADY_SET)
@@ -115,6 +117,86 @@ export function AcpSecretField({
       onChange(extractClaudeOAuthToken(raw));
     } else {
       onChange(raw);
+    }
+  };
+
+  const handleImportFromComputer = async () => {
+    setImporting(true);
+    try {
+      // 1. Try local loopback bridge on 127.0.0.1:41738 if running
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+      try {
+        const endpoint = isAntigravityAuth
+          ? "http://127.0.0.1:41738/antigravity"
+          : isCodexAuth
+            ? "http://127.0.0.1:41738/codex"
+            : "http://127.0.0.1:41738/credentials";
+        const res = await fetch(endpoint, {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const str =
+            typeof data === "string" ? data : JSON.stringify(data, null, 2);
+          if (str && str.trim().startsWith("{")) {
+            handleValueChange(str);
+            setImported(true);
+            setTimeout(() => setImported(false), 2500);
+            return;
+          }
+        }
+      } catch {
+        // Local bridge not active, fall through to native file picker
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // 2. Native browser file picker
+      if (typeof window !== "undefined" && "showOpenFilePicker" in window) {
+        try {
+          const [fileHandle] = await (window as any).showOpenFilePicker({
+            types: [
+              {
+                description: "Credentials JSON",
+                accept: { "application/json": [".json"] },
+              },
+            ],
+            multiple: false,
+          });
+          const file = await fileHandle.getFile();
+          const text = await file.text();
+          if (text) {
+            handleValueChange(text);
+            setImported(true);
+            setTimeout(() => setImported(false), 2500);
+            return;
+          }
+        } catch (pickerErr: any) {
+          if (pickerErr.name === "AbortError") return;
+        }
+      }
+
+      // 3. Fallback standard HTML file input
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (file) {
+          const text = await file.text();
+          if (text) {
+            handleValueChange(text);
+            setImported(true);
+            setTimeout(() => setImported(false), 2500);
+          }
+        }
+      };
+      input.click();
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -211,24 +293,47 @@ export function AcpSecretField({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handlePaste}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-base border border-[var(--oh-border)] text-[var(--oh-muted)] hover:text-white hover:border-[var(--oh-border-strong)] transition-colors cursor-pointer"
-            title="Paste token from clipboard"
-          >
-            {justPasted ? (
-              <>
-                <Check className="size-3 text-emerald-400" />
-                <span className="text-emerald-400">Pasted</span>
-              </>
-            ) : (
-              <>
-                <Clipboard className="size-3" />
-                <span>Paste</span>
-              </>
+          <div className="flex items-center gap-1.5">
+            {(isAntigravityAuth || isCodexAuth) && (
+              <button
+                type="button"
+                onClick={handleImportFromComputer}
+                disabled={importing}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-base border border-[var(--oh-border)] text-[11px] text-[var(--oh-muted)] hover:text-white hover:border-[var(--oh-border-strong)] transition-colors cursor-pointer"
+                title="Fetch from local computer bridge or select file"
+              >
+                {imported ? (
+                  <>
+                    <Check className="size-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">Imported!</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="size-3" />
+                    <span>Import from Computer</span>
+                  </>
+                )}
+              </button>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={handlePaste}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-base border border-[var(--oh-border)] text-[var(--oh-muted)] hover:text-white hover:border-[var(--oh-border-strong)] transition-colors cursor-pointer"
+              title="Paste token from clipboard"
+            >
+              {justPasted ? (
+                <>
+                  <Check className="size-3 text-emerald-400" />
+                  <span className="text-emerald-400">Pasted</span>
+                </>
+              ) : (
+                <>
+                  <Clipboard className="size-3" />
+                  <span>Paste</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
