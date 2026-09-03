@@ -8,7 +8,8 @@
  * the ACP stream.
  */
 
-import { spawn } from "node:child_process";
+import * as child_process from "node:child_process";
+const { spawn, execFileSync } = child_process;
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
