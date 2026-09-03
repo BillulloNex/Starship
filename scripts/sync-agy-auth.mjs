@@ -18,8 +18,22 @@ const args = process.argv.slice(2);
 const printOnly = args.includes("--print");
 const targetIdx = args.indexOf("--target");
 const targetUrl = targetIdx !== -1 ? args[targetIdx + 1] : (process.env.STARSHIP_URL || "https://ship.beenex.org");
-const keyIdx = args.indexOf("--key");
-const apiKey = keyIdx !== -1 ? args[keyIdx + 1] : (process.env.LOCAL_BACKEND_API_KEY || process.env.STARSHIP_API_KEY || "");
+
+function getArgValue(flag) {
+  const idx = args.indexOf(flag);
+  return idx !== -1 && args[idx + 1] ? args[idx + 1] : null;
+}
+
+const DEFAULT_PROD_KEY = "S9Ni/L8opqCk7HgXyBfEwvd16oGixLf6Sg1lZKRtewg=";
+
+const apiKey =
+  getArgValue("--api-key") ||
+  getArgValue("--key") ||
+  getArgValue("-k") ||
+  process.env.STARSHIP_SECRET ||
+  process.env.STARSHIP_API_KEY ||
+  process.env.LOCAL_BACKEND_API_KEY ||
+  (targetUrl.includes("ship.beenex.org") ? DEFAULT_PROD_KEY : "");
 
 const homeDir = os.homedir();
 const credPaths = [
