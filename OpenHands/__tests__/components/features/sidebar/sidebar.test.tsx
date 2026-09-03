@@ -63,8 +63,16 @@ vi.mock("#/contexts/active-backend-context", () => ({
   useActiveBackend: () => activeBackendMock(),
 }));
 
-const activeBackendMock = vi.fn(() => ({
-  backend: { id: "local", name: "Local", kind: "local" as const },
+import type { ResolvedActiveBackend } from "#/api/backend-registry/types";
+
+const activeBackendMock = vi.fn<() => ResolvedActiveBackend>(() => ({
+  backend: {
+    id: "local",
+    name: "Local",
+    kind: "local",
+    host: "http://localhost:8000",
+    apiKey: "test-key",
+  },
   orgId: null,
 }));
 
@@ -245,7 +253,13 @@ describe("Sidebar", () => {
     // a prior test doesn't bleed into this one.
     useSidebarStore.setState({ collapsed: false });
     activeBackendMock.mockReturnValue({
-      backend: { id: "local", name: "Local", kind: "local" },
+      backend: {
+        id: "local",
+        name: "Local",
+        kind: "local",
+        host: "http://localhost:8000",
+        apiKey: "test-key",
+      },
       orgId: null,
     });
   });

@@ -189,7 +189,7 @@ ENV CHROME_PATH=/usr/bin/chromium \
 
 RUN if command -v apt-get >/dev/null 2>&1; then \
       apt-get update && \
-      apt-get install -y --no-install-recommends libpq-dev curl chromium xvfb x11vnc fluxbox xdotool python3-websockify novnc dbus-x11 gnome-keyring libsecret-1-0 libsecret-tools python3-secretstorage && \
+      apt-get install -y --no-install-recommends libpq-dev curl chromium xvfb x11vnc fluxbox xdotool python3-websockify novnc dbus-x11 gnome-keyring libsecret-1-0 libsecret-tools python3-secretstorage unzip && \
       ln -sf /usr/share/novnc /opt/novnc && \
       rm -rf /var/lib/apt/lists/*; \
     fi
@@ -258,6 +258,7 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/agent-canvas/bash_events \
              /home/openhands/.openhands/automation \
              /home/openhands/.openhands/chrome-profile \
+             /home/openhands/.openhands/antigravity/antigravity-acp \
              /home/openhands/.claude \
              /home/openhands/.codex \
              /home/openhands/.cursor \
@@ -267,12 +268,22 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /projects && \
     chown -R openhands:openhands /home/openhands /projects /tmp/vnc-browser
 
-# Copy Antigravity ACP server and create launcher
-COPY references/antigravity-acp /opt/agent-canvas/antigravity-acp
-RUN cd /opt/agent-canvas/antigravity-acp && bun install && \
-    printf '%s\n' '#!/bin/sh' 'exec bun run /opt/agent-canvas/antigravity-acp/index.ts "$@"' > /usr/local/bin/agy-acp && \
-    chmod +x /usr/local/bin/agy-acp && \
-    chown -R openhands:openhands /opt/agent-canvas/antigravity-acp
+# Install official Google Antigravity ACP server (linux-x86_64)
+ARG AGY_ACP_VERSION="agy_acp_server_20260818_01_RC01"
+ARG AGY_ACP_SHA256="ce3f09628575b25497cf5a3c19d073b49acb80f1dab1ff8592919e9c9b8799e1"
+RUN set -eux; \
+    mkdir -p /opt/antigravity; \
+    curl -fsSL "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-${AGY_ACP_VERSION}-linux-x86_64.zip" -o /tmp/agy-acp.zip; \
+    echo "${AGY_ACP_SHA256}  /tmp/agy-acp.zip" | sha256sum -c -; \
+    unzip -q /tmp/agy-acp.zip -d /opt/antigravity; \
+    rm -f /tmp/agy-acp.zip; \
+    chmod +x /opt/antigravity/agy_acp_server.par /opt/antigravity/localharness_external; \
+    chown -R openhands:openhands /opt/antigravity
+
+# Copy Antigravity ACP launcher and register agy-acp
+COPY OpenHands/scripts/agy-acp-launcher.mjs /opt/agent-canvas/agy-acp-launcher.mjs
+RUN chmod +x /opt/agent-canvas/agy-acp-launcher.mjs && \
+    ln -sf /opt/agent-canvas/agy-acp-launcher.mjs /usr/local/bin/agy-acp
 
 # Copy the frontend build output.
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
