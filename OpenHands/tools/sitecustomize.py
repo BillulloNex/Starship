@@ -278,12 +278,33 @@ def _write_antigravity_credentials(value):
         return False
 
 
+def _get_api_key():
+    import os
+    from pathlib import Path
+    key = os.environ.get("OH_SESSION_API_KEYS_0") or os.environ.get("LOCAL_BACKEND_API_KEY") or os.environ.get("STARSHIP_SECRET") or ""
+    if not key:
+        for p in ("/home/openhands/.openhands/agent-canvas/api-key.txt", str(Path.home() / ".openhands" / "agent-canvas" / "api-key.txt")):
+            try:
+                if Path(p).is_file():
+                    content = Path(p).read_text().strip()
+                    if content:
+                        return content
+            except Exception:
+                pass
+    return key
+
+
 def _fetch_antigravity_secret():
     import json
+    api_key = _get_api_key()
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["X-Session-API-Key"] = api_key
+        headers["Authorization"] = f"Bearer {api_key}"
     for port in (18000, 8000):
         try:
             import urllib.request
-            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON", headers={"Accept": "application/json"})
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON", headers=headers)
             with urllib.request.urlopen(req, timeout=2) as resp:
                 if resp.status == 200:
                     data = resp.read().decode("utf-8")
@@ -422,3 +443,22 @@ def _init_antigravity_acp():
 
 _init_llmobs()
 _init_antigravity_acp()
+
+
+def _background_sync():
+    import time
+    for _ in range(10):
+        time.sleep(3)
+        try:
+            raw = _fetch_antigravity_secret()
+            if raw and _write_antigravity_credentials(raw):
+                print("[grokbot-sitecustomize] Background sync: successfully written Antigravity credentials", file=sys.stderr, flush=True)
+                break
+        except Exception:
+            pass
+
+try:
+    import threading
+    threading.Thread(target=_background_sync, daemon=True).start()
+except Exception:
+    pass

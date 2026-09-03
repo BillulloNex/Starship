@@ -48,10 +48,36 @@ let authMethod = "oauth-personal";
 let rawAuth = process.env.ANTIGRAVITY_AUTH_JSON || process.env.GEMINI_OAUTH_JSON;
 
 if (!rawAuth) {
+  let apiKey =
+    process.env.OH_SESSION_API_KEYS_0 ||
+    process.env.LOCAL_BACKEND_API_KEY ||
+    process.env.STARSHIP_SECRET ||
+    process.env.STARSHIP_API_KEY ||
+    "";
+  if (!apiKey) {
+    const keyFiles = [
+      "/home/openhands/.openhands/agent-canvas/api-key.txt",
+      path.join(homeDir, ".openhands", "agent-canvas", "api-key.txt"),
+    ];
+    for (const kf of keyFiles) {
+      try {
+        if (fs.existsSync(kf)) {
+          apiKey = fs.readFileSync(kf, "utf8").trim();
+          if (apiKey) break;
+        }
+      } catch {}
+    }
+  }
+
   const ports = [18000, 8000];
   for (const p of ports) {
     try {
-      const curlOut = child_process.execFileSync("curl", ["-s", "--max-time", "2", `http://127.0.0.1:${p}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON`], {
+      const curlArgs = ["-s", "--max-time", "2"];
+      if (apiKey) {
+        curlArgs.push("-H", `X-Session-API-Key: ${apiKey}`, "-H", `Authorization: Bearer ${apiKey}`);
+      }
+      curlArgs.push(`http://127.0.0.1:${p}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON`);
+      const curlOut = child_process.execFileSync("curl", curlArgs, {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
       });
