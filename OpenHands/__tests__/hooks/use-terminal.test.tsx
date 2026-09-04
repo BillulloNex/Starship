@@ -23,6 +23,15 @@ function TestTerminalComponent() {
   return <div ref={ref} />;
 }
 
+function InteractiveTerminalComponent({
+  onExecuteCommand,
+}: {
+  onExecuteCommand: (command: string) => void;
+}) {
+  const { ref } = useTerminal({ isInteractive: true, onExecuteCommand });
+  return <div ref={ref} />;
+}
+
 describe("useTerminal", () => {
   // Terminal tests
   const mockTerminal = vi.hoisted(() => ({
@@ -32,7 +41,9 @@ describe("useTerminal", () => {
     writeln: vi.fn(),
     clear: vi.fn(),
     dispose: vi.fn(),
-    onData: vi.fn(() => ({ dispose: vi.fn() })),
+    onData: vi.fn((_callback: (data: string) => void) => ({
+      dispose: vi.fn(),
+    })),
     element: document.createElement("div"),
   }));
 
@@ -154,5 +165,41 @@ describe("useTerminal", () => {
 
     // Restore original element
     mockTerminal.element = originalElement;
+  });
+
+  it("should accept pasted text and execute it on Enter", () => {
+    const onExecuteCommand = vi.fn();
+    renderWithProviders(
+      <InteractiveTerminalComponent onExecuteCommand={onExecuteCommand} />,
+    );
+    const onData = mockTerminal.onData.mock.calls[0][0];
+
+    onData("echo paste-test");
+    expect(mockTerminal.write).toHaveBeenLastCalledWith("echo paste-test");
+
+    onData("\r");
+    expect(onExecuteCommand).toHaveBeenCalledWith("echo paste-test");
+  });
+
+  it("should keep typed input and Backspace behavior after pasted text", () => {
+    const onExecuteCommand = vi.fn();
+    renderWithProviders(
+      <InteractiveTerminalComponent onExecuteCommand={onExecuteCommand} />,
+    );
+    const onData = mockTerminal.onData.mock.calls[0][0];
+
+    onData("echo paste-tesx");
+    onData("\x7f");
+    onData("t");
+    onData("\r");
+
+    expect(mockTerminal.write).toHaveBeenCalledWith("\b \b");
+    expect(onExecuteCommand).toHaveBeenCalledWith("echo paste-test");
+  });
+
+  it("should remain non-interactive for Agent Output", () => {
+    renderWithProviders(<TestTerminalComponent />);
+
+    expect(mockTerminal.onData).not.toHaveBeenCalled();
   });
 });

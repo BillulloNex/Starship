@@ -226,8 +226,12 @@ export const useTerminal = (options: UseTerminalOptions = {}) => {
             terminal.current.clear();
             terminal.current.write("$ " + currentLineRef.current);
           }
-          // Printable characters
-          else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+          // Printable typed or pasted text. Xterm sends paste events as a
+          // single onData call containing the full clipboard value.
+          else if (
+            data.length > 0 &&
+            Array.from(data).every((character) => character.charCodeAt(0) >= 32)
+          ) {
             currentLineRef.current += data;
             terminal.current.write(data);
           }
