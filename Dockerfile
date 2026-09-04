@@ -308,6 +308,11 @@ COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-deploy.mjs && ln -sf /opt/agent-canvas/grokbot-deploy.mjs /usr/local/bin/grokbot-deploy
 COPY scripts/start-vnc-browser.sh /opt/agent-canvas/start-vnc-browser.sh
 COPY scripts/ship-jira-orchestrator.mjs /opt/agent-canvas/ship-jira-orchestrator.mjs
+COPY scripts/ship-log-monitor-orchestrator.mjs /opt/agent-canvas/ship-log-monitor-orchestrator.mjs
+COPY scripts/ship-coolify-logs.mjs /opt/agent-canvas/ship-coolify-logs.mjs
+COPY scripts/ship-jira.py /opt/agent-canvas/ship-jira.py
+COPY scripts/register-ship-log-monitor.mjs /opt/agent-canvas/register-ship-log-monitor.mjs
+COPY prompts/ship-log-monitor.md /opt/agent-canvas/prompts/ship-log-monitor.md
 COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy

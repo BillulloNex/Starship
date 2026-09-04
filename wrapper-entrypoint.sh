@@ -49,9 +49,10 @@ if [ "$(id -u)" = "0" ]; then
   fi
 
   # Drop privileges and re-exec as openhands
-  exec su -s /bin/bash openhands -c "node /opt/agent-canvas/ship-jira-orchestrator.mjs >> /home/openhands/.openhands/ship-automation.log 2>&1 & exec tini -- /opt/agent-canvas/entrypoint.sh"
+  exec su -s /bin/bash openhands -c "node /opt/agent-canvas/ship-jira-orchestrator.mjs >> /home/openhands/.openhands/ship-automation.log 2>&1 & node /opt/agent-canvas/ship-log-monitor-orchestrator.mjs >> /home/openhands/.openhands/ship-log-monitor.log 2>&1 & exec tini -- /opt/agent-canvas/entrypoint.sh"
 else
   # Already running as openhands — just exec the real entrypoint
   node /opt/agent-canvas/ship-jira-orchestrator.mjs >> /home/openhands/.openhands/ship-automation.log 2>&1 &
+  node /opt/agent-canvas/ship-log-monitor-orchestrator.mjs >> /home/openhands/.openhands/ship-log-monitor.log 2>&1 &
   exec /opt/agent-canvas/entrypoint.sh
 fi

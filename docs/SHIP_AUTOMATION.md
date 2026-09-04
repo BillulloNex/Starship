@@ -40,3 +40,67 @@ and QA. Logs are written to `/home/openhands/.openhands/ship-automation.log`.
 The orchestrator refuses to claim work until all three profiles exist.
 Cursor profiles use `/opt/agent-canvas/cursor-acp-auth-wrapper.sh` so the ACP
 subprocess receives the stored `CURSOR_API_KEY` without logging or copying it.
+
+## SHIP Log Monitor (Coolify → Jira)
+
+Daily scan of Coolify container logs for `https://ship.beenex.org`. Cursor
+Composer 2.5 (`fast=false`) triages errors from the last 24 hours and files new
+**Bug** tickets in project **SHIP** with status **To Do** for the delivery
+orchestrator above to pick up.
+
+### How it runs (primary)
+
+The background orchestrator starts with the container and runs daily at
+**06:00 America/New_York**:
+
+```bash
+node scripts/ship-log-monitor-orchestrator.mjs
+```
+
+One-shot test: `node scripts/ship-log-monitor-orchestrator.mjs --once`
+
+Logs: `/home/openhands/.openhands/ship-log-monitor.log`  
+State: `/home/openhands/.openhands/ship-automation/log-monitor-state.json`
+
+### Required agent profile
+
+Create **`SHIP-LogMonitor`**: Cursor ACP using `composer-2.5[fast=false]`.
+Same auth wrapper as other SHIP Cursor profiles (`cursor-acp-auth-wrapper.sh`).
+
+The orchestrator refuses to run until this profile exists.
+
+### Optional cron automation (UI)
+
+For visibility in Starship Automations, register a disabled cron twin:
+
+```bash
+node scripts/register-ship-log-monitor.mjs
+```
+
+Keep it **disabled** while the ACP orchestrator is active to avoid duplicate
+Jira tickets. Enable only if you disable the orchestrator.
+
+### Coolify credentials
+
+Store in Coolify runtime env (or agent secrets):
+
+- `COOLIFY_API_TOKEN` (or `COOLIFY_ACCESS_TOKEN`)
+- `COOLIFY_BASE_URL` (default `https://coolify.beenex.org`)
+- `COOLIFY_APP_UUID` (default `b13aardv73k5fyl01a80ggzc` — Starship/grokbot app)
+
+### Jira ticket shape
+
+- Project: **SHIP**, issue type: **Bug**, status: **To Do**
+- Labels: `auto-log`, `severity-critical|high|medium`, `log-sig-<hash>` (dedupe)
+- Summary prefix: `Log:`
+
+Dedupe: `scripts/ship-jira.py create-bug ... --sig "<signature>"` skips when an
+open ticket with the same signature label already exists.
+
+### Helper scripts
+
+| Script | Purpose |
+| --- | --- |
+| `scripts/ship-coolify-logs.mjs` | Fetch Coolify logs, group errors (last 24h) |
+| `scripts/ship-jira.py` | SHIP Jira CLI (search, create-bug, comment) |
+| `prompts/ship-log-monitor.md` | Full runbook the agent executes each run |
