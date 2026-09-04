@@ -14,6 +14,10 @@ import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
 import { chatInputPillButtonClassName } from "#/utils/form-control-classes";
 import { formatModelNameForDisplay } from "#/utils/format-model-name";
+import { Star } from "lucide-react";
+import { useFavoriteAgentModels } from "#/hooks/use-favorite-agent-models";
+import { useChatInputProfileState } from "#/hooks/use-chat-input-profile-state";
+import { FavoriteAgentModelsSection } from "./favorite-agent-models-section";
 
 const PROFILE_LABEL_MAX_CHARS = 18;
 
@@ -50,6 +54,8 @@ export function ChatInputLlmProfileMenuContent({
     canSwitchProfile,
     selectProfile,
   } = useChatInputLlmProfileState();
+  const { currentProfileId } = useChatInputProfileState();
+  const { isFavorite, toggleFavorite } = useFavoriteAgentModels();
   // Read-only surfaces (a cloud member on the home page, or a start-task route)
   // still name the active profile — the same shape ChatInputModelMenuContent
   // uses when the ACP picker is gated off.
@@ -63,6 +69,10 @@ export function ChatInputLlmProfileMenuContent({
 
   return (
     <>
+      <FavoriteAgentModelsSection
+        onClose={onClose}
+        dividerInset={dividerInset}
+      />
       {showProfileList && (
         <>
           {/* role="presentation" keeps this a valid <li> child of the
@@ -76,6 +86,13 @@ export function ChatInputLlmProfileMenuContent({
             {profiles.map((profile) => {
               const isCurrent = profile.name === currentProfileName;
               const displayModel = formatModelNameForDisplay(profile.model);
+              const favorite = currentProfileId
+                ? {
+                    agentProfileId: currentProfileId,
+                    modelId: profile.name,
+                  }
+                : null;
+              const starred = favorite ? isFavorite(favorite) : false;
               return (
                 <ContextMenuListItem
                   key={profile.name}
@@ -108,6 +125,37 @@ export function ChatInputLlmProfileMenuContent({
                         className="shrink-0"
                         aria-hidden
                       />
+                    )}
+                    {favorite && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${t(I18nKey.HOME$FAVORITES)}: ${profile.name}`}
+                        className={cn(
+                          "shrink-0 rounded p-0.5 hover:bg-white/10",
+                          starred
+                            ? "text-amber-400"
+                            : "text-[var(--oh-text-dim)]",
+                        )}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          toggleFavorite(favorite);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ")
+                            return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          toggleFavorite(favorite);
+                        }}
+                      >
+                        <Star
+                          size={15}
+                          fill={starred ? "currentColor" : "none"}
+                          aria-hidden
+                        />
+                      </span>
                     )}
                   </span>
                   {displayModel && (

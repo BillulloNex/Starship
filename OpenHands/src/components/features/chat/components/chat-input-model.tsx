@@ -17,6 +17,10 @@ import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
 import { chatInputPillButtonClassName } from "#/utils/form-control-classes";
 import React from "react";
+import { Star } from "lucide-react";
+import { useFavoriteAgentModels } from "#/hooks/use-favorite-agent-models";
+import { useChatInputProfileState } from "#/hooks/use-chat-input-profile-state";
+import { FavoriteAgentModelsSection } from "./favorite-agent-models-section";
 
 const MODEL_LABEL_MAX_CHARS = 10;
 // ACP surfaces show the provider's human label (e.g. "Claude Opus 4.7"),
@@ -51,6 +55,8 @@ export function ChatInputModelMenuContent({
 }: ChatInputModelMenuContentProps) {
   const { t } = useTranslation("openhands");
   const switchAcpModel = useSwitchAcpModel();
+  const { currentProfileId } = useChatInputProfileState();
+  const { isFavorite, toggleFavorite } = useFavoriteAgentModels();
   const hasModelRows = model.showAcpPicker || Boolean(model.displayModel);
 
   const handleSelectAcpModel = (modelId: string) => {
@@ -65,6 +71,10 @@ export function ChatInputModelMenuContent({
 
   return (
     <>
+      <FavoriteAgentModelsSection
+        onClose={onClose}
+        dividerInset={dividerInset}
+      />
       {model.showAcpPicker ? (
         <>
           {/* role="presentation" keeps this a valid <li> child of the
@@ -78,6 +88,10 @@ export function ChatInputModelMenuContent({
           <div className="flex max-h-[220px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
             {model.availableAcpModels.map((option) => {
               const isSelected = option.id === model.currentModelId;
+              const favorite = currentProfileId
+                ? { agentProfileId: currentProfileId, modelId: option.id }
+                : null;
+              const starred = favorite ? isFavorite(favorite) : false;
               return (
                 <ContextMenuListItem
                   key={option.id}
@@ -105,6 +119,36 @@ export function ChatInputModelMenuContent({
                       className="shrink-0"
                       aria-hidden
                     />
+                  )}
+                  {favorite && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${t(I18nKey.HOME$FAVORITES)}: ${option.label}`}
+                      className={cn(
+                        "shrink-0 rounded p-0.5 hover:bg-white/10",
+                        starred
+                          ? "text-amber-400"
+                          : "text-[var(--oh-text-dim)]",
+                      )}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleFavorite(favorite);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleFavorite(favorite);
+                      }}
+                    >
+                      <Star
+                        size={15}
+                        fill={starred ? "currentColor" : "none"}
+                        aria-hidden
+                      />
+                    </span>
                   )}
                 </ContextMenuListItem>
               );
