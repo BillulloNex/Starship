@@ -7,9 +7,11 @@
  *
  * Credentials: COOLIFY_API_TOKEN (or COOLIFY_ACCESS_TOKEN) and COOLIFY_BASE_URL
  * from env, else http://127.0.0.1:18000/api/settings/secrets/{NAME}.
+ * Falls back to local persisted logs when the Coolify API is unavailable.
  */
 
 import fs from "node:fs/promises";
+import path from "node:path";
 
 const DEFAULT_APP_UUID = "b13aardv73k5fyl01a80ggzc";
 const DEFAULT_BASE_URL = "https://coolify.beenex.org";
@@ -32,6 +34,11 @@ const ERROR_PATTERNS = [
   /\bHealth check failed\b/i,
   /\bexited with code [1-9]/i,
   /\bnon-zero exit\b/i,
+];
+
+const LOCAL_LOG_PATHS = [
+  "/home/openhands/.openhands/ship-automation.log",
+  "/home/openhands/.openhands/ship-log-monitor.log",
 ];
 
 function parseArgs(argv) {
@@ -59,14 +66,18 @@ async function secret(name) {
 }
 
 async function resolveCoolifyCreds() {
-  const token =
+  let token =
     process.env.COOLIFY_API_TOKEN ||
     process.env.COOLIFY_ACCESS_TOKEN ||
     process.env.COOLIFY_TOKEN ||
-    (await secret("COOLIFY_API_TOKEN").catch(() => secret("COOLIFY_ACCESS_TOKEN")));
+    "";
+  if (!token) {
+    token = await secret("COOLIFY_API_TOKEN").catch(() => secret("COOLIFY_ACCESS_TOKEN"));
+  }
   const baseUrl = (
     process.env.COOLIFY_BASE_URL ||
     process.env.COOLIFY_API_URL ||
+    process.env.COOLIFY_URL ||
     (await secret("COOLIFY_BASE_URL").catch(() => secret("COOLIFY_API_URL")))
   )
     .trim()
@@ -75,7 +86,7 @@ async function resolveCoolifyCreds() {
   return { token, baseUrl };
 }
 
-function parseTimestamp(line) {
+export function parseTimestamp(line) {
   const iso = line.match(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/);
   if (iso) {
     const ms = Date.parse(iso[0].replace(" ", "T"));
@@ -84,17 +95,18 @@ function parseTimestamp(line) {
   return null;
 }
 
-function isErrorLine(line) {
+export function isErrorLine(line) {
   if (!line.trim()) return false;
   if (/^\s*(INFO|DEBUG|TRACE)\b/i.test(line)) return false;
   return ERROR_PATTERNS.some((pattern) => pattern.test(line));
 }
 
-function groupErrors(lines, windowStartMs) {
+export function groupErrors(lines, windowStartMs) {
   const groups = new Map();
   for (const entry of lines) {
     if (entry.timestamp && entry.timestamp < windowStartMs) continue;
-    const key = entry.line.replace(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, "<ts>")
+    const key = entry.line
+      .replace(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, "<ts>")
       .replace(/\b[0-9a-f]{8,}\b/gi, "<id>")
       .slice(0, 240);
     const existing = groups.get(key) || {
@@ -115,7 +127,31 @@ function groupErrors(lines, windowStartMs) {
   return [...groups.values()].sort((a, b) => (b.last_seen ?? 0) - (a.last_seen ?? 0));
 }
 
-async function fetchLogs(baseUrl, token, appUuid, lines) {
+export function analyzeLogText(raw, windowStartMs) {
+  const rawLines = String(raw).split(/\r?\n/);
+  const parsedLines = rawLines.map((line) => ({
+    line,
+    timestamp: parseTimestamp(line),
+    is_error: isErrorLine(line),
+  }));
+  const errorLines = parsedLines.filter((entry) => entry.is_error);
+  const recentErrors = errorLines.filter(
+    (entry) => !entry.timestamp || entry.timestamp >= windowStartMs,
+  );
+  const groups = groupErrors(recentErrors.length ? recentErrors : errorLines, windowStartMs);
+  return {
+    total_lines: rawLines.length,
+    error_line_count: errorLines.length,
+    recent_error_line_count: recentErrors.length,
+    error_groups: groups,
+    note:
+      recentErrors.length === 0 && errorLines.length > 0
+        ? "No timestamped errors fell inside the window; returning unscoped error tail for review."
+        : undefined,
+  };
+}
+
+async function fetchCoolifyLogs(baseUrl, token, appUuid, lines) {
   const url = `${baseUrl}/api/v1/applications/${appUuid}/logs?lines=${lines}&show_timestamps=true`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -132,42 +168,81 @@ async function fetchLogs(baseUrl, token, appUuid, lines) {
   }
 }
 
+async function localLogCandidates() {
+  const paths = [...LOCAL_LOG_PATHS];
+  const logDirs = [
+    "/home/openhands/.openhands/logs",
+    "/home/openhands/.openhands/agent-canvas/logs",
+  ];
+  for (const dir of logDirs) {
+    try {
+      const files = await fs.readdir(dir);
+      for (const file of files) {
+        if (file.endsWith(".log")) paths.push(path.join(dir, file));
+      }
+    } catch {
+      // ignore missing dirs
+    }
+  }
+  return paths;
+}
+
+async function fetchLocalLogs(maxLines) {
+  const paths = await localLogCandidates();
+  const chunks = [];
+  for (const filePath of paths) {
+    try {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      const text = await fs.readFile(filePath, "utf8");
+      if (!text.trim()) continue;
+      chunks.push(`# ${filePath}\n${text}`);
+    } catch {
+      // ignore unreadable files
+    }
+  }
+  const combined = chunks.join("\n");
+  const lines = combined.split(/\r?\n/);
+  return lines.slice(-maxLines).join("\n");
+}
+
+async function fetchLogs(opts) {
+  try {
+    const creds = await resolveCoolifyCreds();
+    const appUuid = (process.env.COOLIFY_APP_UUID || DEFAULT_APP_UUID).trim();
+    const raw = await fetchCoolifyLogs(creds.baseUrl, creds.token, appUuid, opts.lines);
+    return { source: "coolify-api", baseUrl: creds.baseUrl, raw };
+  } catch (error) {
+    const raw = await fetchLocalLogs(opts.lines);
+    if (!raw.trim()) throw error;
+    return {
+      source: "local-fallback",
+      baseUrl: process.env.COOLIFY_BASE_URL || process.env.COOLIFY_URL || DEFAULT_BASE_URL,
+      raw,
+      warning: `Coolify API unavailable (${error.message}); used local log files instead.`,
+    };
+  }
+}
+
 async function main() {
   const opts = parseArgs(process.argv);
-  const creds = await resolveCoolifyCreds();
   const appUuid = (process.env.COOLIFY_APP_UUID || DEFAULT_APP_UUID).trim();
-  const fqdn = process.env.SHIP_FQDN || "ship.beenex.org";
+  const fqdn = process.env.SHIP_FQDN || process.env.COOLIFY_FQDN || "ship.beenex.org";
   const windowStartMs = Date.now() - opts.hours * 60 * 60 * 1000;
 
-  const raw = await fetchLogs(creds.baseUrl, creds.token, appUuid, opts.lines);
-  const rawLines = String(raw).split(/\r?\n/);
-  const parsedLines = rawLines.map((line) => ({
-    line,
-    timestamp: parseTimestamp(line),
-    is_error: isErrorLine(line),
-  }));
-
-  const errorLines = parsedLines.filter((entry) => entry.is_error);
-  const recentErrors = errorLines.filter(
-    (entry) => !entry.timestamp || entry.timestamp >= windowStartMs,
-  );
-  const groups = groupErrors(recentErrors.length ? recentErrors : errorLines, windowStartMs);
+  const fetched = await fetchLogs(opts);
+  const analysis = analyzeLogText(fetched.raw, windowStartMs);
 
   const payload = {
     app_uuid: appUuid,
     fqdn,
-    base_url: creds.baseUrl,
+    source: fetched.source,
+    base_url: fetched.baseUrl,
     window_hours: opts.hours,
     window_start: new Date(windowStartMs).toISOString(),
     fetched_at: new Date().toISOString(),
-    total_lines: rawLines.length,
-    error_line_count: errorLines.length,
-    recent_error_line_count: recentErrors.length,
-    error_groups: groups,
-    note:
-      recentErrors.length === 0 && errorLines.length > 0
-        ? "No timestamped errors fell inside the window; returning unscoped error tail for review."
-        : undefined,
+    warning: fetched.warning,
+    ...analysis,
   };
 
   const text = `${JSON.stringify(payload, null, 2)}\n`;
@@ -175,7 +250,9 @@ async function main() {
   process.stdout.write(text);
 }
 
-main().catch((error) => {
-  console.error(`[ship-coolify-logs] ${error.stack || error.message || error}`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === new URL(`file://${path.resolve(process.argv[1])}`).href) {
+  main().catch((error) => {
+    console.error(`[ship-coolify-logs] ${error.stack || error.message || error}`);
+    process.exitCode = 1;
+  });
+}

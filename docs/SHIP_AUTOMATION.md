@@ -88,6 +88,16 @@ Store in Coolify runtime env (or agent secrets):
 - `COOLIFY_BASE_URL` (default `https://coolify.beenex.org`)
 - `COOLIFY_APP_UUID` (default `b13aardv73k5fyl01a80ggzc` — Starship/grokbot app)
 
+Verify or bootstrap from the running container:
+
+```bash
+COOLIFY_API_TOKEN=<token> node scripts/ensure-ship-coolify-secret.mjs
+```
+
+Without the token, `ship-coolify-logs.mjs` falls back to local persisted logs
+(`ship-automation.log`, `ship-log-monitor.log`, `agent-canvas.*.log`) — useful for
+smoke tests but incomplete vs full Coolify container stdout.
+
 ### Jira ticket shape
 
 - Project: **SHIP**, issue type: **Bug**, status: **To Do**
