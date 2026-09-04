@@ -35,7 +35,7 @@ and QA. Logs are written to `/home/openhands/.openhands/ship-automation.log`.
 
 - `SHIP-Triage`: Cursor ACP using `composer-2.5`.
 - `SHIP-Builder`: Codex ACP using `gpt-5.6-sol`.
-- `SHIP-QA`: Cursor ACP using `grok-4.6[effort=high,fast=true]`.
+- `SHIP-QA`: Cursor ACP using `grok-4.6[effort=high,fast=false]`.
 
 The orchestrator refuses to claim work until all three profiles exist.
 Cursor profiles use `/opt/agent-canvas/cursor-acp-auth-wrapper.sh` so the ACP
