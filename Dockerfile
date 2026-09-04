@@ -307,6 +307,8 @@ RUN chmod +x /opt/agent-canvas/job-board.mjs && ln -sf /opt/agent-canvas/job-boa
 COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-deploy.mjs && ln -sf /opt/agent-canvas/grokbot-deploy.mjs /usr/local/bin/grokbot-deploy
 COPY scripts/start-vnc-browser.sh /opt/agent-canvas/start-vnc-browser.sh
+COPY scripts/ship-jira-orchestrator.mjs /opt/agent-canvas/ship-jira-orchestrator.mjs
+COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
@@ -334,7 +336,7 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 
 # Copy the wrapper entrypoint (fixes volume ownership before starting services)
 COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
-RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh
+RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 
 # Stay as root — the wrapper entrypoint drops to openhands after fixing
 # file ownership on mounted volumes. This is needed because the old

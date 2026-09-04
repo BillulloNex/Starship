@@ -47,8 +47,8 @@ and handles WebSockets — all on a single origin.
 
 ### Primary URL: `https://ship.beenex.org`
 
-- **Pushing or merging to `main` automatically triggers Coolify deployment** for the
-  entire stack (frontend + backend). Coolify is connected via the GitHub App.
+- **Pushing or merging to `main` runs `.github/workflows/deploy.yml`, which builds
+  the image and triggers Coolify deployment** for the entire stack (frontend + backend).
 - **NEVER call the manual Coolify `deploy` tool after pushing to `main`.**
 - **How to verify deployment:**
   1. Commit and push to `main`.

@@ -13,7 +13,7 @@ CURSOR_DIR="/home/openhands/.cursor"
 mkdir -p /projects
 
 # Auto-seed repository into /projects/Grokbot if missing
-AUTO_REPO="${AUTO_CLONE_REPO:-https://github.com/ThomasVuNguyen/Grokbot.git}"
+AUTO_REPO="${AUTO_CLONE_REPO:-https://github.com/ThomasVuNguyen/Starship.git}"
 TARGET_DIR="${AUTO_CLONE_TARGET:-/projects/Grokbot}"
 
 if [ -n "${AUTO_REPO}" ] && [ ! -d "${TARGET_DIR}/.git" ]; then
@@ -49,8 +49,9 @@ if [ "$(id -u)" = "0" ]; then
   fi
 
   # Drop privileges and re-exec as openhands
-  exec su -s /bin/bash openhands -c "exec tini -- /opt/agent-canvas/entrypoint.sh"
+  exec su -s /bin/bash openhands -c "node /opt/agent-canvas/ship-jira-orchestrator.mjs >> /home/openhands/.openhands/ship-automation.log 2>&1 & exec tini -- /opt/agent-canvas/entrypoint.sh"
 else
   # Already running as openhands — just exec the real entrypoint
+  node /opt/agent-canvas/ship-jira-orchestrator.mjs >> /home/openhands/.openhands/ship-automation.log 2>&1 &
   exec /opt/agent-canvas/entrypoint.sh
 fi
