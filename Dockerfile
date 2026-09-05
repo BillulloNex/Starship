@@ -314,6 +314,7 @@ COPY OpenHands/scripts/job-board.mjs /opt/agent-canvas/job-board.mjs
 RUN chmod +x /opt/agent-canvas/job-board.mjs && ln -sf /opt/agent-canvas/job-board.mjs /usr/local/bin/grokbot-job
 COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-deploy.mjs && ln -sf /opt/agent-canvas/grokbot-deploy.mjs /usr/local/bin/grokbot-deploy
+COPY OpenHands/scripts/skill-installer.mjs /opt/agent-canvas/skill-installer.mjs
 COPY scripts/start-vnc-browser.sh /opt/agent-canvas/start-vnc-browser.sh
 COPY scripts/ship-jira-orchestrator.mjs /opt/agent-canvas/ship-jira-orchestrator.mjs
 COPY scripts/ship-log-monitor-orchestrator.mjs /opt/agent-canvas/ship-log-monitor-orchestrator.mjs

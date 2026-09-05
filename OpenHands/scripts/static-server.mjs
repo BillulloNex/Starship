@@ -73,6 +73,7 @@ import {
   handleJobBoardRequest,
   startJobBoardDispatcher,
 } from "./job-board.mjs";
+import { handleSkillInstallRequest } from "./skill-installer.mjs";
 
 /** Where the frontend reads the live-preview state from. */
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
@@ -80,6 +81,8 @@ const PREVIEW_PORTS_PATH = "/api/preview/ports";
 const PREVIEW_APPS_PATH = "/api/preview/apps";
 /** Persistent workforce kanban. */
 const JOBS_API_PREFIX = "/api/jobs";
+/** Skill installation endpoint. */
+const SKILLS_INSTALL_PATH = "/api/skills/install";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPA fallback helpers
@@ -975,6 +978,17 @@ export function startStaticServer(config) {
         infrastructurePorts,
       ).catch((err) => {
         console.error("Preview ports error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (parsedUrl.pathname === SKILLS_INSTALL_PATH && req.method === "POST") {
+      handleSkillInstallRequest(req, res).catch((err) => {
+        console.error("Skill installer error:", err);
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: err.message }));

@@ -10,49 +10,43 @@ OPENHANDS_DIR="/home/openhands/.openhands"
 CURSOR_DIR="/home/openhands/.cursor"
 OPENCODE_DIR="/home/openhands/.local/share/opencode"
 
-# Ensure /projects directory exists
-mkdir -p /projects
+# Ensure directories exist
+mkdir -p /projects "$CURSOR_DIR" "$OPENCODE_DIR"
 
-# Auto-seed repository into /projects/Grokbot if missing
+# Auto-seed repository in background if missing so it does not block container startup
 AUTO_REPO="${AUTO_CLONE_REPO:-https://github.com/ThomasVuNguyen/Starship.git}"
 TARGET_DIR="${AUTO_CLONE_TARGET:-/projects/Grokbot}"
 
 if [ -n "${AUTO_REPO}" ] && [ ! -d "${TARGET_DIR}/.git" ]; then
-  echo "[grokbot-wrapper] Auto-seeding workspace ${TARGET_DIR} from ${AUTO_REPO}..."
-  mkdir -p "$(dirname "$TARGET_DIR")"
-  
-  CLONE_URL="$AUTO_REPO"
-  GH_AUTH_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
-  if [ -n "$GH_AUTH_TOKEN" ] && [[ "$AUTO_REPO" =~ ^https://github.com/ ]]; then
-    CLONE_URL="https://x-access-token:${GH_AUTH_TOKEN}@${AUTO_REPO#https://}"
-  fi
-  
-  git clone "$CLONE_URL" "$TARGET_DIR" 2>/dev/null || git clone "$AUTO_REPO" "$TARGET_DIR" 2>/dev/null || echo "[grokbot-wrapper] Auto-clone skipped or failed."
+  (
+    echo "[grokbot-wrapper] Auto-seeding workspace ${TARGET_DIR} from ${AUTO_REPO} in background..."
+    mkdir -p "$(dirname "$TARGET_DIR")"
+    CLONE_URL="$AUTO_REPO"
+    GH_AUTH_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    if [ -n "$GH_AUTH_TOKEN" ] && [[ "$AUTO_REPO" =~ ^https://github.com/ ]]; then
+      CLONE_URL="https://x-access-token:${GH_AUTH_TOKEN}@${AUTO_REPO#https://}"
+    fi
+    git clone --depth 1 "$CLONE_URL" "$TARGET_DIR" 2>/dev/null || git clone --depth 1 "$AUTO_REPO" "$TARGET_DIR" 2>/dev/null || echo "[grokbot-wrapper] Auto-clone skipped or failed."
+    chown -R openhands:openhands "$TARGET_DIR" 2>/dev/null || true
+  ) &
 fi
 
-# Fix ownership on the mounted volume if running as root
+# Fix ownership quickly without blocking startup
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$CURSOR_DIR" "$OPENCODE_DIR"
-
-  # Fast ownership fix: only recursively chown if the target directory is currently owned by root (UID 0)
-  for dir in "$OPENHANDS_DIR" "$CURSOR_DIR" "$OPENCODE_DIR" /projects /root/workspace; do
-    if [ -d "$dir" ]; then
-      owner_uid="$(stat -c '%u' "$dir" 2>/dev/null || echo "0")"
-      if [ "$owner_uid" = "0" ]; then
-        echo "[grokbot-wrapper] Fixing root ownership on $dir..."
-        chown -R openhands:openhands "$dir" 2>/dev/null || true
-      fi
-    fi
-  done
-
-  # The old container stored workspaces at /root/workspace/. Conversations
-  # reference these paths. Make /root accessible and create the workspace
-  # directory if it doesn't exist (it won't in the new base image).
+  chown openhands:openhands "$OPENHANDS_DIR" "$CURSOR_DIR" "$OPENCODE_DIR" /projects /home/openhands 2>/dev/null || true
   chmod 755 /root
   mkdir -p /root/workspace
-  if [ "$(stat -c '%u' /root/workspace 2>/dev/null || echo "0")" = "0" ]; then
-    chown -R openhands:openhands /root/workspace 2>/dev/null || true
+  chown openhands:openhands /root /root/workspace 2>/dev/null || true
+
+  # Ensure persistent skills directory and symlink for npx skills CLI
+  mkdir -p "$OPENHANDS_DIR/skills" /home/openhands/.agents
+  if [ ! -e /home/openhands/.agents/skills ]; then
+    ln -s "$OPENHANDS_DIR/skills" /home/openhands/.agents/skills 2>/dev/null || true
   fi
+  chown -R openhands:openhands "$OPENHANDS_DIR/skills" /home/openhands/.agents 2>/dev/null || true
+
+  # Asynchronous background chown for user config dirs
+  (chown -R openhands:openhands /home/openhands/.local "$CURSOR_DIR" "$OPENCODE_DIR" 2>/dev/null || true) &
 
   # Start D-Bus system service if installed
   if [ -x /etc/init.d/dbus ]; then

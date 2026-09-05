@@ -33427,6 +33427,79 @@
     "uk": "Прочитайте повний посібник з додавання навичок →",
     "ca": "Llegiu la guia completa per afegir habilitats →"
   },
+  "SETTINGS$SKILLS_INSTALL_TITLE": {
+    "en": "Install from skills.sh or GitHub",
+    "ja": "skills.sh または GitHub からインストール",
+    "zh-CN": "从 skills.sh 或 GitHub 安装",
+    "zh-TW": "從 skills.sh 或 GitHub 安裝",
+    "ko-KR": "skills.sh 또는 GitHub에서 설치"
+  },
+  "SETTINGS$SKILLS_INSTALL_DESCRIPTION": {
+    "en": "Paste a skill name, command, or skills.sh/GitHub URL to install directly into your environment.",
+    "ja": "スキル名、コマンド、または skills.sh / GitHub の URL を貼り付けて直接インストールします。",
+    "zh-CN": "粘贴技能名称、命令或 skills.sh / GitHub 链接以直接安装。",
+    "zh-TW": "貼上技能名稱、指令或 skills.sh / GitHub 連結以直接安裝。"
+  },
+  "SETTINGS$SKILLS_INSTALL_INPUT_LABEL": {
+    "en": "Skill package, command, or URL",
+    "ja": "スキルパッケージ、コマンド、または URL",
+    "zh-CN": "技能包、命令或 URL",
+    "zh-TW": "技能包、指令或 URL"
+  },
+  "SETTINGS$SKILLS_INSTALL_PLACEHOLDER": {
+    "en": "e.g. vercel-labs/agent-skills or npx skills add owner/repo",
+    "ja": "例: vercel-labs/agent-skills または npx skills add owner/repo",
+    "zh-CN": "例如 vercel-labs/agent-skills 或 npx skills add owner/repo",
+    "zh-TW": "例如 vercel-labs/agent-skills 或 npx skills add owner/repo"
+  },
+  "SETTINGS$SKILLS_INSTALL_TRY_LABEL": {
+    "en": "Try:",
+    "ja": "お試し:",
+    "zh-CN": "尝试:",
+    "zh-TW": "嘗試:"
+  },
+  "SETTINGS$SKILLS_INSTALL_SCOPE_LABEL": {
+    "en": "Installation Scope",
+    "ja": "インストール範囲",
+    "zh-CN": "安装范围",
+    "zh-TW": "安裝範圍"
+  },
+  "SETTINGS$SKILLS_INSTALL_SCOPE_GLOBAL": {
+    "en": "Global (All conversations & projects)",
+    "ja": "グローバル (すべての会話とプロジェクト)",
+    "zh-CN": "全局 (所有会话与项目)",
+    "zh-TW": "全域 (所有對話與專案)"
+  },
+  "SETTINGS$SKILLS_INSTALL_SCOPE_WORKSPACE": {
+    "en": "Workspace (Current repository only)",
+    "ja": "ワークスペース (現在のリポジトリのみ)",
+    "zh-CN": "工作区 (仅限当前仓库)",
+    "zh-TW": "工作區 (僅限目前儲存庫)"
+  },
+  "SETTINGS$SKILLS_INSTALL_BUTTON": {
+    "en": "Install Skill",
+    "ja": "スキルをインストール",
+    "zh-CN": "安装技能",
+    "zh-TW": "安裝技能"
+  },
+  "SETTINGS$SKILLS_INSTALLING": {
+    "en": "Installing...",
+    "ja": "インストール中...",
+    "zh-CN": "正在安装...",
+    "zh-TW": "正在安裝..."
+  },
+  "SETTINGS$SKILLS_INSTALL_SUCCESS": {
+    "en": "Skill installed successfully!",
+    "ja": "スキルが正常にインストールされました！",
+    "zh-CN": "技能安装成功！",
+    "zh-TW": "技能安裝成功！"
+  },
+  "SETTINGS$SKILLS_INSTALL_MANUAL_GUIDE": {
+    "en": "Alternative: CLI & Chat commands",
+    "ja": "別の方法: CLI およびチャット コマンド",
+    "zh-CN": "备选方案: CLI 与聊天命令",
+    "zh-TW": "替代方案: CLI 與聊天指令"
+  },
   "SETTINGS$SKILLS_CATEGORY_AUTOMATIONS": {
     "en": "Automation recipes",
     "ja": "自動化レシピ",
