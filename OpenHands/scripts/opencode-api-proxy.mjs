@@ -188,11 +188,11 @@ async function resolveEnv(req) {
   // Priority: OPENCODE_AUTH_JSON (full blob) > build from individual API keys.
   let authJsonContent = null;
 
-  if (env.OPENCODE_AUTH_JSON) {
+  if (env.OPENCODE_AUTH_JSON && env.OPENCODE_AUTH_JSON.trim() !== "{}") {
     authJsonContent = env.OPENCODE_AUTH_JSON;
   } else {
     const fetched = await fetchSecret("OPENCODE_AUTH_JSON");
-    if (fetched && fetched.startsWith("{")) {
+    if (fetched && fetched.startsWith("{") && fetched.trim() !== "{}") {
       authJsonContent = fetched;
       env.OPENCODE_AUTH_JSON = fetched;
     }
