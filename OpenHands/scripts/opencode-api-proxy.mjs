@@ -236,31 +236,60 @@ async function resolveEnv(req) {
 }
 
 export async function fetchOpencodeModels(env = process.env) {
+  const debug = { authJsonPath: null, authJsonExists: false, rawStdout: null, rawStderr: null, attempt: null };
   try {
-    const { stdout } = await execFileAsync("opencode", ["models", "--refresh"], {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const authPath = join(homedir(), ".local", "share", "opencode", "auth.json");
+    debug.authJsonPath = authPath;
+    debug.authJsonExists = existsSync(authPath);
+    if (debug.authJsonExists) {
+      try {
+        const content = readFileSync(authPath, "utf8");
+        // Redact actual keys but show structure
+        const parsed = JSON.parse(content);
+        debug.authJsonProviders = Object.keys(parsed);
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+
+  try {
+    debug.attempt = "models --refresh";
+    const { stdout, stderr } = await execFileAsync("opencode", ["models", "--refresh"], {
       env,
       timeout: 15_000,
     });
+    debug.rawStdout = stdout?.substring(0, 500);
+    debug.rawStderr = stderr?.substring(0, 500);
     const parsed = parseOpencodeModelsOutput(stdout);
     if (parsed.length > 0) {
+      parsed._debug = debug;
       return parsed;
     }
-  } catch {
+  } catch (err) {
+    debug.refreshError = err?.message?.substring(0, 200);
     // --refresh may not be supported in all versions, try without
     try {
-      const { stdout } = await execFileAsync("opencode", ["models"], {
+      debug.attempt = "models";
+      const { stdout, stderr } = await execFileAsync("opencode", ["models"], {
         env,
         timeout: 15_000,
       });
+      debug.rawStdout = stdout?.substring(0, 500);
+      debug.rawStderr = stderr?.substring(0, 500);
       const parsed = parseOpencodeModelsOutput(stdout);
       if (parsed.length > 0) {
+        parsed._debug = debug;
         return parsed;
       }
-    } catch {
-      // opencode binary not found or failed, fall back
+    } catch (err2) {
+      debug.fallbackError = err2?.message?.substring(0, 200);
     }
   }
-  return DEFAULT_OPENCODE_MODELS;
+  const result = DEFAULT_OPENCODE_MODELS;
+  result._debug = debug;
+  return result;
 }
 
 export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
@@ -284,11 +313,14 @@ export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
     try {
       const env = await resolveEnv(req);
       const models = await fetchOpencodeModels(env);
+      const debug = models._debug;
+      delete models._debug;
       cachedResult = {
         provider: "opencode",
         models,
         modelCount: models.length,
         updatedAt: now,
+        _debug: debug,
       };
       cacheTimestamp = now;
       json(res, 200, cachedResult);
