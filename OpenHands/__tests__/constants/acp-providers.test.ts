@@ -327,7 +327,7 @@ describe("getAcpPreferredDefaultModel", () => {
     expect(buildAcpAgentSettingsDiff("opencode")).toMatchObject({
       agent_kind: "acp",
       acp_server: "custom",
-      acp_command: ["opencode-acp", "--model", "opencode/big-pickle"],
+      acp_command: ["opencode-acp"],
       acp_model: "opencode/big-pickle",
     });
     expect(
@@ -335,7 +335,7 @@ describe("getAcpPreferredDefaultModel", () => {
         model: "opencode-go/kimi-k3",
       }),
     ).toMatchObject({
-      acp_command: ["opencode-acp", "--model", "opencode-go/kimi-k3"],
+      acp_command: ["opencode-acp"],
       acp_model: "opencode-go/kimi-k3",
     });
   });

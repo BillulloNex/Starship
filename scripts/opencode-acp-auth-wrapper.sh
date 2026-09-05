@@ -6,13 +6,17 @@ set +x
 # Resolves OPENCODE_AUTH_JSON or API keys from environment or Agent Server secret store,
 # materializes credentials to ~/.local/share/opencode/auth.json so Go / paid models
 # are in the ACP catalog (session/set_model cannot see env-only keys on 1.18.x),
-# disables compaction auto-continue, and starts the ACP server in yolo mode (--auto).
+# disables compaction auto-continue, allows tools without CLI --auto, and starts ACP.
+#
+# OpenCode 1.18.x is yargs .strict() with no global --auto/--model. Passing those
+# prints help and process.exit() in a finally block → "Failed to start ACP server:
+# Connection closed". Model selection stays on ACP session/set_model (acp_model).
 
 SECRETS_URL="http://127.0.0.1:18000/api/settings/secrets"
 
 fetch_secret() {
   local secret_name="$1"
-  curl -fsS "${SECRETS_URL}/${secret_name}" 2>/dev/null || true
+  curl -fsS --max-time 2 "${SECRETS_URL}/${secret_name}" 2>/dev/null || true
 }
 
 # 1. Materialize OPENCODE_AUTH_JSON if available
@@ -56,14 +60,15 @@ mkdir -p "$OPENCODE_DIR" "$OPENCODE_CONFIG_DIR"
 # Merge env/API keys into auth.json. OpenCode ACP session/set_model looks up
 # models from providers loaded via this file; OPENCODE_GO_API_KEY alone is not
 # enough for opencode-go/* to appear, which silently falls back to big-pickle.
-python3 - "$OPENCODE_DIR/auth.json" "$AUTH_JSON" <<'PY'
+export OPENCODE_AUTH_JSON_BLOB="$AUTH_JSON"
+python3 - "$OPENCODE_DIR/auth.json" <<'PY'
 import json
 import os
 import sys
 from pathlib import Path
 
 auth_path = Path(sys.argv[1])
-blob = sys.argv[2] if len(sys.argv) > 2 else ""
+blob = os.environ.get("OPENCODE_AUTH_JSON_BLOB") or ""
 data = {}
 if auth_path.exists():
     try:
@@ -75,7 +80,9 @@ if auth_path.exists():
 if blob.strip().startswith("{"):
     try:
         parsed = json.loads(blob)
-        if isinstance(parsed, dict):
+        if isinstance(parsed, dict) and any(
+            isinstance(value, dict) and "type" in value for value in parsed.values()
+        ):
             data.update(parsed)
     except json.JSONDecodeError:
         pass
@@ -97,10 +104,12 @@ put_api("google", "GEMINI_API_KEY")
 auth_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 auth_path.chmod(0o600)
 PY
+unset OPENCODE_AUTH_JSON_BLOB
 
 # Compaction injects a synthetic user turn
 # ("Continue if you have next steps...") which loops the agent in empty
 # workspaces. Disable auto-compaction for ACP sessions.
+# permission:allow replaces unsupported CLI --auto (yolo / never confirm).
 python3 - "$OPENCODE_CONFIG_DIR/opencode.json" <<'PY'
 import json
 import sys
@@ -120,9 +129,31 @@ if not isinstance(compaction, dict):
     compaction = {}
 compaction["auto"] = False
 data["compaction"] = compaction
+data["permission"] = "allow"
 if "$schema" not in data:
     data["$schema"] = "https://opencode.ai/config.json"
 path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 PY
 
-exec opencode --auto "$@" acp
+filtered=()
+skip_next=0
+for arg in "$@"; do
+  if [ "$skip_next" = 1 ]; then
+    skip_next=0
+    continue
+  fi
+  case "$arg" in
+    --auto) continue ;;
+    --model) skip_next=1; continue ;;
+    --model=*) continue ;;
+    acp) continue ;;
+    *) filtered+=("$arg") ;;
+  esac
+done
+
+if [ ${#filtered[@]} -gt 0 ]; then
+  echo "opencode-acp: exec opencode ${filtered[*]} acp" >&2
+  exec opencode "${filtered[@]}" acp
+fi
+echo "opencode-acp: exec opencode acp" >&2
+exec opencode acp

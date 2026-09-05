@@ -752,15 +752,14 @@ export function buildAcpAgentSettingsDiff(
         ? options.command
         : defaultCommand;
 
-  let finalCommand = command;
-  if (providerKey === "opencode" && model && !command.includes("--model")) {
-    finalCommand = [...command, "--model", model];
-  }
+  // OpenCode 1.18.x CLI is yargs .strict() with no global --model. Passing it
+  // on acp_command makes `opencode --model … acp` exit before the ACP
+  // handshake. Model is applied via session/set_model from acp_model.
 
   return {
     agent_kind: "acp",
     acp_server: backendServer,
-    acp_command: finalCommand,
+    acp_command: command,
     acp_args: [],
     acp_model: model,
   };
