@@ -73,9 +73,9 @@ async function fetchModelsFromCursorAPI() {
     cachedConfigOptions = [
       {
         id: "model",
-        displayName: "Model",
+        name: "Model",
         type: "select",
-        values: modelValues,
+        options: modelValues.map((m) => ({ id: m.value, name: m.name })),
         currentValue:
           modelValues.find((v) => v.value.startsWith("default["))?.value ||
           modelValues[0]?.value ||
