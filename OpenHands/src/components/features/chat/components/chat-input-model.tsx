@@ -229,11 +229,11 @@ export function ChatInputModel() {
         <ContextMenu
           ref={popoverRef}
           testId="chat-input-llm-model-popover"
-          position="top"
+          position="bottom"
           alignment="left"
           spacing="none"
           className={cn(
-            "z-[60] mb-2 min-w-[200px] max-w-[320px] pr-0.5",
+            "z-[60] mt-2 min-w-[200px] max-w-[320px] pr-0.5",
             dropdownMenuViewportScrollClassName,
           )}
         >
