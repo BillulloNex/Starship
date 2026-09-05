@@ -32,17 +32,27 @@ fi
 
 # Fix ownership on the mounted volume if running as root
 if [ "$(id -u)" = "0" ]; then
-  echo "[grokbot-wrapper] Fixing ownership on $OPENHANDS_DIR, $CURSOR_DIR, $OPENCODE_DIR, and /projects..."
   mkdir -p "$CURSOR_DIR" "$OPENCODE_DIR"
-  chown -R openhands:openhands "$OPENHANDS_DIR" "$CURSOR_DIR" "$OPENCODE_DIR" /projects 2>/dev/null || true
+
+  # Fast ownership fix: only recursively chown if the target directory is currently owned by root (UID 0)
+  for dir in "$OPENHANDS_DIR" "$CURSOR_DIR" "$OPENCODE_DIR" /projects /root/workspace; do
+    if [ -d "$dir" ]; then
+      owner_uid="$(stat -c '%u' "$dir" 2>/dev/null || echo "0")"
+      if [ "$owner_uid" = "0" ]; then
+        echo "[grokbot-wrapper] Fixing root ownership on $dir..."
+        chown -R openhands:openhands "$dir" 2>/dev/null || true
+      fi
+    fi
+  done
 
   # The old container stored workspaces at /root/workspace/. Conversations
   # reference these paths. Make /root accessible and create the workspace
   # directory if it doesn't exist (it won't in the new base image).
-  echo "[grokbot-wrapper] Fixing /root permissions (legacy workspace path)..."
   chmod 755 /root
   mkdir -p /root/workspace
-  chown -R openhands:openhands /root/workspace 2>/dev/null || true
+  if [ "$(stat -c '%u' /root/workspace 2>/dev/null || echo "0")" = "0" ]; then
+    chown -R openhands:openhands /root/workspace 2>/dev/null || true
+  fi
 
   # Start D-Bus system service if installed
   if [ -x /etc/init.d/dbus ]; then
