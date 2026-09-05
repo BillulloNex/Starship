@@ -253,7 +253,9 @@ RUN set -eux; \
 
 # Install official OpenCode CLI for the OpenCode ACP provider
 ARG OPENCODE_VERSION="1.18.29"
-RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" && \
+RUN curl -fsSL https://opencode.ai/install | bash -s -- --version "${OPENCODE_VERSION}" --no-modify-path && \
+    install -m 755 /root/.opencode/bin/opencode /usr/local/bin/opencode && \
+    rm -rf /root/.opencode && \
     opencode --version
 
 # Pre-create persistence directories with correct ownership so the
