@@ -196,7 +196,7 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
 
   if (key === "cursor") {
     display_name = "Cursor";
-    default_command = ["agent", "acp"];
+    default_command = ["cursor-acp"];
     // Cursor's account-specific catalog is discovered at runtime through the
     // authenticated /v1/models proxy. Keep the static registry empty so stale
     // model ids are never shipped in the bundle; the picker persists the live
@@ -207,9 +207,34 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
 
   if (key === "opencode") {
     display_name = "OpenCode";
-    default_command = ["npx", "-y", "opencode-ai@latest", "acp"];
-    available_models = [{ id: "default", label: "Default (recommended)" }];
-    default_model = "default";
+    default_command = ["opencode-acp"];
+    available_models = [
+      { id: "opencode/big-pickle", label: "OpenCode Big Pickle (Free)" },
+      { id: "opencode/hy3-free", label: "OpenCode HY3 (Free)" },
+      { id: "opencode/mimo-v2.5-free", label: "OpenCode MiMo v2.5 (Free)" },
+      {
+        id: "opencode/muse-spark-1.2-contributor-free",
+        label: "OpenCode Muse Spark 1.2 (Free)",
+      },
+      {
+        id: "opencode/nemotron-3-ultra-free",
+        label: "OpenCode Nemotron 3 Ultra (Free)",
+      },
+      {
+        id: "opencode/nemotron-3.5-lightning-free",
+        label: "OpenCode Nemotron 3.5 Lightning (Free)",
+      },
+      {
+        id: "anthropic/claude-sonnet-4-6",
+        label: "Anthropic Claude Sonnet 4.6",
+      },
+      { id: "anthropic/claude-opus-4-6", label: "Anthropic Claude Opus 4.6" },
+      { id: "anthropic/claude-haiku-4-5", label: "Anthropic Claude Haiku 4.5" },
+      { id: "openai/gpt-5.6", label: "OpenAI GPT-5.6" },
+      { id: "openai/gpt-5.5", label: "OpenAI GPT-5.5" },
+      { id: "openai/gpt-5.4", label: "OpenAI GPT-5.4" },
+    ];
+    default_model = "opencode/big-pickle";
   }
 
   if (
@@ -370,6 +395,16 @@ const ACP_RESERVED_CREDENTIALS: Record<string, ACPProviderSecretField[]> = {
     },
     {
       name: "OPENCODE_GO_API_KEY",
+      secret: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
+    },
+    {
+      name: "ANTHROPIC_API_KEY",
+      secret: true,
+      hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
+    },
+    {
+      name: "OPENAI_API_KEY",
       secret: true,
       hint_key: I18nKey.ONBOARDING$ACP_SECRET_API_KEY_HINT,
     },
@@ -544,6 +579,25 @@ export function resolveAcpProviderKey(
     ? command.join(" ").trim()
     : command?.trim();
   if (!normalizedCommand) return serverKey ?? null;
+
+  if (
+    normalizedCommand === "cursor-acp" ||
+    normalizedCommand === "agent acp" ||
+    normalizedCommand.includes("cursor-acp-auth-wrapper.sh")
+  ) {
+    return "cursor";
+  }
+
+  if (
+    normalizedCommand === "opencode-acp" ||
+    normalizedCommand === "opencode acp" ||
+    normalizedCommand === "opencode acp --auto" ||
+    normalizedCommand === "npx -y opencode-ai@latest acp" ||
+    normalizedCommand.includes("opencode-acp-auth-wrapper.sh")
+  ) {
+    return "opencode";
+  }
+
   const match = ACP_PROVIDERS.find(
     (provider) => provider.default_command.join(" ") === normalizedCommand,
   );

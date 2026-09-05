@@ -40,6 +40,7 @@ import {
 } from "#/constants/acp-providers";
 import { parseCommand, formatCommand } from "#/utils/acp-command";
 import { useCursorModels } from "#/hooks/query/use-cursor-models";
+import { useOpencodeModels } from "#/hooks/query/use-opencode-models";
 
 export const handle = { hideTitle: true };
 
@@ -308,6 +309,14 @@ export function AgentSettingsScreen({
     cursorCatalog?.models[0]?.id ??
     "";
 
+  const { data: opencodeCatalog } = useOpencodeModels(
+    liveSelectedPreset === "opencode",
+  );
+  const preferredOpencodeModel =
+    opencodeCatalog?.models.find((model) => model.isDefault)?.id ??
+    opencodeCatalog?.models[0]?.id ??
+    "opencode/big-pickle";
+
   useEffect(() => {
     if (
       liveSelectedPreset === "cursor" &&
@@ -319,8 +328,21 @@ export function AgentSettingsScreen({
       // Persist an explicit, currently valid Cursor model. The account-level
       // default can be stale even when the key and catalog are valid.
       setIsDirty(true);
+    } else if (
+      liveSelectedPreset === "opencode" &&
+      preferredOpencodeModel &&
+      !acpModel.trim()
+    ) {
+      setAcpModel(preferredOpencodeModel);
+      setIsCustomAcpModel(false);
+      setIsDirty(true);
     }
-  }, [liveSelectedPreset, preferredCursorModel, acpModel]);
+  }, [
+    liveSelectedPreset,
+    preferredCursorModel,
+    preferredOpencodeModel,
+    acpModel,
+  ]);
 
   const lastInitializedSettingsRef = useRef<unknown>(null);
   const loadedAcpServerRef = useRef<string | null>(null);
@@ -444,7 +466,9 @@ export function AgentSettingsScreen({
   const modelSuggestions =
     selectedPreset === "cursor"
       ? (cursorCatalog?.models ?? [])
-      : (selectedProvider?.available_models ?? []);
+      : selectedPreset === "opencode"
+        ? (opencodeCatalog?.models ?? selectedProvider?.available_models ?? [])
+        : (selectedProvider?.available_models ?? []);
   const hasModelSuggestions = modelSuggestions.length > 0;
   const selectedModelIsSuggestion = modelSuggestions.some(
     ({ id }) => id === acpModel.trim(),
@@ -707,7 +731,9 @@ export function AgentSettingsScreen({
                 setAcpModel(
                   preset === "cursor"
                     ? preferredCursorModel
-                    : (getAcpPreferredDefaultModel(preset) ?? ""),
+                    : preset === "opencode"
+                      ? preferredOpencodeModel
+                      : (getAcpPreferredDefaultModel(preset) ?? ""),
                 );
                 setIsCustomAcpModel(false);
               } else if (preset === ACP_CUSTOM_PRESET_KEY) {
@@ -752,7 +778,9 @@ export function AgentSettingsScreen({
                   setAcpModel(
                     nextPreset === "cursor"
                       ? preferredCursorModel
-                      : (getAcpPreferredDefaultModel(nextPreset) ?? ""),
+                      : nextPreset === "opencode"
+                        ? preferredOpencodeModel
+                        : (getAcpPreferredDefaultModel(nextPreset) ?? ""),
                   );
                   setIsCustomAcpModel(false);
                 }

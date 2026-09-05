@@ -8,6 +8,7 @@ set -uo pipefail
 
 OPENHANDS_DIR="/home/openhands/.openhands"
 CURSOR_DIR="/home/openhands/.cursor"
+OPENCODE_DIR="/home/openhands/.local/share/opencode"
 
 # Ensure /projects directory exists
 mkdir -p /projects
@@ -31,9 +32,9 @@ fi
 
 # Fix ownership on the mounted volume if running as root
 if [ "$(id -u)" = "0" ]; then
-  echo "[grokbot-wrapper] Fixing ownership on $OPENHANDS_DIR, $CURSOR_DIR, and /projects..."
-  mkdir -p "$CURSOR_DIR"
-  chown -R openhands:openhands "$OPENHANDS_DIR" "$CURSOR_DIR" /projects 2>/dev/null || true
+  echo "[grokbot-wrapper] Fixing ownership on $OPENHANDS_DIR, $CURSOR_DIR, $OPENCODE_DIR, and /projects..."
+  mkdir -p "$CURSOR_DIR" "$OPENCODE_DIR"
+  chown -R openhands:openhands "$OPENHANDS_DIR" "$CURSOR_DIR" "$OPENCODE_DIR" /projects 2>/dev/null || true
 
   # The old container stored workspaces at /root/workspace/. Conversations
   # reference these paths. Make /root accessible and create the workspace

@@ -47,6 +47,15 @@ describe("resolveAcpProviderKey", () => {
   it("recovers Cursor identity from its exact custom ACP command", () => {
     expect(resolveAcpProviderKey("custom", ["agent", "acp"])).toBe("cursor");
     expect(resolveAcpProviderKey("custom", "agent acp")).toBe("cursor");
+    expect(resolveAcpProviderKey("custom", ["cursor-acp"])).toBe("cursor");
+    expect(resolveAcpProviderKey("custom", "cursor-acp")).toBe("cursor");
+  });
+
+  it("recovers OpenCode identity from its custom ACP command", () => {
+    expect(resolveAcpProviderKey("custom", ["opencode-acp"])).toBe("opencode");
+    expect(resolveAcpProviderKey("custom", "opencode-acp")).toBe("opencode");
+    expect(resolveAcpProviderKey("custom", ["opencode", "acp"])).toBe("opencode");
+    expect(resolveAcpProviderKey("custom", "opencode acp --auto")).toBe("opencode");
   });
 
   it("does not brand an edited custom command as Cursor", () => {
@@ -73,7 +82,7 @@ describe("ACP provider registry", () => {
       }
       if (provider.key === "cursor") {
         expect(provider.display_name).toBe("Cursor");
-        expect(provider.default_command).toEqual(["agent", "acp"]);
+        expect(provider.default_command).toEqual(["cursor-acp"]);
         expect(provider.available_models).toEqual([]);
         expect(provider.default_model).toBeUndefined();
         expect(provider.icon).toBe("cursor");
@@ -82,13 +91,8 @@ describe("ACP provider registry", () => {
       }
       if (provider.key === "opencode") {
         expect(provider.display_name).toBe("OpenCode");
-        expect(provider.default_command).toEqual([
-          "npx",
-          "-y",
-          "opencode-ai@latest",
-          "acp",
-        ]);
-        expect(provider.default_model).toBe("default");
+        expect(provider.default_command).toEqual(["opencode-acp"]);
+        expect(provider.default_model).toBe("opencode/big-pickle");
         expect(provider.icon).toBe("opencode");
         expect(provider.description_key).toBeTruthy();
         continue;
@@ -230,6 +234,16 @@ describe("getAcpProviderSecrets — containerized credentials", () => {
     expect(names).toEqual(["CURSOR_API_KEY", "CURSOR_AUTH_TOKEN"]);
   });
 
+  it("collects supported OpenCode container credentials", () => {
+    const names = getAcpProviderSecrets("opencode").map((f) => f.name);
+    expect(names).toEqual([
+      "OPENCODE_AUTH_JSON",
+      "OPENCODE_GO_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "OPENAI_API_KEY",
+    ]);
+  });
+
   it("renders file-content blobs as multiline secret fields", () => {
     // ``multiline`` also drives the orphaned-credential warning on backends
     // that can't materialise file secrets (cloud, agent-canvas#1016).
@@ -298,8 +312,18 @@ describe("getAcpPreferredDefaultModel", () => {
     expect(buildAcpAgentSettingsDiff("cursor")).toMatchObject({
       agent_kind: "acp",
       acp_server: "custom",
-      acp_command: ["agent", "acp"],
+      acp_command: ["cursor-acp"],
       acp_model: null,
+    });
+  });
+
+  it("sets OpenCode's default model and command", () => {
+    expect(getAcpPreferredDefaultModel("opencode")).toBe("opencode/big-pickle");
+    expect(buildAcpAgentSettingsDiff("opencode")).toMatchObject({
+      agent_kind: "acp",
+      acp_server: "custom",
+      acp_command: ["opencode-acp"],
+      acp_model: "opencode/big-pickle",
     });
   });
 

@@ -9,6 +9,7 @@ import { useCanManageOrgProfiles } from "#/hooks/use-can-manage-org-profiles";
 import { useActiveAcpProfileDetail } from "#/hooks/query/use-active-acp-profile-detail";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import { useCursorModels } from "#/hooks/query/use-cursor-models";
+import { useOpencodeModels } from "#/hooks/query/use-opencode-models";
 import {
   getAcpPreferredDefaultModel,
   getAcpProvider,
@@ -64,10 +65,16 @@ export function useChatInputModelState(): ChatInputModelState {
   );
   const acpProvider = isAcpContext ? getAcpProvider(acpServerKey) : undefined;
   const isCursor = acpServerKey === "cursor";
+  const isOpencode = acpServerKey === "opencode";
   const { data: cursorCatalog } = useCursorModels(isAcpContext && isCursor);
+  const { data: opencodeCatalog } = useOpencodeModels(
+    isAcpContext && isOpencode,
+  );
   const availableAcpModels: ACPModelOption[] = isCursor
     ? (cursorCatalog?.models ?? [])
-    : (acpProvider?.available_models ?? []);
+    : isOpencode
+      ? (opencodeCatalog?.models ?? acpProvider?.available_models ?? [])
+      : (acpProvider?.available_models ?? []);
   const runtimeProviderDefault =
     availableAcpModels.find((model) => model.isDefault)?.id ??
     getAcpPreferredDefaultModel(acpServerKey);

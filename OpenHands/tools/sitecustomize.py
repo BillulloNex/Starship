@@ -278,6 +278,23 @@ def _write_antigravity_credentials(value):
         return False
 
 
+def _write_opencode_credentials(value):
+    if not value or not isinstance(value, str) or not value.strip().startswith("{"):
+        return False
+    try:
+        from pathlib import Path
+        opencode_dir = Path.home() / ".local" / "share" / "opencode"
+        opencode_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        token_file = opencode_dir / "auth.json"
+        token_file.write_text(value.strip() + "\n", encoding="utf-8")
+        token_file.chmod(0o600)
+        print("[grokbot-sitecustomize] Materialized OPENCODE_AUTH_JSON to ~/.local/share/opencode/auth.json", file=sys.stderr, flush=True)
+        return True
+    except Exception as e:
+        print(f"[grokbot-sitecustomize] Error writing opencode credentials: {e}", file=sys.stderr, flush=True)
+        return False
+
+
 def _get_api_key():
     import os
     from pathlib import Path
@@ -294,7 +311,7 @@ def _get_api_key():
     return key
 
 
-def _fetch_antigravity_secret():
+def _fetch_secret(secret_name):
     import json
     api_key = _get_api_key()
     headers = {"Accept": "application/json"}
@@ -304,19 +321,23 @@ def _fetch_antigravity_secret():
     for port in (18000, 8000):
         try:
             import urllib.request
-            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/secrets/ANTIGRAVITY_AUTH_JSON", headers=headers)
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/settings/secrets/{secret_name}", headers=headers)
             with urllib.request.urlopen(req, timeout=2) as resp:
                 if resp.status == 200:
                     data = resp.read().decode("utf-8")
                     val = json.loads(data) if data.strip().startswith("{") else data
                     if isinstance(val, dict):
-                        secret_val = val.get("value") or val.get("secret") or val.get("token") or (data if "refresh_token" in data else "")
-                    else:
-                        secret_val = val
-                    if secret_val and "refresh_token" in str(secret_val):
-                        return secret_val
+                        return val.get("value") or val.get("secret") or val.get("token") or data
+                    return val
         except Exception:
             pass
+    return None
+
+
+def _fetch_antigravity_secret():
+    val = _fetch_secret("ANTIGRAVITY_AUTH_JSON")
+    if val and "refresh_token" in str(val):
+        return val
     return None
 
 
@@ -434,6 +455,8 @@ def _init_antigravity_acp():
             _orig_mat(self, spec, env, directory, target, value, replace_existing=replace_existing)
             if spec.secret_name == "ANTIGRAVITY_AUTH_JSON" and value and value.strip().startswith("{"):
                 _write_antigravity_credentials(value)
+            if spec.secret_name == "OPENCODE_AUTH_JSON" and value and value.strip().startswith("{"):
+                _write_opencode_credentials(value)
 
         acp_agent_mod.ACPAgent._materialise_file_secret = _patched_mat
         print("[grokbot-sitecustomize] Antigravity ACP integration loaded OK", file=sys.stderr, flush=True)
@@ -450,10 +473,12 @@ def _background_sync():
     for _ in range(10):
         time.sleep(3)
         try:
-            raw = _fetch_antigravity_secret()
-            if raw and _write_antigravity_credentials(raw):
+            raw_agy = _fetch_secret("ANTIGRAVITY_AUTH_JSON")
+            if raw_agy and _write_antigravity_credentials(raw_agy):
                 print("[grokbot-sitecustomize] Background sync: successfully written Antigravity credentials", file=sys.stderr, flush=True)
-                break
+            raw_oc = _fetch_secret("OPENCODE_AUTH_JSON")
+            if raw_oc and _write_opencode_credentials(raw_oc):
+                print("[grokbot-sitecustomize] Background sync: successfully written OpenCode credentials", file=sys.stderr, flush=True)
         except Exception:
             pass
 

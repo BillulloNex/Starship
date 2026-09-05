@@ -251,6 +251,11 @@ RUN set -eux; \
     ln -s "${cursor_agent_dir}/cursor-agent" /usr/local/bin/cursor-agent; \
     agent --version
 
+# Install official OpenCode CLI for the OpenCode ACP provider
+ARG OPENCODE_VERSION="1.18.29"
+RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" && \
+    opencode --version
+
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
@@ -262,6 +267,7 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.claude \
              /home/openhands/.codex \
              /home/openhands/.cursor \
+             /home/openhands/.local/share/opencode \
              /home/openhands/.gemini \
              /home/openhands/.agy-acp \
              /tmp/vnc-browser/logs \
@@ -315,7 +321,10 @@ COPY scripts/register-ship-log-monitor.mjs /opt/agent-canvas/register-ship-log-m
 COPY scripts/ensure-ship-coolify-secret.mjs /opt/agent-canvas/ensure-ship-coolify-secret.mjs
 COPY prompts/ship-log-monitor.md /opt/agent-canvas/prompts/ship-log-monitor.md
 COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
-RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser
+COPY scripts/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
+RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser && \
+    chmod +x /opt/agent-canvas/cursor-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/cursor-acp-auth-wrapper.sh /usr/local/bin/cursor-acp && \
+    chmod +x /opt/agent-canvas/opencode-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/opencode-acp-auth-wrapper.sh /usr/local/bin/opencode-acp
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka
@@ -342,7 +351,7 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 
 # Copy the wrapper entrypoint (fixes volume ownership before starting services)
 COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
-RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
+RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
 
 # Stay as root — the wrapper entrypoint drops to openhands after fixing
 # file ownership on mounted volumes. This is needed because the old

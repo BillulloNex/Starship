@@ -6,6 +6,7 @@ import { useActiveBackend } from "#/contexts/active-backend-context";
 import { useAgentProfiles } from "#/hooks/query/use-agent-profiles";
 import { useLlmProfiles } from "#/hooks/query/use-llm-profiles";
 import { useCursorModels } from "#/hooks/query/use-cursor-models";
+import { useOpencodeModels } from "#/hooks/query/use-opencode-models";
 import AgentProfilesService from "#/api/agent-profiles-service/agent-profiles-service.api";
 import { agentProfileDetailQueryKey } from "#/hooks/query/use-active-acp-profile-detail";
 import {
@@ -97,6 +98,14 @@ export function useFavoriteAgentModels() {
   );
   const { data: cursorCatalog, isPending: isCursorCatalogPending } =
     useCursorModels(hasCursor);
+  const hasOpencode = [...details.values()].some(
+    (profile) =>
+      profile.agent_kind === "acp" &&
+      resolveAcpProviderKey(profile.acp_server, profile.acp_command) ===
+        "opencode",
+  );
+  const { data: opencodeCatalog, isPending: isOpencodeCatalogPending } =
+    useOpencodeModels(hasOpencode);
   const [rawFavorites, setRawFavorites] = useLocalStorage<FavoriteAgentModel[]>(
     getFavoriteAgentModelsKey(backend.id, orgId),
     [],
@@ -137,7 +146,11 @@ export function useFavoriteAgentModels() {
       const catalog =
         providerKey === "cursor"
           ? (cursorCatalog?.models ?? [])
-          : (getAcpProvider(providerKey)?.available_models ?? []);
+          : providerKey === "opencode"
+            ? (opencodeCatalog?.models ??
+              getAcpProvider(providerKey)?.available_models ??
+              [])
+            : (getAcpProvider(providerKey)?.available_models ?? []);
       const option = catalog.find((model) => model.id === favorite.modelId);
       if (!option) return [];
       return [
@@ -154,6 +167,7 @@ export function useFavoriteAgentModels() {
     });
   }, [
     cursorCatalog?.models,
+    opencodeCatalog?.models,
     details,
     favorites,
     llmProfiles?.profiles,
@@ -166,7 +180,8 @@ export function useFavoriteAgentModels() {
       !agentProfiles ||
       !llmProfiles ||
       isDetailPending ||
-      (hasCursor && isCursorCatalogPending)
+      (hasCursor && isCursorCatalogPending) ||
+      (hasOpencode && isOpencodeCatalogPending)
     ) {
       return;
     }
