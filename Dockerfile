@@ -305,6 +305,7 @@ COPY OpenHands/scripts/posthog-proxy.mjs /opt/agent-canvas/posthog-proxy.mjs
 COPY OpenHands/scripts/codex-usage-proxy.mjs /opt/agent-canvas/codex-usage-proxy.mjs
 COPY OpenHands/scripts/claude-usage-proxy.mjs /opt/agent-canvas/claude-usage-proxy.mjs
 COPY OpenHands/scripts/cursor-api-proxy.mjs /opt/agent-canvas/cursor-api-proxy.mjs
+COPY OpenHands/scripts/opencode-api-proxy.mjs /opt/agent-canvas/opencode-api-proxy.mjs
 COPY OpenHands/scripts/telegram-bridge.mjs /opt/agent-canvas/telegram-bridge.mjs
 COPY OpenHands/scripts/preview-proxy.mjs /opt/agent-canvas/preview-proxy.mjs
 COPY OpenHands/scripts/app-registry.mjs /opt/agent-canvas/app-registry.mjs
