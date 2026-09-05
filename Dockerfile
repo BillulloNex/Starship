@@ -270,6 +270,7 @@ RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.codex \
              /home/openhands/.cursor \
              /home/openhands/.local/share/opencode \
+             /home/openhands/.config/opencode \
              /home/openhands/.gemini \
              /home/openhands/.agy-acp \
              /tmp/vnc-browser/logs \

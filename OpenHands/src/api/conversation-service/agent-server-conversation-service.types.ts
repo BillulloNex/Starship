@@ -180,6 +180,13 @@ export interface AppConversation {
    */
   tags?: Record<string, string> | null;
   llm_model: string | null;
+  /**
+   * ACP model the conversation was launched with (``agent.acp_model``).
+   * Distinct from ``llm_model``, which prefers the live ACP runtime id/name
+   * after ``session/set_model``. When they disagree, OpenCode fell back to
+   * its server default (usually Big Pickle).
+   */
+  requested_acp_model?: string | null;
   metrics: MetricsSnapshot | null;
   created_at: string;
   updated_at: string;

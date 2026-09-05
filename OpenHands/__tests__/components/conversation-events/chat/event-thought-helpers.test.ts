@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { splitInlineThink } from "#/components/conversation-events/chat/event-thought-helpers";
+import {
+  splitInlineThink,
+  repairLeadingThoughtSplit,
+} from "#/components/conversation-events/chat/event-thought-helpers";
 
 describe("splitInlineThink", () => {
   it("returns content unchanged when there is no <think> block", () => {
@@ -81,6 +84,22 @@ describe("splitInlineThink", () => {
     expect(splitInlineThink(content)).toEqual({
       reasoning: "",
       message: content,
+    });
+  });
+});
+
+describe("repairLeadingThoughtSplit", () => {
+  it("rejoins a single-letter thought that was split off the message", () => {
+    expect(repairLeadingThoughtSplit("W", "aiting for a task")).toEqual({
+      reasoning: "",
+      message: "Waiting for a task",
+    });
+  });
+
+  it("leaves a real one-letter thought plus a capitalized message alone", () => {
+    expect(repairLeadingThoughtSplit("I", "The repo is empty.")).toEqual({
+      reasoning: "I",
+      message: "The repo is empty.",
     });
   });
 });

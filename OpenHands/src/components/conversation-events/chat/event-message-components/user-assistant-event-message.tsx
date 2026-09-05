@@ -8,7 +8,10 @@ import { ConversationConfirmationButtons } from "#/components/shared/buttons/con
 import { parseMessageFromEvent } from "../event-content-helpers/parse-message-from-event";
 import { CriticResultDisplay } from "./critic-result-display";
 import { CollapsibleThinking } from "./collapsible-thinking";
-import { splitInlineThink } from "../event-thought-helpers";
+import {
+  splitInlineThink,
+  repairLeadingThoughtSplit,
+} from "../event-thought-helpers";
 import { Pencil } from "lucide-react";
 import RepoForkedIcon from "#/icons/repo-forked.svg?react";
 import { I18nKey } from "#/i18n/declaration";
@@ -46,18 +49,24 @@ export function UserAssistantEventMessage({
   const parsed = parseMessageFromEvent(event);
   // Route an inline <think> block (e.g. from a streamed reply) to the thinking
   // section so reloaded conversations match the live rendering.
-  const { reasoning, message: rawMessage } =
+  const { reasoning: thinkReasoning, message: rawMessage } =
     event.source === "agent"
       ? splitInlineThink(parsed)
       : { reasoning: "", message: parsed };
+  const { reasoning, message: unstripped } = repairLeadingThoughtSplit(
+    [event.llm_message?.reasoning_content ?? "", thinkReasoning]
+      .filter(Boolean)
+      .join("\n\n"),
+    rawMessage,
+  );
 
   // Strip leading markdown thematic breaks (---, ***, ___) that some LLMs
   // emit at the start of a reply. The markdown renderer converts these into
   // visible <hr> lines which appear as a weird stray line above the response.
   const message =
     event.source === "agent"
-      ? rawMessage.replace(/^(\s*([*_-])\2{2,}\s*\n)+/, "")
-      : rawMessage;
+      ? unstripped.replace(/^(\s*([*_-])\2{2,}\s*\n)+/, "")
+      : unstripped;
 
   const imageUrls: string[] = [];
   if (Array.isArray(event.llm_message.content)) {

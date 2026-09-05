@@ -20,6 +20,7 @@ import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useTaskPollingController } from "#/hooks/query/use-task-polling";
 
 import { displayErrorToast } from "#/utils/custom-toast-handlers";
+import { useAcpModelFallbackToast } from "#/hooks/use-acp-model-fallback-toast";
 import { useIsAuthed } from "#/hooks/query/use-is-authed";
 import { ConversationMain } from "#/components/features/conversation/conversation-main/conversation-main";
 import { ConversationMobilePanelPage } from "#/components/features/conversation/conversation-main/conversation-mobile-panel-page";
@@ -51,6 +52,7 @@ function AppContent() {
     mountedOrgId.current !== active.orgId;
 
   const { data: conversation, isFetched } = useActiveConversation();
+  useAcpModelFallbackToast(conversation);
   const { data: isAuthed } = useIsAuthed();
   const { resetConversationState } = useConversationStore();
   const navigate = useNavigate();

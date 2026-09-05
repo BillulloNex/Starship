@@ -44,6 +44,26 @@ export const hasNonEmptyThought = (action: ActionEvent): boolean =>
   getActionThoughtText(action).trim().length > 0;
 
 /**
+ * OpenCode ACP sometimes routes the first letter of a reply to
+ * ``agent_thought_chunk`` and the rest to ``agent_message_chunk``, so the
+ * bubble starts mid-word ("aiting" instead of "Waiting").
+ */
+export const repairLeadingThoughtSplit = (
+  reasoning: string,
+  message: string,
+): { reasoning: string; message: string } => {
+  const thought = reasoning.trim();
+  if (
+    thought.length === 1 &&
+    /^[A-Za-z]$/.test(thought) &&
+    /^[a-z]/.test(message)
+  ) {
+    return { reasoning: "", message: `${thought}${message}` };
+  }
+  return { reasoning, message };
+};
+
+/**
  * Splits a leading `<think>…</think>` reasoning block out of assistant content
  * so it renders in the collapsible thinking section, not the message bubble.
  * Some models stream reasoning inline instead of via `reasoning_content`.

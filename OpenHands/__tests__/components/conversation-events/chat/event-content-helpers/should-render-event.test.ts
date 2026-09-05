@@ -279,6 +279,16 @@ describe("shouldRenderEvent - /goal loop re-prompts", () => {
     expect(shouldRenderEvent(makeUserMessage("hello"))).toBe(true);
   });
 
+  it("hides OpenCode compaction auto-continue prompts", () => {
+    expect(
+      shouldRenderEvent(
+        makeUserMessage(
+          "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.",
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it("hides the child-conversation launch result the frontend posts back", () => {
     expect(
       shouldRenderEvent(

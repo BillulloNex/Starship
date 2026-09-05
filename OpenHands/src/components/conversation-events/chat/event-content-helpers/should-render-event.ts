@@ -25,6 +25,10 @@ const GOAL_REPROMPT_PREFIXES = [
   "Resuming a goal that was paused or interrupted.",
 ];
 
+// OpenCode compaction injects this as a synthetic user turn (compaction.ts).
+const OPENCODE_COMPACTION_CONTINUE =
+  "Continue if you have next steps, or stop and ask for clarification";
+
 const userMessageText = (event: MessageEvent): string | null => {
   if (event.llm_message?.role !== "user") return null;
   const content = event.llm_message.content;
@@ -40,6 +44,12 @@ const isGoalLoopReprompt = (event: MessageEvent): boolean => {
   const text = userMessageText(event);
   if (text === null) return false;
   return GOAL_REPROMPT_PREFIXES.some((prefix) => text.startsWith(prefix));
+};
+
+const isOpenCodeCompactionContinue = (event: MessageEvent): boolean => {
+  const text = userMessageText(event);
+  if (text === null) return false;
+  return text.includes(OPENCODE_COMPACTION_CONTINUE);
 };
 
 // The frontend posts the outcome of a `launch_child_conversation` call back as
@@ -108,7 +118,11 @@ export const shouldRenderEvent = (event: OpenHandsEvent) => {
   // child-conversation launch results, which are machine payloads the agent
   // relays in its own reply.
   if (isMessageEvent(event)) {
-    return !isGoalLoopReprompt(event) && !isChildConversationResult(event);
+    return (
+      !isGoalLoopReprompt(event) &&
+      !isChildConversationResult(event) &&
+      !isOpenCodeCompactionContinue(event)
+    );
   }
 
   // Render agent error events

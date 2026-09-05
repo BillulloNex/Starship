@@ -424,6 +424,9 @@ export function toAppConversation(
           sdkLlm: info.agent?.llm?.model,
         })
       : (info.agent?.llm?.model ?? DEFAULT_SETTINGS.llm_model),
+    requested_acp_model: isAcp
+      ? resolveEffectiveAcpModel({ configured: info.agent?.acp_model })
+      : null,
     metrics: info.metrics
       ? {
           accumulated_cost: info.metrics.accumulated_cost ?? null,

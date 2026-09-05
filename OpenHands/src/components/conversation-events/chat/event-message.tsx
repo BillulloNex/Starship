@@ -36,7 +36,11 @@ import { CollapsibleThinking } from "./event-message-components/collapsible-thin
 import { HookExecutionEventMessage } from "./event-message-components/hook-execution-event-message";
 import { createSkillReadyEvent } from "./event-content-helpers/create-skill-ready-event";
 import { shouldShowPlanPreview } from "./hooks/use-plan-preview-events";
-import { getReasoningContent, splitInlineThink } from "./event-thought-helpers";
+import {
+  getReasoningContent,
+  splitInlineThink,
+  repairLeadingThoughtSplit,
+} from "./event-thought-helpers";
 
 interface EventMessageProps {
   event: OpenHandsEvent & { isFromPlanningAgent?: boolean };
@@ -193,13 +197,12 @@ export function EventMessage({
 
   if (isStreamingDeltaEvent(event)) {
     // Route an inline <think> block to the thinking section, not the bubble.
-    const { reasoning: inlineThink, message } = splitInlineThink(
-      event.content ?? "",
-      { streaming: true },
+    const { reasoning: inlineThink, message: streamedMessage } =
+      splitInlineThink(event.content ?? "", { streaming: true });
+    const { reasoning: reasoningContent, message } = repairLeadingThoughtSplit(
+      [event.reasoning_content ?? "", inlineThink].filter(Boolean).join("\n\n"),
+      streamedMessage,
     );
-    const reasoningContent = [event.reasoning_content ?? "", inlineThink]
-      .filter(Boolean)
-      .join("\n\n");
     return (
       <>
         {reasoningContent && <CollapsibleThinking content={reasoningContent} />}

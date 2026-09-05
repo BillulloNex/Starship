@@ -4,6 +4,7 @@ import {
   ACP_CUSTOM_PRESET_KEY,
   ACP_PROVIDERS,
   ACP_VERTEX_SAFE_MODEL,
+  acpModelRefsMatch,
   buildAcpAgentSettingsDiff,
   getAcpCredentialConflicts,
   getAcpPreferredDefaultModel,
@@ -54,8 +55,12 @@ describe("resolveAcpProviderKey", () => {
   it("recovers OpenCode identity from its custom ACP command", () => {
     expect(resolveAcpProviderKey("custom", ["opencode-acp"])).toBe("opencode");
     expect(resolveAcpProviderKey("custom", "opencode-acp")).toBe("opencode");
-    expect(resolveAcpProviderKey("custom", ["opencode", "acp"])).toBe("opencode");
-    expect(resolveAcpProviderKey("custom", "opencode acp --auto")).toBe("opencode");
+    expect(resolveAcpProviderKey("custom", ["opencode", "acp"])).toBe(
+      "opencode",
+    );
+    expect(resolveAcpProviderKey("custom", "opencode acp --auto")).toBe(
+      "opencode",
+    );
   });
 
   it("does not brand an edited custom command as Cursor", () => {
@@ -322,8 +327,16 @@ describe("getAcpPreferredDefaultModel", () => {
     expect(buildAcpAgentSettingsDiff("opencode")).toMatchObject({
       agent_kind: "acp",
       acp_server: "custom",
-      acp_command: ["opencode-acp"],
+      acp_command: ["opencode-acp", "--model", "opencode/big-pickle"],
       acp_model: "opencode/big-pickle",
+    });
+    expect(
+      buildAcpAgentSettingsDiff("opencode", {
+        model: "opencode-go/kimi-k3",
+      }),
+    ).toMatchObject({
+      acp_command: ["opencode-acp", "--model", "opencode-go/kimi-k3"],
+      acp_model: "opencode-go/kimi-k3",
     });
   });
 
@@ -331,6 +344,18 @@ describe("getAcpPreferredDefaultModel", () => {
     expect(getAcpPreferredDefaultModel("openhands")).toBeNull();
     expect(getAcpPreferredDefaultModel(ACP_CUSTOM_PRESET_KEY)).toBeNull();
     expect(getAcpPreferredDefaultModel("future-acp-server")).toBeNull();
+  });
+});
+
+describe("acpModelRefsMatch", () => {
+  it("treats provider ids, bare ids, and OpenCode labels as the same model", () => {
+    expect(
+      acpModelRefsMatch("opencode/big-pickle", "OpenCode Big Pickle"),
+    ).toBe(true);
+    expect(acpModelRefsMatch("opencode-go/kimi-k3", "Kimi K3")).toBe(true);
+    expect(
+      acpModelRefsMatch("opencode-go/kimi-k3", "opencode/big-pickle"),
+    ).toBe(false);
   });
 });
 

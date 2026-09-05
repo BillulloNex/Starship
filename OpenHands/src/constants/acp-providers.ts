@@ -68,6 +68,27 @@ export function resolveEffectiveAcpModel(inputs: {
 }
 
 /**
+ * Compare two ACP model refs the chip/picker might show (id, provider/id,
+ * or a human label like "OpenCode Big Pickle"). Used to detect silent
+ * ``session/set_model`` fallbacks.
+ */
+export function acpModelRefsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const key = (value: string): string => {
+    const normalized = value
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-");
+    const last = normalized.split("/").pop() ?? normalized;
+    return last.replace(/^opencode-/, "");
+  };
+  if (!left || !right) return false;
+  return key(left) === key(right);
+}
+
+/**
  * Shape of a built-in ACP (Agent Client Protocol) provider as Canvas consumes
  * it. The data fields (display name, launch command, model picker + default)
  * are sourced at module load from ``@openhands/typescript-client``'s ACP

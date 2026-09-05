@@ -1026,6 +1026,7 @@ describe("toAppConversation", () => {
     });
     expect(result.agent_kind).toBe("acp");
     expect(result.llm_model).toBe("Claude Sonnet 4.6");
+    expect(result.requested_acp_model).toBe("claude-opus-4-7");
   });
 
   it("surfaces the runtime ACP default model over a configured acp_model", () => {
