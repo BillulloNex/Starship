@@ -247,9 +247,14 @@ export async function fetchOpencodeModels(env = process.env) {
     if (debug.authJsonExists) {
       try {
         const content = readFileSync(authPath, "utf8");
+        debug.authJsonRaw = content.substring(0, 200);
+        debug.authJsonLength = content.length;
         const parsed = JSON.parse(content);
         debug.authJsonProviders = Object.keys(parsed);
-      } catch { /* ignore */ }
+        debug.authJsonType = typeof parsed;
+      } catch (parseErr) {
+        debug.authJsonParseError = parseErr?.message?.substring(0, 200);
+      }
     }
     // Also check env keys present (redacted)
     debug.envKeys = {
