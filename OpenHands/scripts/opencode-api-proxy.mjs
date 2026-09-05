@@ -184,22 +184,51 @@ async function resolveEnv(req) {
     }
   }
 
-  // Also materialize OPENCODE_AUTH_JSON to auth.json if available
-  if (!env.OPENCODE_AUTH_JSON) {
-    const authJson = await fetchSecret("OPENCODE_AUTH_JSON");
-    if (authJson && authJson.startsWith("{")) {
-      env.OPENCODE_AUTH_JSON = authJson;
-      // Write auth.json so `opencode models` can read provider credentials
-      try {
-        const { mkdirSync, writeFileSync } = await import("node:fs");
-        const { homedir } = await import("node:os");
-        const { join } = await import("node:path");
-        const dir = join(homedir(), ".local", "share", "opencode");
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, "auth.json"), authJson, { mode: 0o600 });
-      } catch {
-        // Best effort
-      }
+  // Materialize auth.json so `opencode models` can discover authenticated models.
+  // Priority: OPENCODE_AUTH_JSON (full blob) > build from individual API keys.
+  let authJsonContent = null;
+
+  if (env.OPENCODE_AUTH_JSON) {
+    authJsonContent = env.OPENCODE_AUTH_JSON;
+  } else {
+    const fetched = await fetchSecret("OPENCODE_AUTH_JSON");
+    if (fetched && fetched.startsWith("{")) {
+      authJsonContent = fetched;
+      env.OPENCODE_AUTH_JSON = fetched;
+    }
+  }
+
+  // Build auth.json from individual keys if no explicit auth JSON
+  if (!authJsonContent) {
+    const authObj = {};
+    if (env.OPENCODE_GO_API_KEY) {
+      authObj["opencode-go"] = { type: "api", key: env.OPENCODE_GO_API_KEY };
+    }
+    if (env.ANTHROPIC_API_KEY) {
+      authObj["anthropic"] = { type: "api", key: env.ANTHROPIC_API_KEY };
+    }
+    if (env.OPENAI_API_KEY) {
+      authObj["openai"] = { type: "api", key: env.OPENAI_API_KEY };
+    }
+    if (env.GEMINI_API_KEY) {
+      authObj["google"] = { type: "api", key: env.GEMINI_API_KEY };
+    }
+    if (Object.keys(authObj).length > 0) {
+      authJsonContent = JSON.stringify(authObj);
+    }
+  }
+
+  // Write auth.json to disk so `opencode models` CLI can read it
+  if (authJsonContent) {
+    try {
+      const { mkdirSync, writeFileSync } = await import("node:fs");
+      const { homedir } = await import("node:os");
+      const { join } = await import("node:path");
+      const dir = join(homedir(), ".local", "share", "opencode");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "auth.json"), authJsonContent, { mode: 0o600 });
+    } catch {
+      // Best effort
     }
   }
 
@@ -208,16 +237,28 @@ async function resolveEnv(req) {
 
 export async function fetchOpencodeModels(env = process.env) {
   try {
-    const { stdout } = await execFileAsync("opencode", ["models"], {
+    const { stdout } = await execFileAsync("opencode", ["models", "--refresh"], {
       env,
-      timeout: 10_000,
+      timeout: 15_000,
     });
     const parsed = parseOpencodeModelsOutput(stdout);
     if (parsed.length > 0) {
       return parsed;
     }
   } catch {
-    // opencode binary not found or failed, fall back
+    // --refresh may not be supported in all versions, try without
+    try {
+      const { stdout } = await execFileAsync("opencode", ["models"], {
+        env,
+        timeout: 15_000,
+      });
+      const parsed = parseOpencodeModelsOutput(stdout);
+      if (parsed.length > 0) {
+        return parsed;
+      }
+    } catch {
+      // opencode binary not found or failed, fall back
+    }
   }
   return DEFAULT_OPENCODE_MODELS;
 }
