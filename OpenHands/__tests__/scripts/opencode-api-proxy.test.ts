@@ -2,8 +2,9 @@ import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import {
   formatOpencodeModelLabel,
-  parseOpencodeModelsOutput,
   handleOpencodeApiProxy,
+  fetchOpencodeModels,
+  DEFAULT_OPENCODE_MODELS,
 } from "../../scripts/opencode-api-proxy.mjs";
 
 function createRequest(headers: Record<string, string> = {}, method = "GET") {
@@ -35,48 +36,19 @@ function createResponse() {
 
 describe("opencode-api-proxy", () => {
   it("formats model labels properly", () => {
-    expect(formatOpencodeModelLabel("opencode/big-pickle")).toBe(
-      "Opencode Big Pickle",
-    );
-    expect(formatOpencodeModelLabel("anthropic/claude-sonnet-4-6")).toBe(
-      "Anthropic Claude Sonnet 4 6",
+    expect(formatOpencodeModelLabel("big-pickle")).toBe("Big Pickle");
+    expect(formatOpencodeModelLabel("deepseek-v4-pro")).toBe(
+      "Deepseek V4 Pro",
     );
   });
 
-  it("parses stdout lines into models", () => {
-    const stdout = `
-opencode/big-pickle
-opencode/hy3-free
-anthropic/claude-sonnet-4-6
-openai/gpt-5.6
-random text that should be ignored
-`;
-    const models = parseOpencodeModelsOutput(stdout);
-    expect(models).toEqual([
-      {
-        id: "opencode/big-pickle",
-        label: "Opencode Big Pickle",
-        isDefault: true,
-      },
-      {
-        id: "opencode/hy3-free",
-        label: "Opencode Hy3 Free",
-        isDefault: false,
-      },
-      {
-        id: "anthropic/claude-sonnet-4-6",
-        label: "Anthropic Claude Sonnet 4 6",
-        isDefault: false,
-      },
-      {
-        id: "openai/gpt-5.6",
-        label: "Openai Gpt 5.6",
-        isDefault: false,
-      },
-    ]);
+  it("returns fallback models when no API key is provided", async () => {
+    const { models, source } = await fetchOpencodeModels(null);
+    expect(source).toBe("fallback-no-key");
+    expect(models).toEqual(DEFAULT_OPENCODE_MODELS);
   });
 
-  it("handles GET /api/observability/opencode/models returning fallback models when CLI is absent", async () => {
+  it("handles GET /api/observability/opencode/models returning fallback models when no key", async () => {
     const result = createResponse();
     await handleOpencodeApiProxy(
       createRequest(),

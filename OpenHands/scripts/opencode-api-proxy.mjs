@@ -1,17 +1,15 @@
 /**
  * Server-side proxy for OpenCode models discovery.
  *
- * Runs `opencode models` with any provided or saved API credentials to dynamically
- * discover available models (built-in free models, OpenCode Zen, Anthropic, OpenAI, etc.).
- * Falls back gracefully to the verified catalog if the CLI is unavailable.
+ * Calls the OpenCode Go API at https://opencode.ai/zen/go/v1/models
+ * with the user's API key to dynamically discover available models.
+ * Falls back gracefully to a static catalog if the API is unavailable.
  */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import process from "node:process";
 
-const execFileAsync = promisify(execFile);
 const MODEL_CACHE_TTL_MS = 5 * 60_000;
 const MAX_BODY_BYTES = 16 * 1024;
+const OPENCODE_GO_API_BASE = "https://opencode.ai/zen/go/v1";
 
 let cachedResult = null;
 let cacheTimestamp = 0;
@@ -23,12 +21,6 @@ export const DEFAULT_OPENCODE_MODELS = [
   { id: "opencode/muse-spark-1.2-contributor-free", label: "OpenCode Muse Spark 1.2 (Free)" },
   { id: "opencode/nemotron-3-ultra-free", label: "OpenCode Nemotron 3 Ultra (Free)" },
   { id: "opencode/nemotron-3.5-lightning-free", label: "OpenCode Nemotron 3.5 Lightning (Free)" },
-  { id: "anthropic/claude-sonnet-4-6", label: "Anthropic Claude Sonnet 4.6" },
-  { id: "anthropic/claude-opus-4-6", label: "Anthropic Claude Opus 4.6" },
-  { id: "anthropic/claude-haiku-4-5", label: "Anthropic Claude Haiku 4.5" },
-  { id: "openai/gpt-5.6", label: "OpenAI GPT-5.6" },
-  { id: "openai/gpt-5.5", label: "OpenAI GPT-5.5" },
-  { id: "openai/gpt-5.4", label: "OpenAI GPT-5.4" },
 ];
 
 function json(res, status, body, extraHeaders = {}) {
@@ -49,40 +41,7 @@ function titleCase(value) {
 
 export function formatOpencodeModelLabel(id) {
   if (!id || typeof id !== "string") return id;
-  const parts = id.split("/");
-  if (parts.length === 2) {
-    const [provider, model] = parts;
-    const providerName = titleCase(provider);
-    const modelName = titleCase(model);
-    const isFree = model.endsWith("-free");
-    return `${providerName} ${modelName}${isFree ? "" : ""}`;
-  }
   return titleCase(id);
-}
-
-export function parseOpencodeModelsOutput(stdout) {
-  if (!stdout || typeof stdout !== "string") return [];
-  const lines = stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("{") && !line.startsWith("}") && !line.startsWith("Error"));
-
-  const seen = new Set();
-  const models = [];
-
-  for (const line of lines) {
-    // Look for lines formatted like `provider/model`
-    if (line.includes("/") && !line.includes(" ") && !seen.has(line)) {
-      seen.add(line);
-      models.push({
-        id: line,
-        label: formatOpencodeModelLabel(line),
-        isDefault: line === "opencode/big-pickle",
-      });
-    }
-  }
-
-  return models;
 }
 
 async function readBody(req) {
@@ -124,13 +83,10 @@ async function fetchSecret(name) {
     if (!resp.ok) return null;
     const text = await resp.text();
     const trimmed = text.trim();
-    // The secret store may return the raw value or JSON-wrapped
     if (!trimmed || /^\*+$/.test(trimmed)) return null;
     try {
       const parsed = JSON.parse(trimmed);
       if (typeof parsed === "string") return parsed.trim() || null;
-      // If it's a JSON object (like OPENCODE_AUTH_JSON), return the raw text
-      if (typeof parsed === "object") return trimmed;
     } catch {
       // Raw string value
     }
@@ -140,162 +96,93 @@ async function fetchSecret(name) {
   }
 }
 
-async function resolveEnv(req) {
-  const env = { ...process.env };
+/**
+ * Resolve the OpenCode Go API key from (in order):
+ * 1. X-OpenCode-API-Key request header
+ * 2. POST request body
+ * 3. Agent Server secret store (OPENCODE_GO_API_KEY)
+ * 4. Container environment variable (OPENCODE_GO_API_KEY)
+ */
+async function resolveApiKey(req) {
+  // From request header
   const headerKey = extractKey(req.headers["x-opencode-api-key"]);
-  if (headerKey) {
-    if (headerKey.startsWith("sk-ant-")) {
-      env.ANTHROPIC_API_KEY = headerKey;
-    } else if (headerKey.startsWith("sk-")) {
-      env.OPENAI_API_KEY = headerKey;
-    } else {
-      env.OPENCODE_GO_API_KEY = headerKey;
-    }
-  }
+  if (headerKey) return headerKey;
+
+  // From POST body
   if (req.method === "POST") {
     try {
       const body = await readBody(req);
       const bodyKey = extractKey(body);
-      if (bodyKey) {
-        if (bodyKey.startsWith("sk-ant-")) {
-          env.ANTHROPIC_API_KEY = bodyKey;
-        } else if (bodyKey.startsWith("sk-")) {
-          env.OPENAI_API_KEY = bodyKey;
-        } else {
-          env.OPENCODE_GO_API_KEY = bodyKey;
-        }
-      }
+      if (bodyKey) return bodyKey;
     } catch {
-      // Body reading ignored
+      // ignore
     }
   }
 
-  // Fetch keys from Agent Server secret store if not already set
-  const secretMap = [
-    ["OPENCODE_GO_API_KEY", "OPENCODE_GO_API_KEY"],
-    ["ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"],
-    ["OPENAI_API_KEY", "OPENAI_API_KEY"],
-    ["GEMINI_API_KEY", "GEMINI_API_KEY"],
-  ];
-  for (const [envName, secretName] of secretMap) {
-    if (!env[envName]) {
-      const val = await fetchSecret(secretName);
-      if (val) env[envName] = val;
-    }
-  }
+  // From secret store
+  const secretKey = await fetchSecret("OPENCODE_GO_API_KEY");
+  if (secretKey) return secretKey;
 
-  // Materialize auth.json so `opencode models` can discover authenticated models.
-  // Priority: OPENCODE_AUTH_JSON (full blob) > build from individual API keys.
-  let authJsonContent = null;
+  // From container env
+  if (process.env.OPENCODE_GO_API_KEY) return process.env.OPENCODE_GO_API_KEY;
 
-  if (env.OPENCODE_AUTH_JSON && env.OPENCODE_AUTH_JSON.trim() !== "{}") {
-    authJsonContent = env.OPENCODE_AUTH_JSON;
-  } else {
-    const fetched = await fetchSecret("OPENCODE_AUTH_JSON");
-    if (fetched && fetched.startsWith("{") && fetched.trim() !== "{}") {
-      authJsonContent = fetched;
-      env.OPENCODE_AUTH_JSON = fetched;
-    }
-  }
-
-  // Build auth.json from individual keys if no explicit auth JSON
-  if (!authJsonContent) {
-    const authObj = {};
-    if (env.OPENCODE_GO_API_KEY) {
-      authObj["opencode-go"] = { type: "api", key: env.OPENCODE_GO_API_KEY };
-    }
-    if (env.ANTHROPIC_API_KEY) {
-      authObj["anthropic"] = { type: "api", key: env.ANTHROPIC_API_KEY };
-    }
-    if (env.OPENAI_API_KEY) {
-      authObj["openai"] = { type: "api", key: env.OPENAI_API_KEY };
-    }
-    if (env.GEMINI_API_KEY) {
-      authObj["google"] = { type: "api", key: env.GEMINI_API_KEY };
-    }
-    if (Object.keys(authObj).length > 0) {
-      authJsonContent = JSON.stringify(authObj);
-    }
-  }
-
-  // Write auth.json to disk so `opencode models` CLI can read it
-  if (authJsonContent) {
-    try {
-      const { mkdirSync, writeFileSync } = await import("node:fs");
-      const { homedir } = await import("node:os");
-      const { join } = await import("node:path");
-      const dir = join(homedir(), ".local", "share", "opencode");
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "auth.json"), authJsonContent, { mode: 0o600 });
-    } catch {
-      // Best effort
-    }
-  }
-
-  return env;
+  return null;
 }
 
-export async function fetchOpencodeModels(env = process.env) {
-  const debug = { authJsonPath: null, authJsonExists: false, rawStdout: null, rawStderr: null, attempt: null };
-  try {
-    const { readFileSync, existsSync } = await import("node:fs");
-    const { homedir } = await import("node:os");
-    const { join } = await import("node:path");
-    const authPath = join(homedir(), ".local", "share", "opencode", "auth.json");
-    debug.authJsonPath = authPath;
-    debug.authJsonExists = existsSync(authPath);
-    if (debug.authJsonExists) {
-      try {
-        const content = readFileSync(authPath, "utf8");
-        debug.authJsonRaw = content.substring(0, 200);
-        debug.authJsonLength = content.length;
-        const parsed = JSON.parse(content);
-        debug.authJsonProviders = Object.keys(parsed);
-        debug.authJsonType = typeof parsed;
-      } catch (parseErr) {
-        debug.authJsonParseError = parseErr?.message?.substring(0, 200);
-      }
-    }
-    // Also check env keys present (redacted)
-    debug.envKeys = {
-      OPENCODE_GO_API_KEY: !!env.OPENCODE_GO_API_KEY,
-      ANTHROPIC_API_KEY: !!env.ANTHROPIC_API_KEY,
-      OPENAI_API_KEY: !!env.OPENAI_API_KEY,
-      GEMINI_API_KEY: !!env.GEMINI_API_KEY,
-    };
-  } catch { /* ignore */ }
+/**
+ * Fetch models from the OpenCode Go API.
+ * Returns { models: [...], source: "api"|"fallback" }
+ */
+export async function fetchOpencodeModels(apiKey) {
+  if (!apiKey) {
+    return { models: DEFAULT_OPENCODE_MODELS, source: "fallback-no-key" };
+  }
 
   try {
-    debug.attempt = "models --refresh";
-    const { stdout, stderr } = await execFileAsync("opencode", ["models", "--refresh"], {
-      env,
-      timeout: 15_000,
+    const resp = await fetch(`${OPENCODE_GO_API_BASE}/models`, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(10_000),
     });
-    debug.rawStdout = stdout?.substring(0, 1000);
-    debug.rawStderr = stderr?.substring(0, 500);
-    const parsed = parseOpencodeModelsOutput(stdout);
-    if (parsed.length > 0) {
-      return { models: parsed, _debug: debug };
+
+    if (!resp.ok) {
+      return {
+        models: DEFAULT_OPENCODE_MODELS,
+        source: `fallback-http-${resp.status}`,
+      };
     }
+
+    const data = await resp.json();
+
+    if (data?.data && Array.isArray(data.data)) {
+      const models = data.data.map((m) => ({
+        id: `opencode-go/${m.id}`,
+        label: formatOpencodeModelLabel(m.id),
+        isDefault: m.id === "deepseek-v4-pro",
+      }));
+
+      // Prepend free models so they're always available
+      const freeModels = DEFAULT_OPENCODE_MODELS.map((m) => ({
+        ...m,
+        isDefault: false, // Go models take priority
+      }));
+
+      return {
+        models: [...models, ...freeModels],
+        source: "api",
+        apiModelCount: data.data.length,
+      };
+    }
+
+    return { models: DEFAULT_OPENCODE_MODELS, source: "fallback-bad-response" };
   } catch (err) {
-    debug.refreshError = err?.message?.substring(0, 300);
-    try {
-      debug.attempt = "models";
-      const { stdout, stderr } = await execFileAsync("opencode", ["models"], {
-        env,
-        timeout: 15_000,
-      });
-      debug.rawStdout = stdout?.substring(0, 1000);
-      debug.rawStderr = stderr?.substring(0, 500);
-      const parsed = parseOpencodeModelsOutput(stdout);
-      if (parsed.length > 0) {
-        return { models: parsed, _debug: debug };
-      }
-    } catch (err2) {
-      debug.fallbackError = err2?.message?.substring(0, 300);
-    }
+    return {
+      models: DEFAULT_OPENCODE_MODELS,
+      source: `fallback-error: ${err?.message?.substring(0, 100)}`,
+    };
   }
-  return { models: DEFAULT_OPENCODE_MODELS, _debug: debug };
 }
 
 export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
@@ -317,14 +204,18 @@ export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
     }
 
     try {
-      const env = await resolveEnv(req);
-      const { models, _debug } = await fetchOpencodeModels(env);
+      const apiKey = await resolveApiKey(req);
+      const { models, source, apiModelCount } = await fetchOpencodeModels(apiKey);
       cachedResult = {
         provider: "opencode",
         models,
         modelCount: models.length,
         updatedAt: now,
-        _debug,
+        _debug: {
+          source,
+          hasApiKey: !!apiKey,
+          apiModelCount: apiModelCount ?? 0,
+        },
       };
       cacheTimestamp = now;
       json(res, 200, cachedResult);
