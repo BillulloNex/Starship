@@ -166,24 +166,31 @@ export function normalizeCursorModels(payload) {
   return items.flatMap((item) => {
     if (!item || typeof item.id !== "string") return [];
     const variants = Array.isArray(item.variants) ? item.variants : [];
-    const preferred = variants.find((variant) => variant?.isDefault === true) ||
-      variants[0] || {
+    
+    if (variants.length === 0) {
+      return [{
+        id: formatCursorModelId(item.id, []),
+        baseId: item.id,
+        label: item.displayName || item.id,
         params: [],
-        displayName: item.displayName,
-      };
-    const params = Array.isArray(preferred.params) ? preferred.params : [];
-    return [
-      {
+        isDefault: item.id === "default",
+      }];
+    }
+
+    return variants.map((variant, index) => {
+      const isPreferred = variant.isDefault === true || (!variants.some(v => v.isDefault) && index === 0);
+      const params = Array.isArray(variant.params) ? variant.params : [];
+      return {
         id: formatCursorModelId(item.id, params),
         baseId: item.id,
-        label: variantLabel(item, preferred),
+        label: variantLabel(item, variant),
         params: params.map((param) => ({
           id: String(param.id),
           value: String(param.value),
         })),
-        isDefault: item.id === "default",
-      },
-    ];
+        isDefault: item.id === "default" && isPreferred,
+      };
+    });
   });
 }
 
