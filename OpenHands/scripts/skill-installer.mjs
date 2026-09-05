@@ -190,34 +190,37 @@ export async function installSkill({
       copySkillFiles(cloneDir, destDir);
       installedSkills.push(targetName);
     } else if (skillName) {
-      // Install only the requested skill
-      const srcDir = join(skillsRoot, skillName);
+      // Install only the requested skill — search top-level first, then nested categories
+      let srcDir = join(skillsRoot, skillName);
       if (!existsSync(srcDir) || !statSync(srcDir).isDirectory()) {
-        // List available skills in error message
-        const available = listSkillDirs(skillsRoot);
-        throw new Error(
-          `Skill "${skillName}" not found in ${packageSpec}. Available skills: ${available.join(", ") || "none"}`,
-        );
+        // Skill not at top level — search inside category subdirectories
+        srcDir = findSkillRecursive(skillsRoot, skillName);
+        if (!srcDir) {
+          // List ALL available skills (including nested) in error message
+          const available = listAllSkillNames(skillsRoot);
+          throw new Error(
+            `Skill "${skillName}" not found in ${packageSpec}. Available skills: ${available.join(", ") || "none"}`,
+          );
+        }
       }
       const destDir = join(baseDir, skillName);
       mkdirSync(destDir, { recursive: true });
       cpSync(srcDir, destDir, { recursive: true });
       installedSkills.push(skillName);
     } else {
-      // Install ALL skills from the repo
-      const skillDirs = listSkillDirs(skillsRoot);
-      if (skillDirs.length === 0) {
+      // Install ALL skills from the repo (handles nested category dirs)
+      const allSkills = findAllSkills(skillsRoot);
+      if (allSkills.length === 0) {
         throw new Error(
           `No skill directories found in ${packageSpec}/skills/.`,
         );
       }
 
-      for (const dir of skillDirs) {
-        const srcDir = join(skillsRoot, dir);
-        const destDir = join(baseDir, dir);
+      for (const { name, path: srcDir } of allSkills) {
+        const destDir = join(baseDir, name);
         mkdirSync(destDir, { recursive: true });
         cpSync(srcDir, destDir, { recursive: true });
-        installedSkills.push(dir);
+        installedSkills.push(name);
       }
     }
 
@@ -272,6 +275,71 @@ function listSkillDirs(skillsRoot) {
       return false;
     }
   });
+}
+
+/**
+ * Check if a directory is a skill (contains SKILL.md).
+ */
+function isSkillDir(dirPath) {
+  return existsSync(join(dirPath, "SKILL.md"));
+}
+
+/**
+ * Recursively find a skill by name in the skills directory tree.
+ * Handles repos like mattpocock/skills where skills are nested:
+ *   skills/productivity/grill-me/SKILL.md
+ */
+function findSkillRecursive(skillsRoot, skillName, maxDepth = 3) {
+  if (maxDepth <= 0) return null;
+
+  const entries = listSkillDirs(skillsRoot);
+  for (const entry of entries) {
+    const fullPath = join(skillsRoot, entry);
+
+    // Direct match
+    if (entry === skillName && isSkillDir(fullPath)) {
+      return fullPath;
+    }
+
+    // Check subdirectories (category folders)
+    if (!isSkillDir(fullPath)) {
+      const found = findSkillRecursive(fullPath, skillName, maxDepth - 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find ALL skill directories recursively (for "install all" mode).
+ * Returns array of { name, path } for each skill found.
+ */
+function findAllSkills(skillsRoot, maxDepth = 3) {
+  if (maxDepth <= 0) return [];
+
+  const results = [];
+  const entries = listSkillDirs(skillsRoot);
+
+  for (const entry of entries) {
+    const fullPath = join(skillsRoot, entry);
+
+    if (isSkillDir(fullPath)) {
+      // This directory IS a skill
+      results.push({ name: entry, path: fullPath });
+    } else {
+      // This might be a category folder — recurse into it
+      const nested = findAllSkills(fullPath, maxDepth - 1);
+      results.push(...nested);
+    }
+  }
+  return results;
+}
+
+/**
+ * List all skill names (including nested) for error messages.
+ */
+function listAllSkillNames(skillsRoot) {
+  return findAllSkills(skillsRoot).map((s) => s.name);
 }
 
 /**

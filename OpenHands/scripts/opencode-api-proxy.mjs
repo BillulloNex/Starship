@@ -247,11 +247,17 @@ export async function fetchOpencodeModels(env = process.env) {
     if (debug.authJsonExists) {
       try {
         const content = readFileSync(authPath, "utf8");
-        // Redact actual keys but show structure
         const parsed = JSON.parse(content);
         debug.authJsonProviders = Object.keys(parsed);
       } catch { /* ignore */ }
     }
+    // Also check env keys present (redacted)
+    debug.envKeys = {
+      OPENCODE_GO_API_KEY: !!env.OPENCODE_GO_API_KEY,
+      ANTHROPIC_API_KEY: !!env.ANTHROPIC_API_KEY,
+      OPENAI_API_KEY: !!env.OPENAI_API_KEY,
+      GEMINI_API_KEY: !!env.GEMINI_API_KEY,
+    };
   } catch { /* ignore */ }
 
   try {
@@ -260,36 +266,31 @@ export async function fetchOpencodeModels(env = process.env) {
       env,
       timeout: 15_000,
     });
-    debug.rawStdout = stdout?.substring(0, 500);
+    debug.rawStdout = stdout?.substring(0, 1000);
     debug.rawStderr = stderr?.substring(0, 500);
     const parsed = parseOpencodeModelsOutput(stdout);
     if (parsed.length > 0) {
-      parsed._debug = debug;
-      return parsed;
+      return { models: parsed, _debug: debug };
     }
   } catch (err) {
-    debug.refreshError = err?.message?.substring(0, 200);
-    // --refresh may not be supported in all versions, try without
+    debug.refreshError = err?.message?.substring(0, 300);
     try {
       debug.attempt = "models";
       const { stdout, stderr } = await execFileAsync("opencode", ["models"], {
         env,
         timeout: 15_000,
       });
-      debug.rawStdout = stdout?.substring(0, 500);
+      debug.rawStdout = stdout?.substring(0, 1000);
       debug.rawStderr = stderr?.substring(0, 500);
       const parsed = parseOpencodeModelsOutput(stdout);
       if (parsed.length > 0) {
-        parsed._debug = debug;
-        return parsed;
+        return { models: parsed, _debug: debug };
       }
     } catch (err2) {
-      debug.fallbackError = err2?.message?.substring(0, 200);
+      debug.fallbackError = err2?.message?.substring(0, 300);
     }
   }
-  const result = DEFAULT_OPENCODE_MODELS;
-  result._debug = debug;
-  return result;
+  return { models: DEFAULT_OPENCODE_MODELS, _debug: debug };
 }
 
 export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
@@ -312,15 +313,13 @@ export async function handleOpencodeApiProxy(req, res, pathname, query = {}) {
 
     try {
       const env = await resolveEnv(req);
-      const models = await fetchOpencodeModels(env);
-      const debug = models._debug;
-      delete models._debug;
+      const { models, _debug } = await fetchOpencodeModels(env);
       cachedResult = {
         provider: "opencode",
         models,
         modelCount: models.length,
         updatedAt: now,
-        _debug: debug,
+        _debug,
       };
       cacheTimestamp = now;
       json(res, 200, cachedResult);
