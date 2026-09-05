@@ -42,6 +42,8 @@ import {
   filterOutPinnedConversations,
   getGroupDiscoveryConversationIds,
   groupConversations,
+  GROUP_FOLDERS_PREVIEW_LIMIT,
+  MAX_INITIAL_GROUP_DISCOVERY_PAGES,
   MAX_PAGES_PER_LOAD_MORE_CLICK,
   resolvePinnedConversations,
   sortConversationsByField,
@@ -199,6 +201,9 @@ export function ConversationPanel({
   >(() => new Set());
   const [expandedPinnedPreview, setExpandedPinnedPreview] =
     React.useState(false);
+  const [visibleGroupLimit, setVisibleGroupLimit] = React.useState(
+    GROUP_FOLDERS_PREVIEW_LIMIT,
+  );
 
   const pinnedIds = usePinnedConversationsStore(
     (state) =>
@@ -257,6 +262,10 @@ export function ConversationPanel({
       setExpandedGroupPreviewIds(new Set());
     }
   }, [organizeMode]);
+
+  React.useEffect(() => {
+    setVisibleGroupLimit(GROUP_FOLDERS_PREVIEW_LIMIT);
+  }, [activeBackend.id, organizeMode]);
 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -487,6 +496,14 @@ export function ConversationPanel({
     return applyGroupFolderOrder(conversationGroups, groupFolderOrder);
   }, [conversationGroups, groupFolderOrder]);
 
+  const visibleConversationGroups = React.useMemo(
+    () => orderedConversationGroups?.slice(0, visibleGroupLimit) ?? null,
+    [orderedConversationGroups, visibleGroupLimit],
+  );
+
+  const hasLoadedHiddenGroups =
+    (orderedConversationGroups?.length ?? 0) > visibleGroupLimit;
+
   const conversationGroupIds = React.useMemo(
     () => conversationGroups?.map((group) => group.id) ?? [],
     [conversationGroups],
@@ -505,7 +522,7 @@ export function ConversationPanel({
 
   const visibleFlatCount = sortedVisibleConversations.length;
 
-  const visibleGroupCount = orderedConversationGroups?.length ?? 0;
+  const visibleGroupCount = visibleConversationGroups?.length ?? 0;
 
   const listIsEffectivelyEmpty =
     organizeMode === "grouped" && !compact
@@ -531,6 +548,35 @@ export function ConversationPanel({
       ? visibleGroupCount
       : visibleFlatCount;
   const loadedPageCount = data?.pages.length ?? 0;
+
+  // A conversation page can be dominated by one busy agent workspace. Fill
+  // the initial grouped view automatically until it has the requested five
+  // workspaces (or the backend is exhausted), instead of making the user press
+  // "Load more" once per workspace. Bound the discovery pass so accounts with
+  // fewer than five workspaces do not download an unbounded history.
+  React.useEffect(() => {
+    if (
+      compact ||
+      organizeMode !== "grouped" ||
+      visibleGroupCount >= GROUP_FOLDERS_PREVIEW_LIMIT ||
+      loadedPageCount >= MAX_INITIAL_GROUP_DISCOVERY_PAGES ||
+      !hasNextPage ||
+      isFetching ||
+      isFetchingNextPage
+    ) {
+      return;
+    }
+    fetchNextPage();
+  }, [
+    compact,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    loadedPageCount,
+    organizeMode,
+    visibleGroupCount,
+  ]);
 
   // KNOWN ISSUE (unresolved as of 2026-05-29): users still report that the
   // sidebar "Load more" sometimes requires two clicks before new conversations
@@ -568,11 +614,17 @@ export function ConversationPanel({
   }, []);
 
   const requestLoadMore = React.useCallback(() => {
+    if (organizeMode === "grouped") {
+      setVisibleGroupLimit((current) => current + GROUP_FOLDERS_PREVIEW_LIMIT);
+      if (hasLoadedHiddenGroups) {
+        return;
+      }
+    }
     if (hasNextPage) {
       setLoadMoreFloor(visibleCountRef.current);
       setLoadMorePageFloor(loadedPageCountRef.current);
     }
-  }, [hasNextPage]);
+  }, [hasLoadedHiddenGroups, hasNextPage, organizeMode]);
 
   React.useEffect(() => {
     if (loadMoreFloor === null) {
@@ -643,7 +695,8 @@ export function ConversationPanel({
   // remaining pages behind an empty-state message with no way forward.
   // `requestLoadMore`'s floor driver keeps paging until a visible row
   // appears, so a single click walks past pages that are entirely filtered.
-  const showLoadMore = !!hasNextPage && !olderHidden && !compact;
+  const showLoadMore =
+    (hasLoadedHiddenGroups || !!hasNextPage) && !olderHidden && !compact;
 
   const { mutate: createConversation } = useCreateConversation();
   const isCreatingConversationFlow = useIsCreatingConversation();
@@ -1097,10 +1150,10 @@ export function ConversationPanel({
         {!showInitialSkeleton &&
         !compact &&
         organizeMode === "grouped" &&
-        orderedConversationGroups &&
-        orderedConversationGroups.length > 0 ? (
+        visibleConversationGroups &&
+        visibleConversationGroups.length > 0 ? (
           <ConversationGroupFolderList
-            groups={orderedConversationGroups}
+            groups={visibleConversationGroups}
             groupIds={conversationGroupIds}
             groupFolderOrder={groupFolderOrder}
             setGroupFolderOrder={setGroupFolderOrder}

@@ -17,6 +17,12 @@ export type AutomationFilterMode =
 /** Max conversations shown under a workspace/repo folder before "View more". */
 export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 5;
 
+/** Max workspace/repository folders shown before the global "Load more". */
+export const GROUP_FOLDERS_PREVIEW_LIMIT = 5;
+
+/** Guardrail for automatically finding the first five workspace folders. */
+export const MAX_INITIAL_GROUP_DISCOVERY_PAGES = 5;
+
 interface GroupConversationPreviewOptions {
   limit?: number;
   expanded: boolean;

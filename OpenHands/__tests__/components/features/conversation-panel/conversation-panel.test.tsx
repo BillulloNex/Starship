@@ -2122,7 +2122,44 @@ describe("ConversationPanel", () => {
       ).toBeInTheDocument();
     });
 
-    it("caps a grouped load-more click at three pages when no new folder appears", async () => {
+    it("shows five workspace folders by default and reveals the next batch with one click", async () => {
+      useConversationPanelPreferencesStore.setState({
+        organizeMode: "grouped",
+      });
+      const searchSpy = vi
+        .spyOn(AgentServerConversationService, "searchConversations")
+        .mockResolvedValue({
+          items: Array.from({ length: 6 }, (_, index) =>
+            createMockConversation({
+              id: `workspace-${index + 1}`,
+              title: `Workspace ${index + 1} chat`,
+              selected_workspace: `/workspace/project-${index + 1}`,
+            }),
+          ),
+          next_page_id: null,
+        });
+
+      const user = userEvent.setup();
+      renderConversationPanel();
+
+      await screen.findByTestId("thread-folder-ws--workspace-project-5");
+      expect(
+        document.querySelectorAll('section[data-testid^="thread-folder-"]'),
+      ).toHaveLength(5);
+      expect(
+        screen.queryByTestId("thread-folder-ws--workspace-project-6"),
+      ).not.toBeInTheDocument();
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByTestId("load-more-conversations"));
+
+      expect(
+        await screen.findByTestId("thread-folder-ws--workspace-project-6"),
+      ).toBeInTheDocument();
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("caps initial workspace discovery when no new folder appears", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
@@ -2135,36 +2172,22 @@ describe("ConversationPanel", () => {
         ),
         next_page_id: nextPageId,
       });
-      // Exactly four pages are queued: the drive must consume the initial page
-      // plus MAX_PAGES_PER_LOAD_MORE_CLICK more and stop — a fetch beyond the
-      // cap would find no queued response and fail the test loudly.
       const searchSpy = vi
         .spyOn(AgentServerConversationService, "searchConversations")
         .mockResolvedValueOnce(deepenOnlyPage(1, "page-2"))
         .mockResolvedValueOnce(deepenOnlyPage(2, "page-3"))
         .mockResolvedValueOnce(deepenOnlyPage(3, "page-4"))
-        .mockResolvedValueOnce(deepenOnlyPage(4, "page-5"));
+        .mockResolvedValueOnce(deepenOnlyPage(4, "page-5"))
+        .mockResolvedValueOnce(deepenOnlyPage(5, "page-6"));
 
-      const user = userEvent.setup();
       renderConversationPanel();
 
       await screen.findByTestId("thread-folder-__none_workspace");
-      expect(searchSpy).toHaveBeenCalledTimes(1);
-
-      // Every remaining page only deepens the existing folder, so the driver
-      // must stop at the per-click page cap instead of draining the cursor.
-      await user.click(screen.getByTestId("load-more-conversations"));
       await waitFor(() => {
-        expect(searchSpy).toHaveBeenCalledTimes(4);
+        expect(searchSpy).toHaveBeenCalledTimes(5);
       });
-      // The drive has ended: the control is idle again and no further page
-      // was requested beyond the cap.
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("load-more-conversations"),
-        ).toBeInTheDocument();
-      });
-      expect(searchSpy).toHaveBeenCalledTimes(4);
+      expect(screen.getByTestId("load-more-conversations")).toBeInTheDocument();
+      expect(searchSpy).toHaveBeenCalledTimes(5);
     });
 
     it("force-includes the active conversation in a folder preview even when it arrived on a later page", async () => {
@@ -2193,7 +2216,6 @@ describe("ConversationPanel", () => {
           next_page_id: null,
         });
 
-      const user = userEvent.setup();
       renderConversationPanel({
         navigation: {
           conversationId: "alpha-active",
@@ -2204,12 +2226,6 @@ describe("ConversationPanel", () => {
       const alphaFolder = await screen.findByTestId(
         "thread-folder-ws--workspace-alpha",
       );
-      expect(
-        within(alphaFolder).queryByText("Alpha Active"),
-      ).not.toBeInTheDocument();
-
-      await user.click(screen.getByTestId("load-more-conversations"));
-
       await waitFor(() => {
         expect(
           within(
