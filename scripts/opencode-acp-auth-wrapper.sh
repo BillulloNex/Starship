@@ -56,4 +56,4 @@ if [ -z "${GEMINI_API_KEY:-}" ]; then
   fi
 fi
 
-exec opencode acp
+exec opencode --auto "$@" acp

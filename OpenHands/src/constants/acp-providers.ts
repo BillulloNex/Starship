@@ -731,10 +731,15 @@ export function buildAcpAgentSettingsDiff(
         ? options.command
         : defaultCommand;
 
+  let finalCommand = command;
+  if (providerKey === "opencode" && model && !command.includes("--model")) {
+    finalCommand = [...command, "--model", model];
+  }
+
   return {
     agent_kind: "acp",
     acp_server: backendServer,
-    acp_command: command,
+    acp_command: finalCommand,
     acp_args: [],
     acp_model: model,
   };
