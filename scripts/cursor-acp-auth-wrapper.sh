@@ -15,4 +15,4 @@ if [ -z "$CURSOR_KEY" ]; then
   exit 1
 fi
 
-exec agent --api-key "$CURSOR_KEY" acp
+exec agent --trust --approve-mcps -f --api-key "$CURSOR_KEY" acp

@@ -80,11 +80,13 @@ export function acpModelRefsMatch(
     const normalized = value
       .trim()
       .toLowerCase()
+      .replace(/\[.*?\]/g, "")
       .replace(/[\s_]+/g, "-");
     const last = normalized.split("/").pop() ?? normalized;
-    return last.replace(/^opencode-/, "");
+    return last.replace(/^opencode-/, "").replace(/^cursor-/, "");
   };
   if (!left || !right) return false;
+  if (left.trim().toLowerCase() === right.trim().toLowerCase()) return true;
   return key(left) === key(right);
 }
 
@@ -780,5 +782,7 @@ export function isOpenCodeAcpLaunch(input: {
   acpCommand?: string | string[] | null;
 }): boolean {
   if (input.agentKind && input.agentKind !== "acp") return false;
-  return resolveAcpProviderKey(input.acpServer, input.acpCommand) === "opencode";
+  return (
+    resolveAcpProviderKey(input.acpServer, input.acpCommand) === "opencode"
+  );
 }

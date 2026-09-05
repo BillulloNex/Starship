@@ -380,6 +380,12 @@ describe("acpModelRefsMatch", () => {
     expect(
       acpModelRefsMatch("opencode-go/kimi-k3", "opencode/big-pickle"),
     ).toBe(false);
+    expect(
+      acpModelRefsMatch("grok-4.6[effort=high,fast=true]", "cursor-grok-4.6"),
+    ).toBe(true);
+    expect(acpModelRefsMatch("composer-2.5[fast=true]", "composer-2.5")).toBe(
+      true,
+    );
   });
 });
 
