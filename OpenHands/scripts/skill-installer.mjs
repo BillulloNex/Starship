@@ -1,23 +1,30 @@
 /**
  * Skill Installer Helper & Route Handler for Starship.
  *
- * Supports installing skills from skills.sh, GitHub, or package identifiers
- * using the official `skills` CLI (`npx skills add ...`).
+ * Installs skills from skills.sh / GitHub repositories by cloning the repo
+ * and copying skill directories into ~/.agents/skills/ (global) or
+ * <projectDir>/.agents/skills/ (workspace).
+ *
+ * This replaces the previous `npx skills add` approach which had Node.js
+ * version incompatibility issues in the container.
  */
 
-import { spawn, execSync } from "node:child_process";
-import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { execSync, spawn } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  cpSync,
+  readdirSync,
+  rmSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-function stripAnsi(text) {
-  return typeof text === "string"
-    ? text.replace(/\x1B\[\??[0-9;]*[a-zA-Z]/g, "").replace(/\x1B\([B0]/g, "")
-    : "";
-}
+import { randomBytes } from "node:crypto";
 
 /**
- * Parse arbitrary user input into package, skill name, and clean arguments.
+ * Parse arbitrary user input into owner, repo, and optional skill name.
  *
  * Supported formats:
  * - `npx skills add vercel-labs/agent-skills`
@@ -50,13 +57,18 @@ export function parseSkillInput(rawInput) {
     trimmed = trimmed.replace(/(?:--skill|-s)\s+[^\s]+/gi, "").trim();
   }
 
-  // Handle skills.sh URLs: https://skills.sh/owner/repo/skill-name or https://skills.sh/owner/repo
+  // Strip other flags that the skills CLI uses (-y, --copy, -g, etc.)
+  trimmed = trimmed.replace(/\s+(?:-[yg]|--copy|--global)\b/g, "").trim();
+
+  // Handle skills.sh URLs: https://skills.sh/owner/repo/skill-name
   const skillsShMatch = trimmed.match(
     /^https?:\/\/skills\.sh\/([^/\s]+)\/([^/\s]+)(?:\/([^\s]+))?$/i,
   );
   if (skillsShMatch) {
     const [, owner, repo, pathSkill] = skillsShMatch;
     return {
+      owner,
+      repo,
       packageSpec: `${owner}/${repo}`,
       skillName: explicitSkill || pathSkill || undefined,
     };
@@ -70,7 +82,9 @@ export function parseSkillInput(rawInput) {
     const [, owner, repo, path] = ghTreeMatch;
     const leaf = path.split("/").filter(Boolean).pop();
     return {
-      packageSpec: `https://github.com/${owner}/${repo}`,
+      owner,
+      repo,
+      packageSpec: `${owner}/${repo}`,
       skillName: explicitSkill || leaf || undefined,
     };
   }
@@ -81,6 +95,8 @@ export function parseSkillInput(rawInput) {
   );
   if (ghMatch) {
     return {
+      owner: ghMatch[1],
+      repo: ghMatch[2],
       packageSpec: `${ghMatch[1]}/${ghMatch[2]}`,
       skillName: explicitSkill || undefined,
     };
@@ -90,162 +106,238 @@ export function parseSkillInput(rawInput) {
   const parts = trimmed.split("/").filter(Boolean);
   if (parts.length === 3 && !trimmed.startsWith("http")) {
     return {
+      owner: parts[0],
+      repo: parts[1],
       packageSpec: `${parts[0]}/${parts[1]}`,
       skillName: explicitSkill || parts[2],
     };
   }
 
-  // Default: treat as package spec (e.g. owner/repo)
-  return {
-    packageSpec: trimmed,
-    skillName: explicitSkill || undefined,
-  };
+  if (parts.length >= 2 && !trimmed.startsWith("http")) {
+    return {
+      owner: parts[0],
+      repo: parts[1],
+      packageSpec: `${parts[0]}/${parts[1]}`,
+      skillName: explicitSkill || undefined,
+    };
+  }
+
+  throw new Error(
+    `Cannot parse input: "${rawInput}". Expected owner/repo, owner/repo/skill, or a GitHub/skills.sh URL.`,
+  );
 }
 
 /**
- * Execute skill installation using `npx --yes skills add`.
+ * Clone a GitHub repo (shallow) and install skill directories.
  */
 export async function installSkill({
   input,
   scope = "personal",
   projectDir,
 }) {
-  const { packageSpec, skillName } = parseSkillInput(input);
+  const { owner, repo, packageSpec, skillName } = parseSkillInput(input);
   const isGlobal = scope === "personal";
 
-  let executable = "npx";
-  let args = [];
+  // Destination directory
+  const home = homedir();
+  const baseDir = isGlobal
+    ? join(home, ".agents", "skills")
+    : projectDir
+      ? join(resolve(projectDir), ".agents", "skills")
+      : join(home, ".agents", "skills");
 
-  // Prefer direct skills CLI if available, then bunx, then npx
-  let hasGlobalSkills = false;
-  if (existsSync("/usr/local/bin/skills")) {
-    executable = "/usr/local/bin/skills";
-    hasGlobalSkills = true;
-  } else {
+  mkdirSync(baseDir, { recursive: true });
+
+  // Create temp dir for clone
+  const tmpId = randomBytes(8).toString("hex");
+  const cloneDir = join(tmpdir(), `skill-install-${tmpId}`);
+
+  try {
+    // Shallow clone the repo
+    const cloneUrl = `https://github.com/${owner}/${repo}.git`;
+
+    await runCommand("git", [
+      "clone",
+      "--depth",
+      "1",
+      "--single-branch",
+      cloneUrl,
+      cloneDir,
+    ], { timeout: 30_000 });
+
+    // Find the skills directory — convention is `skills/` at repo root
+    let skillsRoot = join(cloneDir, "skills");
+    if (!existsSync(skillsRoot)) {
+      // Some repos put skills directly in the root with SKILL.md
+      if (existsSync(join(cloneDir, "SKILL.md"))) {
+        // The entire repo IS a skill
+        skillsRoot = null;
+      } else {
+        // Try the repo root if no skills/ dir exists
+        throw new Error(
+          `Repository "${packageSpec}" does not contain a "skills/" directory or a root SKILL.md.`,
+        );
+      }
+    }
+
+    const installedSkills = [];
+
+    if (skillsRoot === null) {
+      // The entire repo is a single skill
+      const targetName = skillName || repo;
+      const destDir = join(baseDir, targetName);
+      mkdirSync(destDir, { recursive: true });
+      copySkillFiles(cloneDir, destDir);
+      installedSkills.push(targetName);
+    } else if (skillName) {
+      // Install only the requested skill
+      const srcDir = join(skillsRoot, skillName);
+      if (!existsSync(srcDir) || !statSync(srcDir).isDirectory()) {
+        // List available skills in error message
+        const available = listSkillDirs(skillsRoot);
+        throw new Error(
+          `Skill "${skillName}" not found in ${packageSpec}. Available skills: ${available.join(", ") || "none"}`,
+        );
+      }
+      const destDir = join(baseDir, skillName);
+      mkdirSync(destDir, { recursive: true });
+      cpSync(srcDir, destDir, { recursive: true });
+      installedSkills.push(skillName);
+    } else {
+      // Install ALL skills from the repo
+      const skillDirs = listSkillDirs(skillsRoot);
+      if (skillDirs.length === 0) {
+        throw new Error(
+          `No skill directories found in ${packageSpec}/skills/.`,
+        );
+      }
+
+      for (const dir of skillDirs) {
+        const srcDir = join(skillsRoot, dir);
+        const destDir = join(baseDir, dir);
+        mkdirSync(destDir, { recursive: true });
+        cpSync(srcDir, destDir, { recursive: true });
+        installedSkills.push(dir);
+      }
+    }
+
+    // Mirror to ~/.openhands/skills if global install
+    if (isGlobal) {
+      const openhandsSkillsDir = join(home, ".openhands", "skills");
+      try {
+        mkdirSync(openhandsSkillsDir, { recursive: true });
+        for (const name of installedSkills) {
+          const src = join(baseDir, name);
+          const dst = join(openhandsSkillsDir, name);
+          if (existsSync(src) && !existsSync(dst)) {
+            cpSync(src, dst, { recursive: true });
+          }
+        }
+      } catch {
+        // Best-effort mirror
+      }
+    }
+
+    return {
+      success: true,
+      skillName: installedSkills.join(", "),
+      packageSpec,
+      scope,
+      installed: installedSkills,
+      output: `Successfully installed ${installedSkills.length} skill(s) from ${packageSpec}: ${installedSkills.join(", ")}`,
+    };
+  } finally {
+    // Cleanup temp clone
     try {
-      execSync("which skills", { stdio: "ignore" });
-      executable = "skills";
-      hasGlobalSkills = true;
+      rmSync(cloneDir, { recursive: true, force: true });
     } catch {
-      // not in path
+      // Ignore cleanup errors
     }
   }
+}
 
-  if (hasGlobalSkills) {
-    args = ["add", packageSpec, "-y", "--copy"];
-  } else {
+/**
+ * List subdirectories in skills/ that are valid skill directories.
+ */
+function listSkillDirs(skillsRoot) {
+  return readdirSync(skillsRoot).filter((entry) => {
+    const fullPath = join(skillsRoot, entry);
     try {
-      execSync("which bunx", { stdio: "ignore" });
-      executable = "bunx";
-      args = ["skills", "add", packageSpec, "-y", "--copy"];
+      return (
+        statSync(fullPath).isDirectory() &&
+        !entry.startsWith(".") &&
+        !entry.endsWith(".zip")
+      );
     } catch {
-      executable = "npx";
-      args = ["--yes", "skills", "add", packageSpec, "-y", "--copy"];
+      return false;
+    }
+  });
+}
+
+/**
+ * Copy relevant skill files from source to destination, excluding .git etc.
+ */
+function copySkillFiles(src, dst) {
+  const entries = readdirSync(src);
+  for (const entry of entries) {
+    if (entry === ".git" || entry === ".github" || entry === "node_modules") {
+      continue;
+    }
+    const srcPath = join(src, entry);
+    const dstPath = join(dst, entry);
+    try {
+      cpSync(srcPath, dstPath, { recursive: true });
+    } catch {
+      // Skip individual file copy errors
     }
   }
+}
 
-  if (skillName) {
-    args.push("--skill", skillName);
-  }
-  if (isGlobal) {
-    args.push("-g");
-  }
-
-  const cwd = !isGlobal && projectDir ? resolve(projectDir) : homedir();
-
-  return new Promise((resolvePromise, rejectPromise) => {
+/**
+ * Run a command and return stdout. Rejects on non-zero exit.
+ */
+function runCommand(cmd, args, { timeout = 30_000 } = {}) {
+  return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
 
-    const proc = spawn(executable, args, {
-      cwd,
+    const proc = spawn(cmd, args, {
+      stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
-        CI: "true",
-        FORCE_COLOR: "0",
-        npm_config_cache: "/tmp/npm-cache",
-        NPM_CONFIG_CACHE: "/tmp/npm-cache",
+        GIT_TERMINAL_PROMPT: "0",
       },
-      stdio: ["ignore", "pipe", "pipe"],
     });
 
     proc.stdout.on("data", (data) => {
       stdout += data.toString();
     });
-
     proc.stderr.on("data", (data) => {
       stderr += data.toString();
     });
 
-    const timeout = setTimeout(() => {
+    const timer = setTimeout(() => {
       proc.kill("SIGKILL");
-      rejectPromise(new Error("Skill installation timed out after 60 seconds"));
-    }, 60_000);
+      reject(new Error(`Command timed out after ${timeout}ms`));
+    }, timeout);
 
     proc.on("error", (err) => {
-      clearTimeout(timeout);
-      rejectPromise(err);
+      clearTimeout(timer);
+      reject(err);
     });
 
     proc.on("close", (code) => {
-      clearTimeout(timeout);
-
-      const combinedOutput = `${stdout}\n${stderr}`.trim();
-
+      clearTimeout(timer);
       if (code !== 0) {
-        let errorMsg = `Installation failed with exit code ${code}`;
-        const notFoundMatch = combinedOutput.match(/No matching skills found for: (.*)/i);
-        if (notFoundMatch) {
-          errorMsg = `Skill "${notFoundMatch[1]}" was not found in ${packageSpec}.`;
-        } else if (combinedOutput.includes("Git error") || combinedOutput.includes("Repository not found")) {
-          errorMsg = `Repository "${packageSpec}" was not found or is inaccessible.`;
+        const errText = stderr.trim() || stdout.trim();
+        if (errText.includes("not found") || errText.includes("Repository not found")) {
+          reject(new Error(`Repository not found: ${args.find((a) => a.includes("github.com")) || args.join(" ")}`));
+        } else {
+          reject(new Error(`Command failed (exit ${code}): ${errText}`));
         }
-        return rejectPromise(new Error(`${errorMsg}\n\n${combinedOutput}`));
+      } else {
+        resolve(stdout);
       }
-
-      // If global, mirror installed skills from ~/.agents/skills to ~/.openhands/skills
-      const home = homedir();
-      const agentsSkillsDir = join(home, ".agents", "skills");
-      const openhandsSkillsDir = join(home, ".openhands", "skills");
-
-      try {
-        if (isGlobal && existsSync(agentsSkillsDir)) {
-          mkdirSync(openhandsSkillsDir, { recursive: true });
-          const entries = readdirSync(agentsSkillsDir);
-          for (const entry of entries) {
-            const src = join(agentsSkillsDir, entry);
-            const dst = join(openhandsSkillsDir, entry);
-            if (existsSync(src) && !existsSync(dst)) {
-              try {
-                cpSync(src, dst, { recursive: true });
-              } catch {
-                // Ignore copy errors
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("[skill-installer] Warning syncing skills directory:", err.message);
-      }
-
-      const cleanOutput = stripAnsi(combinedOutput);
-
-      let detectedSkillName = skillName;
-      const installedMatch = cleanOutput.match(/(?:Installed|Selected)\s+\d+\s+skill[s]?\s*:\s*([^\s\n]+)/i)
-        || cleanOutput.match(/✓\s+([^\s\n]+)\s+\(copied\)/i)
-        || cleanOutput.match(/→\s+.*?[\\/]\.agents[\\/]skills[\\/]([^\s\n\\/]+)/i);
-
-      if (installedMatch) {
-        detectedSkillName = installedMatch[1];
-      }
-
-      resolvePromise({
-        success: true,
-        skillName: stripAnsi(detectedSkillName || packageSpec),
-        packageSpec,
-        scope,
-        output: cleanOutput,
-      });
     });
   });
 }

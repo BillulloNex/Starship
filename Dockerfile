@@ -177,7 +177,7 @@ USER root
 # Reuse the pinned Node build stage instead of installing from an external APT
 # repository or relying on the agent-server base image to provide Node.js.
 COPY --from=frontend-build /usr/local /usr/local
-RUN node --version && npm --version && npx --version && npm install -g skills
+RUN node --version && npm --version && npx --version
 
 # Install system deps required by automation and headless Chromium
 ENV CHROME_PATH=/usr/bin/chromium \
