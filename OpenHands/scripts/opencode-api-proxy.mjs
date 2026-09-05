@@ -118,6 +118,28 @@ function extractKey(value) {
   return trimmed;
 }
 
+async function fetchSecret(name) {
+  try {
+    const resp = await fetch(`http://127.0.0.1:18000/api/settings/secrets/${name}`);
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const trimmed = text.trim();
+    // The secret store may return the raw value or JSON-wrapped
+    if (!trimmed || /^\*+$/.test(trimmed)) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "string") return parsed.trim() || null;
+      // If it's a JSON object (like OPENCODE_AUTH_JSON), return the raw text
+      if (typeof parsed === "object") return trimmed;
+    } catch {
+      // Raw string value
+    }
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveEnv(req) {
   const env = { ...process.env };
   const headerKey = extractKey(req.headers["x-opencode-api-key"]);
@@ -147,6 +169,40 @@ async function resolveEnv(req) {
       // Body reading ignored
     }
   }
+
+  // Fetch keys from Agent Server secret store if not already set
+  const secretMap = [
+    ["OPENCODE_GO_API_KEY", "OPENCODE_GO_API_KEY"],
+    ["ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"],
+    ["OPENAI_API_KEY", "OPENAI_API_KEY"],
+    ["GEMINI_API_KEY", "GEMINI_API_KEY"],
+  ];
+  for (const [envName, secretName] of secretMap) {
+    if (!env[envName]) {
+      const val = await fetchSecret(secretName);
+      if (val) env[envName] = val;
+    }
+  }
+
+  // Also materialize OPENCODE_AUTH_JSON to auth.json if available
+  if (!env.OPENCODE_AUTH_JSON) {
+    const authJson = await fetchSecret("OPENCODE_AUTH_JSON");
+    if (authJson && authJson.startsWith("{")) {
+      env.OPENCODE_AUTH_JSON = authJson;
+      // Write auth.json so `opencode models` can read provider credentials
+      try {
+        const { mkdirSync, writeFileSync } = await import("node:fs");
+        const { homedir } = await import("node:os");
+        const { join } = await import("node:path");
+        const dir = join(homedir(), ".local", "share", "opencode");
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, "auth.json"), authJson, { mode: 0o600 });
+      } catch {
+        // Best effort
+      }
+    }
+  }
+
   return env;
 }
 
