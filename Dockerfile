@@ -325,6 +325,7 @@ COPY scripts/ship-jira.py /opt/agent-canvas/ship-jira.py
 COPY scripts/register-ship-log-monitor.mjs /opt/agent-canvas/register-ship-log-monitor.mjs
 COPY scripts/ensure-ship-coolify-secret.mjs /opt/agent-canvas/ensure-ship-coolify-secret.mjs
 COPY prompts/ship-log-monitor.md /opt/agent-canvas/prompts/ship-log-monitor.md
+COPY scripts/cursor-acp-bridge.mjs /opt/agent-canvas/cursor-acp-bridge.mjs
 COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-prewarm.sh /opt/agent-canvas/opencode-acp-prewarm.sh
