@@ -5,10 +5,16 @@
  * using the official `skills` CLI (`npx skills add ...`).
  */
 
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+
+function stripAnsi(text) {
+  return typeof text === "string"
+    ? text.replace(/\x1B\[\??[0-9;]*[a-zA-Z]/g, "").replace(/\x1B\([B0]/g, "")
+    : "";
+}
 
 /**
  * Parse arbitrary user input into package, skill name, and clean arguments.
@@ -107,7 +113,37 @@ export async function installSkill({
   const { packageSpec, skillName } = parseSkillInput(input);
   const isGlobal = scope === "personal";
 
-  const args = ["--yes", "skills", "add", packageSpec, "-y", "--copy"];
+  let executable = "npx";
+  let args = [];
+
+  // Prefer direct skills CLI if available, then bunx, then npx
+  let hasGlobalSkills = false;
+  if (existsSync("/usr/local/bin/skills")) {
+    executable = "/usr/local/bin/skills";
+    hasGlobalSkills = true;
+  } else {
+    try {
+      execSync("which skills", { stdio: "ignore" });
+      executable = "skills";
+      hasGlobalSkills = true;
+    } catch {
+      // not in path
+    }
+  }
+
+  if (hasGlobalSkills) {
+    args = ["add", packageSpec, "-y", "--copy"];
+  } else {
+    try {
+      execSync("which bunx", { stdio: "ignore" });
+      executable = "bunx";
+      args = ["skills", "add", packageSpec, "-y", "--copy"];
+    } catch {
+      executable = "npx";
+      args = ["--yes", "skills", "add", packageSpec, "-y", "--copy"];
+    }
+  }
+
   if (skillName) {
     args.push("--skill", skillName);
   }
@@ -121,12 +157,14 @@ export async function installSkill({
     let stdout = "";
     let stderr = "";
 
-    const proc = spawn("npx", args, {
+    const proc = spawn(executable, args, {
       cwd,
       env: {
         ...process.env,
         CI: "true",
         FORCE_COLOR: "0",
+        npm_config_cache: "/tmp/npm-cache",
+        NPM_CONFIG_CACHE: "/tmp/npm-cache",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -190,10 +228,12 @@ export async function installSkill({
         console.warn("[skill-installer] Warning syncing skills directory:", err.message);
       }
 
+      const cleanOutput = stripAnsi(combinedOutput);
+
       let detectedSkillName = skillName;
-      const installedMatch = combinedOutput.match(/(?:Installed|Selected)\s+\d+\s+skill[s]?\s*:\s*([^\s\n]+)/i)
-        || combinedOutput.match(/✓\s+([^\s\n]+)\s+\(copied\)/i)
-        || combinedOutput.match(/→\s+.*?[\\/]\.agents[\\/]skills[\\/]([^\s\n\\/]+)/i);
+      const installedMatch = cleanOutput.match(/(?:Installed|Selected)\s+\d+\s+skill[s]?\s*:\s*([^\s\n]+)/i)
+        || cleanOutput.match(/✓\s+([^\s\n]+)\s+\(copied\)/i)
+        || cleanOutput.match(/→\s+.*?[\\/]\.agents[\\/]skills[\\/]([^\s\n\\/]+)/i);
 
       if (installedMatch) {
         detectedSkillName = installedMatch[1];
@@ -201,10 +241,10 @@ export async function installSkill({
 
       resolvePromise({
         success: true,
-        skillName: detectedSkillName || packageSpec,
+        skillName: stripAnsi(detectedSkillName || packageSpec),
         packageSpec,
         scope,
-        output: combinedOutput,
+        output: cleanOutput,
       });
     });
   });

@@ -177,7 +177,7 @@ USER root
 # Reuse the pinned Node build stage instead of installing from an external APT
 # repository or relying on the agent-server base image to provide Node.js.
 COPY --from=frontend-build /usr/local /usr/local
-RUN node --version && npm --version && npx --version
+RUN node --version && npm --version && npx --version && npm install -g skills
 
 # Install system deps required by automation and headless Chromium
 ENV CHROME_PATH=/usr/bin/chromium \
@@ -372,7 +372,7 @@ VOLUME ["/home/openhands/.openhands", "/projects"]
 EXPOSE 8000
 
 # Docker-level health check so Coolify (and Docker itself) can detect failures.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
   CMD curl -sf http://localhost:8000/health || exit 1
 
 # Wrapper fixes permissions, then execs the real entrypoint as openhands
