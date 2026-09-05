@@ -17,7 +17,9 @@ import { formatModelNameForDisplay } from "#/utils/format-model-name";
 import { Star } from "lucide-react";
 import { useFavoriteAgentModels } from "#/hooks/use-favorite-agent-models";
 import { useChatInputProfileState } from "#/hooks/use-chat-input-profile-state";
+import { useDropdownPlacement } from "#/hooks/use-dropdown-placement";
 import { FavoriteAgentModelsSection } from "./favorite-agent-models-section";
+import { dropdownMenuViewportScrollClassName } from "#/utils/dropdown-classes";
 
 const PROFILE_LABEL_MAX_CHARS = 18;
 
@@ -218,6 +220,9 @@ export function ChatInputLlmProfilePicker() {
     () => setIsPopoverOpen(false),
     triggerRef,
   );
+  const { placement, updatePlacement } = useDropdownPlacement(triggerRef, {
+    isOpen: isPopoverOpen,
+  });
 
   // No LLM profiles yet (or the agent-server lacks the surface): stay out of
   // the way, exactly like the ACP/AgentProfile pickers.
@@ -247,6 +252,9 @@ export function ChatInputLlmProfilePicker() {
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (!isPopoverOpen) {
+            updatePlacement();
+          }
           setIsPopoverOpen((open) => !open);
         }}
       >
@@ -258,10 +266,14 @@ export function ChatInputLlmProfilePicker() {
         <ContextMenu
           ref={popoverRef}
           testId="chat-input-llm-profile-popover"
-          position="top"
+          position={placement}
           alignment="left"
           spacing="none"
-          className="z-[60] mb-2 min-w-[200px] max-w-[320px]"
+          className={cn(
+            "z-[60] min-w-[200px] max-w-[320px] pr-0.5",
+            placement === "top" ? "mb-2" : "mt-2",
+            dropdownMenuViewportScrollClassName,
+          )}
         >
           <ChatInputLlmProfileMenuContent
             onClose={() => setIsPopoverOpen(false)}

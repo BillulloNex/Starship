@@ -20,6 +20,7 @@ import React from "react";
 import { Star } from "lucide-react";
 import { useFavoriteAgentModels } from "#/hooks/use-favorite-agent-models";
 import { useChatInputProfileState } from "#/hooks/use-chat-input-profile-state";
+import { useDropdownPlacement } from "#/hooks/use-dropdown-placement";
 import { FavoriteAgentModelsSection } from "./favorite-agent-models-section";
 import { dropdownMenuViewportScrollClassName } from "#/utils/dropdown-classes";
 
@@ -86,73 +87,71 @@ export function ChatInputModelMenuContent({
               {t(I18nKey.MODEL$AVAILABLE_MODELS)}
             </Typography.Text>
           </li>
-            {model.availableAcpModels.map((option) => {
-              const isSelected = option.id === model.currentModelId;
-              const favorite = currentProfileId
-                ? { agentProfileId: currentProfileId, modelId: option.id }
-                : null;
-              const starred = favorite ? isFavorite(favorite) : false;
-              return (
-                <ContextMenuListItem
-                  key={option.id}
-                  testId={`chat-input-acp-model-option-${option.id}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleSelectAcpModel(option.id);
-                  }}
-                  className={cn(
-                    "flex items-center gap-2",
-                    isSelected && "bg-[var(--oh-interactive-hover)]",
-                  )}
+          {model.availableAcpModels.map((option) => {
+            const isSelected = option.id === model.currentModelId;
+            const favorite = currentProfileId
+              ? { agentProfileId: currentProfileId, modelId: option.id }
+              : null;
+            const starred = favorite ? isFavorite(favorite) : false;
+            return (
+              <ContextMenuListItem
+                key={option.id}
+                testId={`chat-input-acp-model-option-${option.id}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleSelectAcpModel(option.id);
+                }}
+                className={cn(
+                  "flex items-center gap-2",
+                  isSelected && "bg-[var(--oh-interactive-hover)]",
+                )}
+              >
+                <span
+                  className="flex-1 truncate text-sm leading-5"
+                  title={option.label}
                 >
+                  {option.label}
+                </span>
+                {isSelected && (
+                  <CheckIcon
+                    width={14}
+                    height={14}
+                    className="shrink-0"
+                    aria-hidden
+                  />
+                )}
+                {favorite && (
                   <span
-                    className="flex-1 truncate text-sm leading-5"
-                    title={option.label}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${t(I18nKey.HOME$FAVORITES)}: ${option.label}`}
+                    className={cn(
+                      "shrink-0 rounded p-0.5 hover:bg-white/10",
+                      starred ? "text-amber-400" : "text-[var(--oh-text-dim)]",
+                    )}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleFavorite(favorite);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleFavorite(favorite);
+                    }}
                   >
-                    {option.label}
-                  </span>
-                  {isSelected && (
-                    <CheckIcon
-                      width={14}
-                      height={14}
-                      className="shrink-0"
+                    <Star
+                      size={15}
+                      fill={starred ? "currentColor" : "none"}
                       aria-hidden
                     />
-                  )}
-                  {favorite && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${t(I18nKey.HOME$FAVORITES)}: ${option.label}`}
-                      className={cn(
-                        "shrink-0 rounded p-0.5 hover:bg-white/10",
-                        starred
-                          ? "text-amber-400"
-                          : "text-[var(--oh-text-dim)]",
-                      )}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        toggleFavorite(favorite);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter" && event.key !== " ") return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        toggleFavorite(favorite);
-                      }}
-                    >
-                      <Star
-                        size={15}
-                        fill={starred ? "currentColor" : "none"}
-                        aria-hidden
-                      />
-                    </span>
-                  )}
-                </ContextMenuListItem>
-              );
-            })}
+                  </span>
+                )}
+              </ContextMenuListItem>
+            );
+          })}
         </>
       ) : model.displayModel ? (
         <li className="text-sm">
@@ -192,6 +191,9 @@ export function ChatInputModel() {
     () => setIsPopoverOpen(false),
     triggerRef,
   );
+  const { placement, updatePlacement } = useDropdownPlacement(triggerRef, {
+    isOpen: isPopoverOpen,
+  });
 
   if (!model.displayModel) {
     return null;
@@ -218,6 +220,9 @@ export function ChatInputModel() {
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (!isPopoverOpen) {
+            updatePlacement();
+          }
           setIsPopoverOpen((open) => !open);
         }}
       >
@@ -229,11 +234,12 @@ export function ChatInputModel() {
         <ContextMenu
           ref={popoverRef}
           testId="chat-input-llm-model-popover"
-          position="bottom"
+          position={placement}
           alignment="left"
           spacing="none"
           className={cn(
-            "z-[60] mt-2 min-w-[200px] max-w-[320px] pr-0.5",
+            "z-[60] min-w-[200px] max-w-[320px] pr-0.5",
+            placement === "top" ? "mb-2" : "mt-2",
             dropdownMenuViewportScrollClassName,
           )}
         >
