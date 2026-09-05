@@ -14,7 +14,7 @@ OPENCODE_DIR="/home/openhands/.local/share/opencode"
 mkdir -p /projects "$CURSOR_DIR" "$OPENCODE_DIR"
 
 # Auto-seed repository in background if missing so it does not block container startup
-AUTO_REPO="${AUTO_CLONE_REPO:-https://github.com/ThomasVuNguyen/Starship.git}"
+AUTO_REPO="${AUTO_CLONE_REPO:-https://github.com/BillulloNex/Starship.git}"
 TARGET_DIR="${AUTO_CLONE_TARGET:-/projects/Grokbot}"
 
 if [ -n "${AUTO_REPO}" ] && [ ! -d "${TARGET_DIR}/.git" ]; then

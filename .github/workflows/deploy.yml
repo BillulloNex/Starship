@@ -7,7 +7,7 @@ on:
 jobs:
   build-and-deploy:
     name: Build Image & Trigger Deploy
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
@@ -32,8 +32,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/thomasvunguyen/grokbot:latest
-            ghcr.io/thomasvunguyen/grokbot:${{ github.sha }}
+            ghcr.io/billullonex/grokbot:latest
+            ghcr.io/billullonex/grokbot:${{ github.sha }}
           build-args: |
             VITE_DD_APPLICATION_ID=${{ secrets.VITE_DD_APPLICATION_ID }}
             VITE_DD_CLIENT_TOKEN=${{ secrets.VITE_DD_CLIENT_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
   post-deploy-verify:
     name: Post-Deploy Verification
     needs: build-and-deploy
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
       statuses: write

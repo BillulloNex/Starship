@@ -20,7 +20,7 @@ const CONFIG = {
     process.env.SHIP_AUTOMATION_STATE_FILE ||
     "/home/openhands/.openhands/ship-automation/state.json",
   agentUrl: process.env.SHIP_AGENT_URL || "http://127.0.0.1:18000",
-  githubRepo: process.env.SHIP_GITHUB_REPO || "ThomasVuNguyen/Starship",
+  githubRepo: process.env.SHIP_GITHUB_REPO || "BillulloNex/Starship",
   slackChannel: process.env.SHIP_SLACK_CHANNEL_ID || "",
   maxBuildAttempts: Number(process.env.SHIP_MAX_BUILD_ATTEMPTS || 3),
   conversationTimeoutMs: Number(process.env.SHIP_CONVERSATION_TIMEOUT_MS || 1_800_000),
