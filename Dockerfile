@@ -327,9 +327,11 @@ COPY scripts/ensure-ship-coolify-secret.mjs /opt/agent-canvas/ensure-ship-coolif
 COPY prompts/ship-log-monitor.md /opt/agent-canvas/prompts/ship-log-monitor.md
 COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
+COPY scripts/opencode-acp-prewarm.sh /opt/agent-canvas/opencode-acp-prewarm.sh
 RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser && \
     chmod +x /opt/agent-canvas/cursor-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/cursor-acp-auth-wrapper.sh /usr/local/bin/cursor-acp && \
-    chmod +x /opt/agent-canvas/opencode-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/opencode-acp-auth-wrapper.sh /usr/local/bin/opencode-acp
+    chmod +x /opt/agent-canvas/opencode-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/opencode-acp-auth-wrapper.sh /usr/local/bin/opencode-acp && \
+    chmod +x /opt/agent-canvas/opencode-acp-prewarm.sh
 COPY --from=frontend-build /build/node_modules/httpxy /opt/agent-canvas/node_modules/httpxy
 COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modules/sirv
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka
@@ -356,7 +358,7 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 
 # Copy the wrapper entrypoint (fixes volume ownership before starting services)
 COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
-RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
+RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-prewarm.sh
 
 # Stay as root — the wrapper entrypoint drops to openhands after fixing
 # file ownership on mounted volumes. This is needed because the old

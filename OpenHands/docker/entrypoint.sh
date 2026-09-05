@@ -345,6 +345,15 @@ wait_for_port "$AUTOMATION_PORT" "Automation Server" 60 &
 WAIT_PID2=$!
 wait "$WAIT_PID1" "$WAIT_PID2"
 
+# Warm OpenCode's ACP HTTP stack (SQLite + Bun modules) so the first user
+# chat does not pay a fully cold Server.listen. MCP is attached later per
+# conversation; this only pre-heats the binary.
+if command -v opencode >/dev/null 2>&1 && [ -x /opt/agent-canvas/opencode-acp-prewarm.sh ]; then
+  log "Pre-warming OpenCode ACP..."
+  /opt/agent-canvas/opencode-acp-prewarm.sh >/tmp/opencode-acp-prewarm.log 2>&1 &
+  PIDS+=($!)
+fi
+
 # ── 4. Start optional Telegram bridge ───────────────────────────────────────
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
   log "Starting Telegram mobile bridge..."

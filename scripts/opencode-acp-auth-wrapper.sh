@@ -151,9 +151,15 @@ for arg in "$@"; do
   esac
 done
 
+# Skip oh-my-openagent / npm plugin reify on ACP spawn. MCP from the ACP
+# session (MetaMCP, dispatcher) is unaffected — those are session/new servers.
+export OPENCODE_PURE=1
+# Persistent npm cache so stdio MCP `npx` servers skip a cold download.
+export npm_config_cache="${npm_config_cache:-${HOME}/.npm}"
+
 if [ ${#filtered[@]} -gt 0 ]; then
-  echo "opencode-acp: exec opencode ${filtered[*]} acp" >&2
+  echo "opencode-acp: exec OPENCODE_PURE=1 opencode ${filtered[*]} acp" >&2
   exec opencode "${filtered[@]}" acp
 fi
-echo "opencode-acp: exec opencode acp" >&2
+echo "opencode-acp: exec OPENCODE_PURE=1 opencode acp" >&2
 exec opencode acp

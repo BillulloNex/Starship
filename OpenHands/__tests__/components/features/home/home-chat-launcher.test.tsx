@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { HomeChatLauncher } from "#/components/features/home/home-chat-launcher";
-import AgentServerConversationService from "#/api/conversation-service/agent-server-conversation-service.api";
 import WorkspacesService from "#/api/workspaces-service/workspaces-service.api";
 
 const mockNavigate = vi.fn();
@@ -18,6 +17,11 @@ const mockUseLlmConfigured = vi.fn();
 
 let mockImages: File[] = [];
 let mockFiles: File[] = [];
+
+const { prewarmCtl, createConversationMutate } = vi.hoisted(() => ({
+  prewarmCtl: { id: null as string | null },
+  createConversationMutate: vi.fn(),
+}));
 
 vi.mock("#/utils/send-message-with-attachments", () => ({
   sendMessageWithAttachments: (...args: unknown[]) =>
@@ -62,6 +66,25 @@ vi.mock("#/context/navigation-context", () => ({
 
 vi.mock("#/contexts/active-backend-context", () => ({
   useActiveBackend: () => mockUseActiveBackend(),
+}));
+
+vi.mock("#/hooks/mutation/use-create-conversation", () => ({
+  useCreateConversation: () => ({
+    mutateAsync: createConversationMutate,
+    isPending: false,
+  }),
+  CREATE_CONVERSATION_MUTATION_KEY: ["create-conversation"],
+}));
+
+vi.mock("#/hooks/use-opencode-acp-prewarm", () => ({
+  useOpencodeAcpPrewarm: () => ({
+    take: () => {
+      const id = prewarmCtl.id;
+      prewarmCtl.id = null;
+      return id;
+    },
+  }),
+  OPENCODE_ACP_PREWARM_ENTRY: "opencode_acp_prewarm",
 }));
 
 vi.mock("#/hooks/use-llm-configured", () => ({
@@ -240,21 +263,19 @@ const renderLauncher = () =>
     ),
   });
 
-function makeConversationResponse(
-  overrides: Record<string, unknown> = {},
-): never {
+function makeCreateResult(
+  overrides: {
+    conversation_id?: string;
+    task_id?: string;
+  } = {},
+) {
   return {
-    id: "conv-abc",
-    created_by_user_id: null,
-    status: "READY",
-    detail: null,
-    app_conversation_id: "conv-abc",
-    agent_server_url: "http://agent-server.local",
-    request: { initial_message: undefined, plugins: null },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    conversation_id: "conv-abc",
+    session_api_key: null,
+    url: "http://agent-server.local",
+    task_id: "conv-abc",
     ...overrides,
-  } as never;
+  };
 }
 
 const localBackend = {
@@ -285,6 +306,9 @@ describe("HomeChatLauncher", () => {
     vi.clearAllMocks();
     mockImages = [];
     mockFiles = [];
+    prewarmCtl.id = null;
+    createConversationMutate.mockReset();
+    createConversationMutate.mockResolvedValue(makeCreateResult());
     mockUseActiveBackend.mockReturnValue(localBackend);
     mockUseLlmConfigured.mockReturnValue({
       isConfigured: true,
@@ -309,22 +333,45 @@ describe("HomeChatLauncher", () => {
   });
 
   it("creates a conversation with just the typed query and navigates when no workspace is selected", async () => {
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(makeConversationResponse());
-
     renderLauncher();
     const user = userEvent.setup();
 
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      initialUserMsg: "hello world",
-      metadata: null,
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
     });
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith("/conversations/conv-abc"),
+    );
+  });
+
+  it("sends into a prewarmed OpenCode conversation instead of creating on submit", async () => {
+    prewarmCtl.id = "conv-warm";
+
+    renderLauncher();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("stub-chat-submit"));
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/conversations/conv-warm"),
+    );
+    expect(createConversationMutate).not.toHaveBeenCalled();
+    expect(sendMessageWithAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conv-warm",
+        content: "hello world",
+      }),
+    );
+    expect(enqueueHomeTaskPendingMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conv-warm",
+        text: "hello world",
+      }),
     );
   });
 
@@ -333,23 +380,17 @@ describe("HomeChatLauncher", () => {
       isConfigured: false,
       isLoading: false,
     });
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(makeConversationResponse());
 
     renderLauncher();
 
-    // The send is disabled, so the agent can't be handed a request it can't run.
     expect(screen.getByTestId("stub-chat-submit")).toBeDisabled();
-    expect(createSpy).not.toHaveBeenCalled();
+    expect(createConversationMutate).not.toHaveBeenCalled();
   });
 
   it("passes the picked workspace path as working_dir on a local backend", async () => {
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(
-        makeConversationResponse({ app_conversation_id: "conv-ws" }),
-      );
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({ conversation_id: "conv-ws", task_id: "conv-ws" }),
+    );
 
     renderLauncher();
     const user = userEvent.setup();
@@ -360,11 +401,13 @@ describe("HomeChatLauncher", () => {
     );
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      initialUserMsg: "hello world",
-      metadata: null,
-      workingDirOverride: "/p/app",
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
+      workingDir: "/p/app",
       workspaceMode: "local_repo",
     });
     await waitFor(() =>
@@ -373,11 +416,9 @@ describe("HomeChatLauncher", () => {
   });
 
   it("passes the picked workspace path with new-worktree mode when selected", async () => {
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(
-        makeConversationResponse({ app_conversation_id: "conv-wt" }),
-      );
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({ conversation_id: "conv-wt", task_id: "conv-wt" }),
+    );
 
     renderLauncher();
     const user = userEvent.setup();
@@ -396,11 +437,13 @@ describe("HomeChatLauncher", () => {
     );
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      initialUserMsg: "hello world",
-      metadata: null,
-      workingDirOverride: "/p/app",
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
+      workingDir: "/p/app",
       workspaceMode: "new_worktree",
     });
     await waitFor(() =>
@@ -431,11 +474,9 @@ describe("HomeChatLauncher", () => {
 
   it("passes the picked repository + branch payload on a cloud backend", async () => {
     mockUseActiveBackend.mockReturnValue(cloudBackend);
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(
-        makeConversationResponse({ app_conversation_id: "conv-repo" }),
-      );
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({ conversation_id: "conv-repo", task_id: "conv-repo" }),
+    );
 
     renderLauncher();
     const user = userEvent.setup();
@@ -444,13 +485,16 @@ describe("HomeChatLauncher", () => {
     await user.click(await screen.findByTestId("stub-repo-dialog-confirm"));
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      initialUserMsg: "hello world",
-      metadata: {
-        selected_repository: "org/repo",
-        selected_branch: "main",
-        git_provider: "github",
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
+      repository: {
+        name: "org/repo",
+        gitProvider: "github",
+        branch: "main",
       },
     });
     await waitFor(() =>
@@ -460,17 +504,17 @@ describe("HomeChatLauncher", () => {
 
   it("does not pass query to createConversation when attachments are present", async () => {
     mockImages = [new File(["x"], "shot.png", { type: "image/png" })];
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(makeConversationResponse());
 
     renderLauncher();
     const user = userEvent.setup();
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      metadata: null,
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: undefined,
+      entryPoint: "home_chat_launcher",
     });
     await waitFor(() =>
       expect(sendMessageWithAttachments).toHaveBeenCalledTimes(1),
@@ -482,10 +526,7 @@ describe("HomeChatLauncher", () => {
   });
 
   it("surfaces a toast and skips navigation when conversation creation fails", async () => {
-    vi.spyOn(
-      AgentServerConversationService,
-      "createConversation",
-    ).mockRejectedValue(new Error("Network down"));
+    createConversationMutate.mockRejectedValue(new Error("Network down"));
 
     renderLauncher();
     const user = userEvent.setup();
@@ -497,20 +538,20 @@ describe("HomeChatLauncher", () => {
 
   it("enqueues an optimistic pending message when cloud returns a start task", async () => {
     mockUseActiveBackend.mockReturnValue(cloudBackend);
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(
-        makeConversationResponse({
-          id: "start-task-1",
-          app_conversation_id: null,
-        }),
-      );
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({
+        conversation_id: "task-start-task-1",
+        task_id: "start-task-1",
+      }),
+    );
 
     renderLauncher();
     const user = userEvent.setup();
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
     await waitFor(() =>
       expect(enqueueHomeTaskPendingMessage).toHaveBeenCalledWith({
         conversationId: "task-start-task-1",
@@ -529,22 +570,23 @@ describe("HomeChatLauncher", () => {
   it("defers attachments and enqueues an optimistic pending message for cloud start tasks", async () => {
     mockUseActiveBackend.mockReturnValue(cloudBackend);
     mockImages = [new File(["x"], "shot.png", { type: "image/png" })];
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(
-        makeConversationResponse({
-          id: "start-task-2",
-          app_conversation_id: null,
-        }),
-      );
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({
+        conversation_id: "task-start-task-2",
+        task_id: "start-task-2",
+      }),
+    );
 
     renderLauncher();
     const user = userEvent.setup();
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      metadata: null,
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: undefined,
+      entryPoint: "home_chat_launcher",
     });
     expect(sendMessageWithAttachments).not.toHaveBeenCalled();
     await waitFor(() =>
@@ -563,10 +605,6 @@ describe("HomeChatLauncher", () => {
   });
 
   it("attaches the picked plugins to the created conversation", async () => {
-    const createSpy = vi
-      .spyOn(AgentServerConversationService, "createConversation")
-      .mockResolvedValue(makeConversationResponse());
-
     renderLauncher();
     const user = userEvent.setup();
 
@@ -574,11 +612,13 @@ describe("HomeChatLauncher", () => {
     await user.click(await screen.findByTestId("stub-plugin-pick"));
     await user.click(screen.getByTestId("stub-chat-submit"));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy).toHaveBeenCalledWith({
-      initialUserMsg: "hello world",
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
       plugins: [{ source: "github:o/a", ref: null, repo_path: null }],
-      metadata: null,
     });
   });
 });

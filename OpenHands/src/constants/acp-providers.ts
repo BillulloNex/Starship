@@ -764,3 +764,21 @@ export function buildAcpAgentSettingsDiff(
     acp_model: model,
   };
 }
+
+/**
+ * Home-launcher create used only to start ACP spawn + MCP before send.
+ */
+export const OPENCODE_ACP_PREWARM_ENTRY = "opencode_acp_prewarm";
+export const OPENCODE_ACP_PREWARM_MUTATION_KEY = [
+  "opencode-acp-prewarm",
+] as const;
+
+/** True when a launch should use the OpenCode ACP warm-start path. */
+export function isOpenCodeAcpLaunch(input: {
+  agentKind?: string | null;
+  acpServer?: string | null;
+  acpCommand?: string | string[] | null;
+}): boolean {
+  if (input.agentKind && input.agentKind !== "acp") return false;
+  return resolveAcpProviderKey(input.acpServer, input.acpCommand) === "opencode";
+}

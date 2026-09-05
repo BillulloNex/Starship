@@ -12,6 +12,7 @@ import {
   getAcpProviderDisplayName,
   getAcpProviderSecrets,
   resolveAcpProviderKey,
+  isOpenCodeAcpLaunch,
 } from "#/constants/acp-providers";
 
 describe("getAcpProviderDisplayName", () => {
@@ -67,6 +68,29 @@ describe("resolveAcpProviderKey", () => {
     expect(resolveAcpProviderKey("custom", "agent acp --future-flag")).toBe(
       "custom",
     );
+  });
+});
+
+describe("isOpenCodeAcpLaunch", () => {
+  it("detects OpenCode ACP from the wrapper command", () => {
+    expect(
+      isOpenCodeAcpLaunch({
+        agentKind: "acp",
+        acpServer: "custom",
+        acpCommand: ["opencode-acp"],
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for OpenHands and other ACP providers", () => {
+    expect(isOpenCodeAcpLaunch({ agentKind: "openhands" })).toBe(false);
+    expect(
+      isOpenCodeAcpLaunch({
+        agentKind: "acp",
+        acpServer: "claude-code",
+        acpCommand: ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
+      }),
+    ).toBe(false);
   });
 });
 

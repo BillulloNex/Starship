@@ -28,6 +28,7 @@ import {
   toPluginCoordinates,
   type WorkspaceMode,
 } from "#/api/conversation-metadata-store";
+import { OPENCODE_ACP_PREWARM_ENTRY } from "#/constants/acp-providers";
 
 export interface CreateConversationVariables {
   query?: string;
@@ -59,7 +60,9 @@ interface CreateConversationResponse {
   task_id?: string;
 }
 
-export const useCreateConversation = () => {
+export const useCreateConversation = (options?: {
+  mutationKey?: readonly string[];
+}) => {
   const queryClient = useQueryClient();
   const { trackConversationCreated } = useTracking();
   // Cache-warm on the home page (the profile picker reads the same query).
@@ -76,7 +79,7 @@ export const useCreateConversation = () => {
   useAgentProfiles();
 
   return useMutation({
-    mutationKey: CREATE_CONVERSATION_MUTATION_KEY,
+    mutationKey: options?.mutationKey ?? CREATE_CONVERSATION_MUTATION_KEY,
     mutationFn: async (
       variables: CreateConversationVariables,
     ): Promise<CreateConversationResponse> => {
@@ -305,18 +308,21 @@ export const useCreateConversation = () => {
       };
     },
     onSuccess: async (data, variables) => {
-      trackConversationCreated({
-        conversationId: data.conversation_id,
-        taskId: data.task_id,
-        hasRepository: !!variables.repository,
-        gitProvider: variables.repository?.gitProvider,
-        hasWorkspace: !!variables.workingDir,
-        workspaceMode: variables.workspaceMode,
-        hasInitialQuery: !!variables.query,
-        agentType: variables.agentType,
-        hasParentConversation: !!variables.parentConversationId,
-        entryPoint: variables.entryPoint,
-      });
+      // Skip funnel analytics for OpenCode ACP pre-create (spawn/MCP warmup).
+      if (variables.entryPoint !== OPENCODE_ACP_PREWARM_ENTRY) {
+        trackConversationCreated({
+          conversationId: data.conversation_id,
+          taskId: data.task_id,
+          hasRepository: !!variables.repository,
+          gitProvider: variables.repository?.gitProvider,
+          hasWorkspace: !!variables.workingDir,
+          workspaceMode: variables.workspaceMode,
+          hasInitialQuery: !!variables.query,
+          agentType: variables.agentType,
+          hasParentConversation: !!variables.parentConversationId,
+          entryPoint: variables.entryPoint,
+        });
+      }
 
       // Invalidate (rather than remove) so the existing paginated list stays
       // rendered while a background refetch picks up the new conversation.

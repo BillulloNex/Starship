@@ -341,6 +341,67 @@ def _fetch_antigravity_secret():
     return None
 
 
+def _init_acp_background_warmup():
+    """Start ACP spawn + session/new (including MCP) when the conversation is
+    constructed, not on the first run() after the user hits send.
+
+    OpenHands defers ACPAgent.init_state until run() so send_message stays
+    fast. That puts OpenCode's Server.listen plus MCP connect on the prompt
+    clock. Warming in a daemon thread overlaps that work with typing when
+    the UI pre-creates the conversation.
+    """
+    try:
+        import threading
+
+        from openhands.sdk.agent.acp_agent import ACPAgent
+        from openhands.sdk.conversation.impl.local_conversation import (
+            LocalConversation,
+        )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] ACP warmup patch skipped: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+
+    orig_init = LocalConversation.__init__
+
+    def _patched_init(self, *args, **kwargs):
+        orig_init(self, *args, **kwargs)
+        try:
+            if not isinstance(getattr(self, "agent", None), ACPAgent):
+                return
+            def _warmup():
+                try:
+                    self._ensure_agent_ready()
+                except Exception as warmup_err:
+                    print(
+                        f"[grokbot-sitecustomize] ACP warmup failed: {warmup_err}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+
+            threading.Thread(
+                target=_warmup,
+                name="grokbot-acp-warmup",
+                daemon=True,
+            ).start()
+        except Exception as e:
+            print(
+                f"[grokbot-sitecustomize] ACP warmup thread skipped: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    LocalConversation.__init__ = _patched_init
+    print(
+        "[grokbot-sitecustomize] ACP background warmup enabled",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def _init_antigravity_acp():
     """Ensure OpenHands SDK recognizes and authenticates Google Antigravity ACP."""
     try:
@@ -466,6 +527,7 @@ def _init_antigravity_acp():
 
 _init_llmobs()
 _init_antigravity_acp()
+_init_acp_background_warmup()
 
 
 def _background_sync():

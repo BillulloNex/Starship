@@ -35,6 +35,7 @@ import { OpenLauncherButton } from "./open-launcher-button";
 import { OpenWorkspaceDialog } from "./open-workspace-dialog";
 import { OpenRepositoryDialog } from "./open-repository-dialog";
 import { HomeGitControlBarPreview } from "./home-git-control-bar-preview";
+import { useOpencodeAcpPrewarm } from "#/hooks/use-opencode-acp-prewarm";
 
 export function HomeChatLauncher() {
   const { t } = useTranslation("openhands");
@@ -63,6 +64,12 @@ export function HomeChatLauncher() {
   // Block sending entirely when there's no usable LLM; the banner above the
   // launcher (rendered by the home route) explains it and offers setup.
   const llmBlocked = !isLlmConfigLoading && !isLlmConfigured;
+  const opencodePrewarm = useOpencodeAcpPrewarm({
+    enabled: isLocal && !llmBlocked,
+    workingDir: pendingWorkspace?.path,
+    workspaceMode: pendingWorkspace ? workspaceMode : undefined,
+    plugins: selectedPlugins,
+  });
   const { images, files, imagesMarkedUploadAsFile, clearAllFiles } =
     useConversationStore();
   const { handleUpload } = useChatAttachmentUpload();
@@ -133,6 +140,44 @@ export function HomeChatLauncher() {
 
     void (async () => {
       try {
+        const prewarmedId =
+          !hasAttachments && isLocal
+            ? opencodePrewarm.take({
+                workingDir: pendingWorkspace?.path,
+                workspaceMode: pendingWorkspace ? workspaceMode : undefined,
+              })
+            : null;
+
+        if (prewarmedId) {
+          toast.dismiss(toastId);
+          try {
+            sessionStorage.removeItem(HOME_PROMPT_DRAFT_KEY);
+          } catch {
+            // sessionStorage not available
+          }
+          await enqueueHomeTaskPendingMessage({
+            conversationId: prewarmedId,
+            text: trimmed,
+            images: attachmentSnapshot.images,
+            imagesMarkedUploadAsFile,
+          });
+          navigate(`/conversations/${prewarmedId}`);
+          try {
+            await sendMessageWithAttachments({
+              conversationId: prewarmedId,
+              content: trimmed,
+              images: attachmentSnapshot.images,
+              files: attachmentSnapshot.files,
+              imagesMarkedUploadAsFile,
+              t,
+            });
+            clearAllFiles();
+          } catch (error) {
+            displayErrorToast(error instanceof Error ? error.message : null);
+          }
+          return;
+        }
+
         const data = await createConversation(variables);
         toast.dismiss(toastId);
         try {
