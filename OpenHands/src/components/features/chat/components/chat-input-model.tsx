@@ -21,6 +21,7 @@ import { Star } from "lucide-react";
 import { useFavoriteAgentModels } from "#/hooks/use-favorite-agent-models";
 import { useChatInputProfileState } from "#/hooks/use-chat-input-profile-state";
 import { FavoriteAgentModelsSection } from "./favorite-agent-models-section";
+import { dropdownMenuViewportScrollClassName } from "#/utils/dropdown-classes";
 
 const MODEL_LABEL_MAX_CHARS = 10;
 // ACP surfaces show the provider's human label (e.g. "Claude Opus 4.7"),
@@ -85,7 +86,6 @@ export function ChatInputModelMenuContent({
               {t(I18nKey.MODEL$AVAILABLE_MODELS)}
             </Typography.Text>
           </li>
-          <div className="flex max-h-[220px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
             {model.availableAcpModels.map((option) => {
               const isSelected = option.id === model.currentModelId;
               const favorite = currentProfileId
@@ -153,7 +153,6 @@ export function ChatInputModelMenuContent({
                 </ContextMenuListItem>
               );
             })}
-          </div>
         </>
       ) : model.displayModel ? (
         <li className="text-sm">
@@ -233,7 +232,10 @@ export function ChatInputModel() {
           position="top"
           alignment="left"
           spacing="none"
-          className="z-[60] mb-2 min-w-[200px] max-w-[320px]"
+          className={cn(
+            "z-[60] mb-2 min-w-[200px] max-w-[320px] pr-0.5",
+            dropdownMenuViewportScrollClassName,
+          )}
         >
           <ChatInputModelMenuContent
             model={model}

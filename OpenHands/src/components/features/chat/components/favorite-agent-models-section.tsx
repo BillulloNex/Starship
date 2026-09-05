@@ -29,7 +29,6 @@ export function FavoriteAgentModelsSection({
           {t(I18nKey.HOME$FAVORITES)}
         </Typography.Text>
       </li>
-      <div className="flex max-h-[180px] flex-col gap-0.5 overflow-y-auto pr-0.5 custom-scrollbar">
         {resolvedFavorites.map((favorite) => (
           <ContextMenuListItem
             key={`${favorite.agentProfileId}:${favorite.modelId}`}
@@ -70,7 +69,6 @@ export function FavoriteAgentModelsSection({
             </span>
           </ContextMenuListItem>
         ))}
-      </div>
       <Divider inset={dividerInset} />
     </>
   );
