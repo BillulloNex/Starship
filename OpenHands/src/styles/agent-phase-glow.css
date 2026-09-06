@@ -5,6 +5,10 @@
 
    Child elements (message bubbles, input fields) have their own opaque
    backgrounds, so the gradient shows through naturally in the gaps.
+
+   Hues come from the 021 sticker set:
+   star #FFDB6E, automation #FF9368, starship #A5E5A1, agent #67E8F9,
+   terminal #7893FF, folder #B7A0FF, hand #FA91FF.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Keyframes ─────────────────────────────────────────────────────────── */
@@ -25,19 +29,19 @@
   0% {
     background-image: linear-gradient(
       135deg,
-      rgba(34, 197, 94, 0.25),
-      rgba(20, 184, 166, 0.2),
-      rgba(6, 182, 212, 0.18),
-      rgba(34, 197, 94, 0.25)
+      rgba(165, 229, 161, 0.25),
+      rgba(103, 232, 249, 0.2),
+      rgba(120, 147, 255, 0.18),
+      rgba(165, 229, 161, 0.25)
     );
   }
   100% {
     background-image: linear-gradient(
       135deg,
-      rgba(34, 197, 94, 0),
-      rgba(20, 184, 166, 0),
-      rgba(6, 182, 212, 0),
-      rgba(34, 197, 94, 0)
+      rgba(165, 229, 161, 0),
+      rgba(103, 232, 249, 0),
+      rgba(120, 147, 255, 0),
+      rgba(165, 229, 161, 0)
     );
   }
 }
@@ -57,12 +61,12 @@
 .agent-phase-waiting {
   background-image: linear-gradient(
     135deg,
-    rgba(245, 158, 11, 0.2),
-    rgba(249, 115, 22, 0.25),
-    rgba(239, 68, 68, 0.15),
-    rgba(245, 158, 11, 0.2),
-    rgba(234, 179, 8, 0.18),
-    rgba(249, 115, 22, 0.2)
+    rgba(255, 219, 110, 0.22),
+    rgba(255, 147, 104, 0.25),
+    rgba(250, 145, 255, 0.16),
+    rgba(255, 219, 110, 0.22),
+    rgba(255, 147, 104, 0.18),
+    rgba(255, 219, 110, 0.2)
   ) !important;
   background-size: 400% 400% !important;
   animation: phase-sweep 4s ease infinite !important;
@@ -73,30 +77,30 @@
 .agent-phase-thinking {
   background-image: linear-gradient(
     135deg,
-    rgba(99, 102, 241, 0.25),
-    rgba(139, 92, 246, 0.3),
-    rgba(167, 139, 250, 0.2),
-    rgba(99, 102, 241, 0.25),
-    rgba(20, 184, 166, 0.2),
-    rgba(129, 140, 248, 0.25)
+    rgba(120, 147, 255, 0.25),
+    rgba(183, 160, 255, 0.3),
+    rgba(103, 232, 249, 0.2),
+    rgba(120, 147, 255, 0.25),
+    rgba(250, 145, 255, 0.18),
+    rgba(183, 160, 255, 0.25)
   ) !important;
   background-size: 400% 400% !important;
   animation: phase-sweep 3s ease infinite !important;
 }
 
-/* ── Phase: Running (tool calls, full rainbow) ─────────────────────────── */
+/* ── Phase: Running (tool calls, full sticker rainbow) ─────────────────── */
 
 .agent-phase-running {
   background-image: linear-gradient(
     135deg,
-    rgba(239, 68, 68, 0.2),
-    rgba(249, 115, 22, 0.22),
-    rgba(234, 179, 8, 0.2),
-    rgba(34, 197, 94, 0.22),
-    rgba(6, 182, 212, 0.2),
-    rgba(59, 130, 246, 0.22),
-    rgba(139, 92, 246, 0.2),
-    rgba(239, 68, 68, 0.2)
+    rgba(255, 147, 104, 0.22),
+    rgba(255, 219, 110, 0.22),
+    rgba(165, 229, 161, 0.22),
+    rgba(103, 232, 249, 0.2),
+    rgba(120, 147, 255, 0.22),
+    rgba(183, 160, 255, 0.2),
+    rgba(250, 145, 255, 0.2),
+    rgba(255, 147, 104, 0.22)
   ) !important;
   background-size: 400% 400% !important;
   animation: phase-sweep 2s ease infinite !important;
@@ -107,10 +111,10 @@
 .agent-phase-finished {
   background-image: linear-gradient(
     135deg,
-    rgba(34, 197, 94, 0.25),
-    rgba(20, 184, 166, 0.2),
-    rgba(6, 182, 212, 0.18),
-    rgba(34, 197, 94, 0.25)
+    rgba(165, 229, 161, 0.25),
+    rgba(103, 232, 249, 0.2),
+    rgba(120, 147, 255, 0.18),
+    rgba(165, 229, 161, 0.25)
   ) !important;
   background-size: 400% 400% !important;
   animation: phase-finished-fade 2.5s ease forwards !important;
@@ -121,10 +125,10 @@
 .agent-phase-error {
   background-image: linear-gradient(
     135deg,
-    rgba(239, 68, 68, 0.3),
-    rgba(249, 115, 22, 0.25),
-    rgba(220, 38, 38, 0.3),
-    rgba(239, 68, 68, 0.3)
+    rgba(255, 147, 104, 0.3),
+    rgba(250, 145, 255, 0.2),
+    rgba(255, 147, 104, 0.3),
+    rgba(255, 147, 104, 0.3)
   ) !important;
   background-size: 400% 400% !important;
   animation: phase-error-throb 1s ease infinite !important;

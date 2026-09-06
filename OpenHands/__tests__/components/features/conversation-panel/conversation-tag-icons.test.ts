@@ -3,7 +3,6 @@ import {
   Briefcase,
   CircleUserRound,
   CloudCog,
-  Folder,
   FolderGit2,
   FolderKey,
   GitBranch,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { FaGithub } from "react-icons/fa6";
 import SlackIcon from "#/icons/slack.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { getConversationTagIcon } from "#/components/features/conversation-panel/conversation-card/conversation-tag-icons";
 
 describe("getConversationTagIcon", () => {
@@ -25,7 +25,7 @@ describe("getConversationTagIcon", () => {
     expect(getConversationTagIcon("selected_branch", "main")).toBe(GitBranch);
     expect(
       getConversationTagIcon("archiveworkspacepath", "/workspace/project"),
-    ).toBe(Folder);
+    ).toBe(StickerFolderIcon);
     expect(getConversationTagIcon("worktools", "browser")).toBe(Wrench);
     expect(
       getConversationTagIcon("Workwsid", "cad8995a71e54b12b156d1d153be062f"),

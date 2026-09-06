@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Folder } from "lucide-react";
 import { FaBitbucket, FaGithub, FaGitlab } from "react-icons/fa6";
 import { FaCodeBranch } from "react-icons/fa";
 import type { IconType } from "react-icons/lib";
@@ -13,6 +12,7 @@ import { getDisplayConversationTags } from "#/api/agent-server-adapter";
 import { resolveAcpProviderIcon } from "#/constants/acp-providers";
 import AzureDevOpsLogo from "#/assets/branding/azure-devops-logo.svg?react";
 import { AgentBrandIcon } from "#/components/shared/agent-brand-icon";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { ConversationStatusDot } from "../conversation-status-dot";
 import { getConversationTagLabel } from "./conversation-tag-display";
 import { getConversationTagIcon } from "./conversation-tag-icons";
@@ -177,7 +177,9 @@ export function ConversationCardPreview({
           </>
         ) : workspaceWorkingDir ? (
           <PreviewRow label={t(I18nKey.CONVERSATION_PANEL$PREVIEW_DIRECTORY)}>
-            <PreviewValueWithIcon icon={<Folder size={12} />}>
+            <PreviewValueWithIcon
+              icon={<StickerFolderIcon className="size-3 overflow-visible" />}
+            >
               {workspaceWorkingDir}
             </PreviewValueWithIcon>
           </PreviewRow>

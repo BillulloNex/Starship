@@ -11,7 +11,7 @@ export default heroui({
   themes: {
     dark: {
       colors: {
-        primary: "#4465DB",
+        primary: "#FFDB6E",
 
         // Map HeroUI's zinc-based semantic colours to our cool-grey palette.
         // This ensures every HeroUI component that uses bg-default, bg-content*,
@@ -43,7 +43,7 @@ export default heroui({
         content4: { DEFAULT: "#4B5468", foreground: "#A3B0C4" }, // cool-grey-700 / 400
 
         focus: {
-          DEFAULT: "#ffffff", // white focus ring — visible on all dark surfaces
+          DEFAULT: "#67E8F9", // agent cyan — matches 021 sticker focus
         },
         default: {
           "50": "#05070A", // cool-grey-975

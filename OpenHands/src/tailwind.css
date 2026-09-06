@@ -54,6 +54,15 @@
   --color-interactive-hover-low: var(--oh-interactive-hover-low);
   --color-interactive-active: var(--oh-interactive-active);
 
+  /* 021 sticker palette */
+  --color-sticker-star: var(--oh-sticker-star);
+  --color-sticker-starship: var(--oh-sticker-starship);
+  --color-sticker-automation: var(--oh-sticker-automation);
+  --color-sticker-terminal: var(--oh-sticker-terminal);
+  --color-sticker-folder: var(--oh-sticker-folder);
+  --color-sticker-hand: var(--oh-sticker-hand);
+  --color-sticker-agent: var(--oh-sticker-agent);
+
   /* Cool Grey scale */
   --color-cool-grey-50: var(--cool-grey-50);
   --color-cool-grey-100: var(--cool-grey-100);
@@ -72,12 +81,20 @@
 
 :root {
   color-scheme: dark;
-  --oh-color-primary: #c9b974;
-  --oh-color-logo: #cfb755;
+  /* Sticker fills from message_boards/deep_dive/021 */
+  --oh-sticker-star: #ffdb6e;
+  --oh-sticker-starship: #a5e5a1;
+  --oh-sticker-automation: #ff9368;
+  --oh-sticker-terminal: #7893ff;
+  --oh-sticker-folder: #b7a0ff;
+  --oh-sticker-hand: #fa91ff;
+  --oh-sticker-agent: #67e8f9;
+  --oh-color-primary: var(--oh-sticker-star);
+  --oh-color-logo: var(--oh-sticker-star);
   --oh-color-base: var(--cool-grey-950);
   --oh-color-base-secondary: var(--cool-grey-925);
-  --oh-color-danger: #e76a5e;
-  --oh-color-success: #a5e75e;
+  --oh-color-danger: var(--oh-sticker-automation);
+  --oh-color-success: var(--oh-sticker-starship);
   --oh-color-basic: var(--cool-grey-400);
   --oh-color-tertiary: var(--cool-grey-800);
   --oh-color-tertiary-light: var(--cool-grey-300);
@@ -117,13 +134,13 @@
   );
   --oh-default: var(--cool-grey-800);
   --oh-default-foreground: var(--cool-grey-100);
-  --oh-accent: #c9b974;
+  --oh-accent: var(--oh-sticker-star);
   --oh-accent-foreground: var(--cool-grey-950);
-  --oh-success: #a5e75e;
+  --oh-success: var(--oh-sticker-starship);
   --oh-success-foreground: var(--cool-grey-950);
-  --oh-warning: #c9b974;
+  --oh-warning: var(--oh-sticker-automation);
   --oh-warning-foreground: var(--cool-grey-950);
-  --oh-danger: #e76a5e;
+  --oh-danger: var(--oh-sticker-automation);
   --oh-danger-foreground: var(--cool-grey-50);
   --oh-segment: var(--cool-grey-925);
   --oh-segment-foreground: var(--cool-grey-100);
@@ -137,10 +154,10 @@
     --cool-grey-800
   ); /* within-panel separators, list dividers */
   --oh-separator: rgba(113, 120, 136, 0.5);
-  --oh-focus: #ffffff;
-  --oh-status-success: #1fbd53;
-  --oh-status-error: #ff684e;
-  --oh-link: var(--cool-grey-100);
+  --oh-focus: var(--oh-sticker-agent);
+  --oh-status-success: var(--oh-sticker-starship);
+  --oh-status-error: var(--oh-sticker-automation);
+  --oh-link: var(--oh-sticker-terminal);
   --oh-radius: 8px;
   --oh-field-radius: 8px;
   --oh-surface-shadow: none;

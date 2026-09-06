@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
-import { Folder, FolderOpen, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRef, type DragEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { I18nKey } from "#/i18n/declaration";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { cn } from "#/utils/utils";
 import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
 import type {
@@ -161,26 +162,14 @@ export function ConversationGroupFolderRow({
               onDragEnd();
             }}
             className={cn(
-              "group/folder flex min-h-8 min-w-0 flex-1 cursor-grab items-center gap-2 rounded-md py-1 text-left text-inherit outline-none active:cursor-grabbing",
+              "flex min-h-8 min-w-0 flex-1 cursor-grab items-center gap-2 rounded-md py-1 text-left text-inherit outline-none active:cursor-grabbing",
               "focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
             )}
           >
-            <Folder
-              className={cn(
-                "h-4 w-4 shrink-0",
-                expanded
-                  ? "hidden group-hover/folder:block"
-                  : "block group-hover/folder:hidden",
-              )}
-              aria-hidden
-            />
-            <FolderOpen
-              className={cn(
-                "h-4 w-4 shrink-0",
-                expanded
-                  ? "block group-hover/folder:hidden"
-                  : "hidden group-hover/folder:block",
-              )}
+            <StickerFolderIcon
+              width={16}
+              height={16}
+              className="h-4 w-4 shrink-0 overflow-visible"
               aria-hidden
             />
             <span className="truncate">{group.label}</span>

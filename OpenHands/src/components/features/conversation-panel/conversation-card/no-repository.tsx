@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Folder } from "lucide-react";
 import { I18nKey } from "#/i18n/declaration";
 import RepoForkedIcon from "#/icons/repo-forked.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { getPathBasename } from "#/utils/path-utils";
 import {
   CONVERSATION_CARD_META_CHIP_CLASSNAME,
@@ -31,7 +31,9 @@ export function NoRepository({ workspaceWorkingDir }: NoRepositoryProps) {
           className={CONVERSATION_CARD_META_CHIP_ICON_SLOT_CLASSNAME}
           aria-hidden
         >
-          <Folder className={CONVERSATION_CARD_META_CHIP_ICON_CLASSNAME} />
+          <StickerFolderIcon
+            className={`${CONVERSATION_CARD_META_CHIP_ICON_CLASSNAME} overflow-visible`}
+          />
         </span>
         <span className="truncate leading-4">{folderName}</span>
       </span>

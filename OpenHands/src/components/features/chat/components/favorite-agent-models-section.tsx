@@ -52,7 +52,7 @@ export function FavoriteAgentModelsSection({
               role="button"
               tabIndex={0}
               aria-label={`${t(I18nKey.HOME$FAVORITES)}: ${favorite.agentName} — ${favorite.modelLabel}`}
-              className="shrink-0 rounded p-0.5 text-amber-400 hover:bg-white/10"
+              className="shrink-0 rounded p-0.5 text-[var(--oh-sticker-star)] hover:bg-white/10"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();

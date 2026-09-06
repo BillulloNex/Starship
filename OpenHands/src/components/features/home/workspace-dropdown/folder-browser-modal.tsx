@@ -18,7 +18,7 @@ import {
 import { useActiveBackend } from "#/contexts/active-backend-context";
 import { cn } from "#/utils/utils";
 import { modalTitleSmClassName } from "#/utils/modal-classes";
-import FolderIcon from "#/icons/folder.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import ChevronLeft from "#/icons/chevron-left-small.svg?react";
 
 const PROJECTS_PATH = "/projects";
@@ -70,7 +70,7 @@ function SidebarSection({
                     : "text-[var(--oh-text-tertiary)] hover:bg-[var(--oh-surface-raised)]",
                 )}
               >
-                <FolderIcon width={14} height={14} className="shrink-0" />
+                <StickerFolderIcon width={14} height={14} className="shrink-0 overflow-visible" />
                 <span className="truncate">{entry.label}</span>
               </button>
             </li>
@@ -337,7 +337,7 @@ export function FolderBrowserModal({
                     data-testid={`folder-browser-entry-${entry.name}`}
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      <FolderIcon width={16} height={16} className="shrink-0" />
+                      <StickerFolderIcon width={16} height={16} className="shrink-0 overflow-visible" />
                       <span className="truncate">{entry.name}</span>
                     </span>
                     <span className="text-[var(--oh-text-secondary)] text-xs">

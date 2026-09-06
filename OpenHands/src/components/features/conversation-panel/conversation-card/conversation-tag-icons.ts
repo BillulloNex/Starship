@@ -6,7 +6,6 @@ import {
   CircleUserRound,
   CloudCog,
   Flag,
-  Folder,
   FolderGit2,
   FolderKey,
   GitBranch,
@@ -34,6 +33,7 @@ import {
 import { FaBitbucket, FaGithub, FaGitlab } from "react-icons/fa6";
 import type { IconType } from "react-icons/lib";
 import SlackIcon from "#/icons/slack.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 
 /**
  * Any icon renderable inside a tag chip / overflow row. Lucide, react-icons,
@@ -80,9 +80,9 @@ const KEY_ICONS: Record<string, ConversationTagIcon> = {
   repo_name: FolderGit2,
   branch: GitBranch,
   selected_branch: GitBranch,
-  archiveworkspacepath: Folder,
-  workspace: Folder,
-  working_dir: Folder,
+  archiveworkspacepath: StickerFolderIcon,
+  workspace: StickerFolderIcon,
+  working_dir: StickerFolderIcon,
   team: UsersRound,
   org: Building2,
   organization: Building2,

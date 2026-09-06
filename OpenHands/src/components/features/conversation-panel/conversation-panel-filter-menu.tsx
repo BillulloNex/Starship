@@ -8,7 +8,6 @@ import {
   ClockArrowDown,
   Eye,
   EyeOff,
-  Folder,
   GitBranch,
   ListFilter,
   MessageCircle,
@@ -19,6 +18,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { I18nKey } from "#/i18n/declaration";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import type { BackendKind } from "#/api/backend-registry/types";
 import { cn } from "#/utils/utils";
 import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
@@ -216,7 +216,7 @@ export function ConversationPanelFilterMenu({
         >
           <MenuHeading>{t(I18nKey.CONVERSATION_PANEL$ORGANIZE)}</MenuHeading>
           <MenuRow
-            icon={Folder}
+            icon={StickerFolderIcon}
             label={groupedLabel}
             selected={organizeMode === "grouped"}
             onClick={() => {

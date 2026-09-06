@@ -10,7 +10,7 @@ import {
 import { formControlFieldClassName } from "#/utils/form-control-classes";
 import type { LocalWorkspace, LocalWorkspaceParent } from "#/types/workspace";
 import { I18nKey } from "#/i18n/declaration";
-import RepoIcon from "#/icons/repo.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 
 import { ClearButton } from "../shared/clear-button";
@@ -319,7 +319,11 @@ export function WorkspaceDropdown({
     <div className={cn("relative", className)}>
       <div className="group relative text-[var(--oh-muted)] hover:text-white">
         <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-          <RepoIcon width={16} height={16} />
+          <StickerFolderIcon
+            width={16}
+            height={16}
+            className="overflow-visible"
+          />
         </div>
         <input
           {...getInputProps({

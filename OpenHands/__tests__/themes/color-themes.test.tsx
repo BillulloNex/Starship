@@ -166,6 +166,8 @@ describe("color themes", () => {
 
     applyColorTheme("openhands-neutral");
 
-    expect(scopeRoot.style.getPropertyValue("--oh-color-primary")).toBe("");
+    expect(scopeRoot.style.getPropertyValue("--oh-color-primary")).toBe(
+      "#FFDB6E",
+    );
   });
 });

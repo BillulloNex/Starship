@@ -25,11 +25,11 @@ export function StartTaskStatusBadge({
   const getStatusStyle = () => {
     switch (taskStatus) {
       case "READY":
-        return "bg-green-500/10 text-green-400 border-green-500/20";
+        return "bg-[var(--oh-status-success)]/10 text-[var(--oh-status-success)] border-[var(--oh-status-success)]/20";
       case "ERROR":
-        return "bg-red-500/10 text-red-400 border-red-500/20";
+        return "bg-[var(--oh-status-error)]/10 text-[var(--oh-status-error)] border-[var(--oh-status-error)]/20";
       default:
-        return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+        return "bg-[var(--oh-color-primary)]/10 text-[var(--oh-color-primary)] border-[var(--oh-color-primary)]/20";
     }
   };
 

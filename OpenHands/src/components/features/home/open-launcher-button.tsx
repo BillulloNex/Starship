@@ -1,7 +1,7 @@
-import { Folder } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
 import RepoForkedIcon from "#/icons/repo-forked.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { cn } from "#/utils/utils";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import {
@@ -49,7 +49,10 @@ export function OpenLauncherButton({
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
         {isLocal ? (
-          <Folder aria-hidden className="h-4 w-4" strokeWidth={2} />
+          <StickerFolderIcon
+            aria-hidden
+            className="h-4 w-4 overflow-visible"
+          />
         ) : (
           <RepoForkedIcon width={16} height={16} className="shrink-0" />
         )}

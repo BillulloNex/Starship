@@ -98,6 +98,16 @@ import { AGENT_SERVER_UI_THEMEABLE_BRAND_VARIABLES } from "#/styles/agent-server
 /** CSS custom properties overridden by color themes (see applyColorTheme). */
 export const COLOR_THEME_TOKEN_KEYS = AGENT_SERVER_UI_THEMEABLE_BRAND_VARIABLES;
 
+/** Yellow star + orange bolt tokens from the 021 sticker set — default brand. */
+const STICKER_BRAND_TOKENS: Record<
+  (typeof COLOR_THEME_TOKEN_KEYS)[number],
+  string
+> = {
+  "--oh-color-primary": "#FFDB6E",
+  "--oh-accent": "#FFDB6E",
+  "--oh-warning": "#FF9368",
+};
+
 /** White primary/accent tokens — used by OpenHands-Neo for button surfaces. */
 const NEO_WHITE_BUTTON_TOKENS: Record<
   (typeof COLOR_THEME_TOKEN_KEYS)[number],
@@ -278,6 +288,7 @@ export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
     description: "Balanced neutral dark with high-clarity greys",
     scale: NEUTRAL_SCALE,
     heroui: NEUTRAL_HEROUI,
+    tokens: STICKER_BRAND_TOKENS,
   },
 
   "openhands-neo": {

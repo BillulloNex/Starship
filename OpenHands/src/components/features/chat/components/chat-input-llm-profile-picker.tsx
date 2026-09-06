@@ -136,7 +136,7 @@ export function ChatInputLlmProfileMenuContent({
                         className={cn(
                           "shrink-0 rounded p-0.5 hover:bg-white/10",
                           starred
-                            ? "text-amber-400"
+                            ? "text-[var(--oh-sticker-star)]"
                             : "text-[var(--oh-text-dim)]",
                         )}
                         onClick={(event) => {

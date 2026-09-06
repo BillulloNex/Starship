@@ -43,7 +43,10 @@ export function MenuRow({
       )}
     >
       <Icon
-        className={cn("h-3.5 w-3.5", dropdownMenuRowIconClassName)}
+        className={cn(
+          "h-3.5 w-3.5 overflow-visible",
+          dropdownMenuRowIconClassName,
+        )}
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>

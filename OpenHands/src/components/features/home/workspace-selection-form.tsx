@@ -14,7 +14,7 @@ import { useLocalWorkspaces } from "#/hooks/query/use-local-workspaces";
 import { useResolvedWorkspaces } from "#/hooks/query/use-resolved-workspaces";
 import { LocalWorkspace } from "#/types/workspace";
 import { I18nKey } from "#/i18n/declaration";
-import FolderIcon from "#/icons/folder.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { getWorkspacesUnsupportedMessage } from "#/utils/workspaces-compatibility";
 
 import { BrandButton } from "../settings/brand-button";
@@ -174,7 +174,11 @@ export function WorkspaceSelectionForm({
           already shows an "Open Workspace" title, so this would be redundant. */}
       {!onConfirm && (
         <div className="flex items-center gap-[10px] pb-4">
-          <FolderIcon width={24} height={24} />
+          <StickerFolderIcon
+            width={24}
+            height={24}
+            className="overflow-visible"
+          />
           <span className="leading-5 font-bold text-base text-white">
             {t(I18nKey.HOME$WORKSPACES_TAB)}
           </span>

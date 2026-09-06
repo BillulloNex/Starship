@@ -12,6 +12,7 @@ import { getTaskStatusI18nKey } from "#/utils/status";
 import type { AppConversationStartTaskStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
 import {
   OH_STATUS_ERROR_COLOR,
+  OH_STATUS_PENDING_COLOR,
   OH_STATUS_SUCCESS_COLOR,
 } from "#/constants/status-colors";
 
@@ -760,7 +761,7 @@ export const getStatusColor = (options: {
 
   // Show pausing status
   if (isPausing) {
-    return "#FFD600";
+    return OH_STATUS_PENDING_COLOR;
   }
 
   // Show task status if we're polling a task
@@ -768,11 +769,11 @@ export const getStatusColor = (options: {
     if (taskStatus === "ERROR") {
       return OH_STATUS_ERROR_COLOR;
     }
-    return "#FFD600";
+    return OH_STATUS_PENDING_COLOR;
   }
 
   if (isStartingStatus) {
-    return "#FFD600";
+    return OH_STATUS_PENDING_COLOR;
   }
   if (isStopStatus) {
     return "#ffffff";

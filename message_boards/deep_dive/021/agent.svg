@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Cyan agent bot</title>
+  <desc>A chubby robot-head agent with one rounded antenna, two goggle eyes, a cyan sticker border, rounded black outlines, and a transparent background.</desc>
+  <g fill="#67E8F9" stroke="#67E8F9" stroke-width="19" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="18" r="11"/>
+    <path d="M64 18V42"/>
+    <rect x="24" y="40" width="80" height="70" rx="26"/>
+  </g>
+  <g fill="#67E8F9" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="18" r="11"/>
+    <path d="M64 18V42"/>
+    <rect x="24" y="40" width="80" height="70" rx="26"/>
+    <circle cx="48" cy="72" r="10.5"/>
+    <circle cx="80" cy="72" r="10.5"/>
+  </g>
+</svg>

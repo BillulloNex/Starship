@@ -20,7 +20,7 @@ import {
   dropdownMenuRowIconWrapperClassName,
 } from "#/utils/dropdown-classes";
 import { getWorkspacesUnsupportedMessage } from "#/utils/workspaces-compatibility";
-import RepoIcon from "#/icons/repo.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 
 import { FolderBrowserModal } from "#/components/features/home/workspace-dropdown/folder-browser-modal";
 import { ManageWorkspacesModal } from "#/components/features/home/workspace-dropdown/manage-workspaces-modal";
@@ -241,7 +241,12 @@ export function LocalNewConversationMenu({
                     className={dropdownMenuRowIconWrapperClassName}
                     aria-hidden
                   >
-                    <RepoIcon width={14} height={14} />
+                    <StickerFolderIcon
+                      width={14}
+                      height={14}
+                      className="overflow-visible pointer-events-none"
+                      aria-hidden
+                    />
                   </span>
                   <span className="truncate">{w.name}</span>
                 </button>

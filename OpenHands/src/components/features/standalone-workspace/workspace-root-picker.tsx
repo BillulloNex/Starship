@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FolderTree } from "lucide-react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 
 import {
   useWorkspaceRootPresets,
@@ -43,7 +43,7 @@ export function WorkspaceRootPicker() {
         )}
         title={activeRoot || "Select workspace root"}
       >
-        <FolderTree className="h-3.5 w-3.5 shrink-0 text-[var(--oh-accent)]" />
+        <StickerFolderIcon className="h-3.5 w-3.5 shrink-0 overflow-visible" />
         <span className="truncate font-mono">
           {isLoading ? "Loading roots…" : activeRoot || "Select root"}
         </span>
