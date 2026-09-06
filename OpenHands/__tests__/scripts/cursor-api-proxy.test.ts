@@ -49,7 +49,7 @@ describe("cursor-api-proxy model normalization", () => {
     ).toBe("grok-4.6[effort=high,fast=true]");
   });
 
-  it("uses Cursor's default variant, matching native agent acp model ads", () => {
+  it("keeps Cursor's default variant and its fast/normal sibling", () => {
     const models = normalizeCursorModels({
       items: [
         {
@@ -77,6 +77,14 @@ describe("cursor-api-proxy model normalization", () => {
                 { id: "cyber", value: false },
               ],
             },
+            {
+              displayName: "Grok 4.6",
+              params: [
+                { id: "effort", value: "high" },
+                { id: "fast", value: false },
+                { id: "cyber", value: false },
+              ],
+            },
           ],
         },
       ],
@@ -90,6 +98,17 @@ describe("cursor-api-proxy model normalization", () => {
         params: [
           { id: "effort", value: "high" },
           { id: "fast", value: "true" },
+          { id: "cyber", value: "false" },
+        ],
+        isDefault: false,
+      },
+      {
+        id: "grok-4.6[effort=high,fast=false,cyber=false]",
+        baseId: "grok-4.6",
+        label: "Grok 4.6 · High",
+        params: [
+          { id: "effort", value: "high" },
+          { id: "fast", value: "false" },
           { id: "cyber", value: "false" },
         ],
         isDefault: false,

@@ -161,42 +161,77 @@ function variantLabel(item, variant) {
   );
 }
 
+function paramValue(variant, id) {
+  const params = Array.isArray(variant?.params) ? variant.params : [];
+  const match = params.find((param) => param?.id === id);
+  return match == null ? undefined : String(match.value);
+}
+
+function paramsMatchExcept(left, right, ignoredId) {
+  const leftParams = Array.isArray(left?.params) ? left.params : [];
+  const rightParams = Array.isArray(right?.params) ? right.params : [];
+  const ids = new Set(
+    [...leftParams, ...rightParams]
+      .map((param) => param?.id)
+      .filter((id) => id && id !== ignoredId),
+  );
+  for (const id of ids) {
+    if (paramValue(left, id) !== paramValue(right, id)) return false;
+  }
+  return true;
+}
+
+function toModelOption(item, variant, isDefault) {
+  const params = Array.isArray(variant?.params) ? variant.params : [];
+  return {
+    id: formatCursorModelId(item.id, params),
+    baseId: item.id,
+    label:
+      (Array.isArray(item.variants) ? item.variants.length : 0) === 0
+        ? item.displayName || item.id
+        : variantLabel(item, variant),
+    params: params.map((param) => ({
+      id: String(param.id),
+      value: String(param.value),
+    })),
+    isDefault,
+  };
+}
+
+/**
+ * Cursor's /v1/models catalog has many effort×fast permutations. Native ACP
+ * only advertises the default variant, which hid Grok's non-fast "normal"
+ * mode. Keep the default, and also include its fast/non-fast sibling.
+ */
+function selectCursorVariants(item) {
+  const variants = Array.isArray(item.variants) ? item.variants : [];
+  if (variants.length === 0) {
+    return [{ params: [], displayName: item.displayName, isDefault: true }];
+  }
+  const preferred =
+    variants.find((variant) => variant?.isDefault === true) || variants[0];
+  const selected = [preferred];
+  const preferredFast = paramValue(preferred, "fast");
+  if (preferredFast === "true" || preferredFast === "false") {
+    const flipped = preferredFast === "true" ? "false" : "true";
+    const sibling = variants.find(
+      (variant) =>
+        variant !== preferred &&
+        paramValue(variant, "fast") === flipped &&
+        paramsMatchExcept(preferred, variant, "fast"),
+    );
+    if (sibling) selected.push(sibling);
+  }
+  return selected;
+}
+
 export function normalizeCursorModels(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   return items.flatMap((item) => {
     if (!item || typeof item.id !== "string") return [];
-    const variants = Array.isArray(item.variants) ? item.variants : [];
-
-    if (variants.length === 0) {
-      return [
-        {
-          id: formatCursorModelId(item.id, []),
-          baseId: item.id,
-          label: item.displayName || item.id,
-          params: [],
-          isDefault: item.id === "default",
-        },
-      ];
-    }
-
-    const preferred = variants.find((variant) => variant?.isDefault === true) ||
-      variants[0] || {
-        params: [],
-        displayName: item.displayName,
-      };
-    const params = Array.isArray(preferred.params) ? preferred.params : [];
-    return [
-      {
-        id: formatCursorModelId(item.id, params),
-        baseId: item.id,
-        label: variantLabel(item, preferred),
-        params: params.map((param) => ({
-          id: String(param.id),
-          value: String(param.value),
-        })),
-        isDefault: item.id === "default",
-      },
-    ];
+    return selectCursorVariants(item).map((variant, index) =>
+      toModelOption(item, variant, item.id === "default" && index === 0),
+    );
   });
 }
 

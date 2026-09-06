@@ -208,6 +208,13 @@ describe("cursor model catalog used by ACP print-mode", () => {
               { id: "fast", value: true },
             ],
           },
+          {
+            displayName: "Cursor Grok 4.6",
+            params: [
+              { id: "effort", value: "high" },
+              { id: "fast", value: false },
+            ],
+          },
         ],
       },
       {
@@ -241,6 +248,10 @@ describe("cursor model catalog used by ACP print-mode", () => {
       {
         value: "grok-4.6[effort=high,fast=true]",
         name: "Cursor Grok 4.6 · High · Fast",
+      },
+      {
+        value: "grok-4.6[effort=high,fast=false]",
+        name: "Cursor Grok 4.6 · High",
       },
       { value: "claude-4.6-opus-high[]", name: "Claude 4.6 Opus" },
     ]);
