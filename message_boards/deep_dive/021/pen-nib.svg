@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Blue pen nib</title>
+  <desc>Editable vector recreation from the supplied screenshot, with a blue sticker border and rounded black outlines.</desc>
+  <path d="M24 15C18 13 14 17 15 24C19 45 24 72 36 85C46 96 61 101 75 99L90 113L113 89L99 74C100 58 95 44 82 35C68 26 43 19 24 15Z" fill="#7893FF" stroke="#7893FF" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 15C18 13 14 17 15 24C19 45 24 72 36 85C46 96 61 101 75 99L90 113L113 89L99 74C100 58 95 44 82 35C68 26 43 19 24 15Z" fill="#7893FF" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 19L56 55" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="63" r="10.5" fill="#7893FF" stroke="#000" stroke-width="6"/>
+</svg>

@@ -1,15 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Columns3,
-  FolderTree,
-  Plus,
-  Server,
-  Settings,
-  SquareTerminal,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Server, Settings } from "lucide-react";
 import { OpenHandsLogoButton } from "#/components/shared/buttons/openhands-logo-button";
 import { NavigationLink } from "#/components/shared/navigation-link";
 import {
@@ -31,6 +22,10 @@ import {
   useSupportsStandaloneTerminal,
 } from "#/hooks/use-standalone-workspace-runtime";
 import AutomationsIcon from "#/icons/automations.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
+import StickerHandIcon from "#/icons/sticker-hand.svg?react";
+import StickerStarIcon from "#/icons/sticker-star.svg?react";
+import StickerTerminalIcon from "#/icons/sticker-terminal.svg?react";
 import {
   SIDEBAR_COLLAPSE_TOGGLE_OVERLAY_CLASS,
   SIDEBAR_COLLAPSED_LOGO_WRAPPER_CLASS,
@@ -43,10 +38,8 @@ import {
 } from "./sidebar-layout";
 
 const ICON_SIZE = 18;
-const SIDEBAR_LOGO_WIDTH = 26;
-const SIDEBAR_LOGO_HEIGHT = Math.round(
-  (SIDEBAR_LOGO_WIDTH * 157.8125) / 166.77734375,
-);
+const SIDEBAR_LOGO_SIZE = 26;
+const STICKER_ICON_CLASS = "overflow-visible";
 
 export interface SidebarRailBodyProps {
   collapsed: boolean;
@@ -112,9 +105,9 @@ export function SidebarRailBody({
             )}
           >
             <OpenHandsLogoButton
-              logoWidth={SIDEBAR_LOGO_WIDTH}
-              logoHeight={SIDEBAR_LOGO_HEIGHT}
-              logoClassName="max-w-none"
+              logoWidth={SIDEBAR_LOGO_SIZE}
+              logoHeight={SIDEBAR_LOGO_SIZE}
+              logoClassName="max-w-none overflow-visible"
               className={cn(SIDEBAR_ICON_SLOT_CLASS, "overflow-visible")}
             />
             {!collapsed ? <GrokbotVersionBadge /> : null}
@@ -177,7 +170,13 @@ export function SidebarRailBody({
           label={t(I18nKey.SIDEBAR$NEW_CHAT)}
           testId="sidebar-conversations-link"
           collapsed={collapsed}
-          icon={<Plus width={ICON_SIZE} height={ICON_SIZE} />}
+          icon={
+            <StickerStarIcon
+              width={ICON_SIZE}
+              height={ICON_SIZE}
+              className={STICKER_ICON_CLASS}
+            />
+          }
         />
         <SidebarNavLink
           to={automationListPath()}
@@ -186,14 +185,26 @@ export function SidebarRailBody({
           }
           testId="sidebar-automations-link"
           collapsed={collapsed}
-          icon={<AutomationsIcon width={ICON_SIZE} height={ICON_SIZE} />}
+          icon={
+            <AutomationsIcon
+              width={ICON_SIZE}
+              height={ICON_SIZE}
+              className={STICKER_ICON_CLASS}
+            />
+          }
         />
         <SidebarNavLink
           to="/jobs"
           label="Job Board"
           testId="sidebar-jobs-link"
           collapsed={collapsed}
-          icon={<Columns3 width={ICON_SIZE} height={ICON_SIZE} />}
+          icon={
+            <StickerHandIcon
+              width={ICON_SIZE}
+              height={ICON_SIZE}
+              className={STICKER_ICON_CLASS}
+            />
+          }
         />
         {supportsStandaloneFiles ? (
           <SidebarNavLink
@@ -201,7 +212,13 @@ export function SidebarRailBody({
             label={t(I18nKey.COMMON$FILES)}
             testId="sidebar-files-link"
             collapsed={collapsed}
-            icon={<FolderTree width={ICON_SIZE} height={ICON_SIZE} />}
+            icon={
+              <StickerFolderIcon
+                width={ICON_SIZE}
+                height={ICON_SIZE}
+                className={STICKER_ICON_CLASS}
+              />
+            }
           />
         ) : null}
         {supportsStandaloneTerminal ? (
@@ -210,7 +227,13 @@ export function SidebarRailBody({
             label={t(I18nKey.TERMINAL$CONSOLE)}
             testId="sidebar-terminal-link"
             collapsed={collapsed}
-            icon={<SquareTerminal width={ICON_SIZE} height={ICON_SIZE} />}
+            icon={
+              <StickerTerminalIcon
+                width={ICON_SIZE}
+                height={ICON_SIZE}
+                className={STICKER_ICON_CLASS}
+              />
+            }
           />
         ) : null}
       </nav>

@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LayoutGroup } from "framer-motion";
-import { Gauge, Globe, ListTodo, SquareChevronRight } from "lucide-react";
-import DocumentIcon from "#/icons/document.svg?react";
+import { Gauge, Globe } from "lucide-react";
 import DoubleCheckIcon from "#/icons/double-check.svg?react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
+import StickerPenNibIcon from "#/icons/sticker-pen-nib.svg?react";
+import StickerTerminalIcon from "#/icons/sticker-terminal.svg?react";
 import { EllipsisButton } from "#/components/features/conversation-panel/ellipsis-button";
 import { cn } from "#/utils/utils";
 import { useConversationLocalStorageState } from "#/utils/conversation-local-storage";
@@ -85,7 +87,7 @@ export function ConversationTabs({
     {
       tabValue: "files",
       isActive: isTabActive("files"),
-      icon: DocumentIcon,
+      icon: StickerFolderIcon,
       onClick: () => selectTab("files"),
       tooltipContent: t(I18nKey.COMMON$FILES),
       tooltipAriaLabel: t(I18nKey.COMMON$FILES),
@@ -94,7 +96,7 @@ export function ConversationTabs({
     {
       tabValue: "planner",
       isActive: isTabActive("planner"),
-      icon: ListTodo,
+      icon: StickerPenNibIcon,
       onClick: () => selectTab("planner"),
       tooltipContent: t(I18nKey.COMMON$PLANNER),
       tooltipAriaLabel: t(I18nKey.COMMON$PLANNER),
@@ -103,7 +105,7 @@ export function ConversationTabs({
     {
       tabValue: "terminal",
       isActive: isTabActive("terminal"),
-      icon: SquareChevronRight,
+      icon: StickerTerminalIcon,
       onClick: () => selectTab("terminal"),
       tooltipContent: t(I18nKey.COMMON$TERMINAL),
       tooltipAriaLabel: t(I18nKey.COMMON$TERMINAL),

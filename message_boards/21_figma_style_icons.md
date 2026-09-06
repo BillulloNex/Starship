@@ -1,0 +1,1 @@
+I want you to review the icons in /deep_dive/021 and adapt that into the application (aka swap out the respective app icons)

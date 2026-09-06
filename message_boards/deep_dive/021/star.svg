@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Yellow star</title>
+  <desc>A playful five-point star with rounded black outlines, a yellow sticker border, and a transparent background. All artwork is editable vector geometry.</desc>
+  <path d="M64 14L79 45L113 50L88 74L94 108L64 92L34 108L40 74L15 50L49 45Z" fill="#FFDB6E" stroke="#FFDB6E" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 14L79 45L113 50L88 74L94 108L64 92L34 108L40 74L15 50L49 45Z" fill="#FFDB6E" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

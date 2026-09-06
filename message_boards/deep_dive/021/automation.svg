@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Orange automation bolt</title>
+  <desc>A minimal lightning bolt representing automation, with a rounded black outline, an orange sticker border, and a transparent background.</desc>
   <path d="M75 15L27 71H60L51 113L101 55H68L75 15Z" fill="#FF9368" stroke="#FF9368" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M75 15L27 71H60L51 113L101 55H68L75 15Z" fill="#FF9368" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

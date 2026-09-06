@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Columns3 } from "lucide-react";
+import StickerHandIcon from "#/icons/sticker-hand.svg?react";
 import { useNavigate } from "react-router";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useCreateJob } from "#/hooks/query/use-jobs";
@@ -69,7 +69,7 @@ export function HandoffToJobBoardButton() {
           : "inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--oh-border)] px-2 py-0.5 text-[11px] text-[var(--oh-muted)] hover:bg-white/10 hover:text-white disabled:opacity-40"
       }
     >
-      <Columns3 className="size-3" />
+      <StickerHandIcon className="size-3 overflow-visible" />
       {isAnyExhausted ? "Handoff — quota low" : "To Job Board"}
     </button>
   );

@@ -25,7 +25,7 @@ import { cn } from "#/utils/utils";
  */
 export type AgentBrandIconKind = "openhands" | ACPProviderIcon;
 
-const OPENHANDS_LOGO_ASPECT_RATIO = 166.77734375 / 157.8125;
+const OPENHANDS_LOGO_ASPECT_RATIO = 1;
 
 interface AgentBrandIconProps {
   kind: AgentBrandIconKind;
@@ -45,7 +45,7 @@ export function AgentBrandIcon({
       <OpenHandsLogo
         width={Math.round(size * OPENHANDS_LOGO_ASPECT_RATIO)}
         height={size}
-        className={cn("shrink-0 [&_path]:fill-current", className)}
+        className={cn("shrink-0 overflow-visible", className)}
         data-testid={testId ?? "agent-brand-icon-openhands"}
         aria-hidden
       />

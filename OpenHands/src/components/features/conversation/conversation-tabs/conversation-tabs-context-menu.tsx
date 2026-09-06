@@ -10,8 +10,10 @@ import {
   type ConversationTab,
 } from "#/stores/conversation-store";
 import { I18nKey } from "#/i18n/declaration";
-import { Gauge, Globe, ListTodo, SquareChevronRight } from "lucide-react";
-import DocumentIcon from "#/icons/document.svg?react";
+import { Gauge, Globe } from "lucide-react";
+import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
+import StickerPenNibIcon from "#/icons/sticker-pen-nib.svg?react";
+import StickerTerminalIcon from "#/icons/sticker-terminal.svg?react";
 import PillIcon from "#/icons/pill.svg?react";
 import PillFillIcon from "#/icons/pill-fill.svg?react";
 import DoubleCheckIcon from "#/icons/double-check.svg?react";
@@ -92,13 +94,13 @@ export function ConversationTabsContextMenu({
   const tabConfig = [
     {
       tab: "planner",
-      icon: ListTodo,
+      icon: StickerPenNibIcon,
       i18nKey: I18nKey.COMMON$PLANNER,
     },
-    { tab: "files", icon: DocumentIcon, i18nKey: I18nKey.COMMON$FILES },
+    { tab: "files", icon: StickerFolderIcon, i18nKey: I18nKey.COMMON$FILES },
     {
       tab: "terminal",
-      icon: SquareChevronRight,
+      icon: StickerTerminalIcon,
       i18nKey: I18nKey.COMMON$TERMINAL,
     },
     { tab: "browser", icon: Globe, i18nKey: I18nKey.COMMON$BROWSER },
@@ -196,7 +198,7 @@ export function ConversationTabsContextMenu({
                     className={dropdownMenuRowIconWrapperClassName}
                     aria-hidden
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 overflow-visible" />
                   </span>
                   <span className="text-sm">{t(i18nKey)}</span>
                 </button>

@@ -5,7 +5,7 @@ import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
 
 const DEFAULT_LOGO_WIDTH = 32;
-const DEFAULT_LOGO_HEIGHT = 30;
+const DEFAULT_LOGO_HEIGHT = 32;
 
 export type OpenHandsLogoButtonProps = {
   className?: string;
@@ -34,7 +34,7 @@ export function OpenHandsLogoButton({
       <OpenHandsLogo
         width={logoWidth}
         height={logoHeight}
-        className={cn("shrink-0", logoClassName)}
+        className={cn("shrink-0 overflow-visible", logoClassName)}
       />
     </NavigationLink>
   );

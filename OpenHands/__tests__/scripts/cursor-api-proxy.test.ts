@@ -49,7 +49,7 @@ describe("cursor-api-proxy model normalization", () => {
     ).toBe("grok-4.6[effort=high,fast=true]");
   });
 
-  it("uses Cursor's default variant and keeps hidden params out of the label", () => {
+  it("uses Cursor's default variant, matching native agent acp model ads", () => {
     const models = normalizeCursorModels({
       items: [
         {

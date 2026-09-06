@@ -3,7 +3,6 @@ import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Check,
-  Columns3,
   Loader2,
   Play,
   Plus,
@@ -12,6 +11,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import StickerHandIcon from "#/icons/sticker-hand.svg?react";
 import {
   type JobRecord,
   type JobStatus,
@@ -375,8 +375,8 @@ export default function JobsScreen() {
       <div className="mx-auto max-w-[1600px] space-y-6">
         <div className="flex flex-col gap-4 border-b border-[var(--oh-border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400">
-              <Columns3 className="size-5" />
+            <div className="flex size-10 items-center justify-center">
+              <StickerHandIcon className="size-8 overflow-visible" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Job Board</h1>
