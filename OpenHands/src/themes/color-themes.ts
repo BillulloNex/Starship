@@ -23,38 +23,39 @@ export interface ColorThemeDefinition {
   tokens?: Record<string, string>;
 }
 
-// HSL channel strings for the neutral grey palette (H=0, S=0%, L=hex/255*100)
+// HSL channel strings for the Figma-style charcoal palette (H=0, S=0%)
 // prettier-ignore
 const NEUTRAL_HSL = {
-  50:  "0 0% 96.86%", // #F7F7F7
-  100: "0 0% 92.55%", // #ECECEC
-  200: "0 0% 86.27%", // #DCDCDC
-  300: "0 0% 74.51%", // #BEBEBE
-  400: "0 0% 59.22%", // #979797
-  500: "0 0% 45.1%",  // #737373
-  600: "0 0% 33.73%", // #565656
-  700: "0 0% 25.1%",  // #404040
-  800: "0 0% 19.22%", // #313131
-  850: "0 0% 15.69%", // #282828
-  900: "0 0% 12.55%", // #202020
-  950: "0 0% 9.41%",  // #181818
-  975: "0 0% 6.27%",  // #101010
+  50:  "0 0% 98.04%", // #FAFAFA
+  100: "0 0% 96.08%", // #F5F5F5
+  200: "0 0% 90.20%", // #E6E6E6
+  300: "0 0% 69.80%", // #B2B2B2
+  400: "0 0% 54.90%", // #8C8C8C
+  500: "0 0% 43.14%", // #6E6E6E
+  600: "0 0% 33.33%", // #555555
+  700: "0 0% 26.67%", // #444444
+  800: "0 0% 22.75%", // #3A3A3A
+  850: "0 0% 22.35%", // #393939
+  900: "0 0% 21.96%", // #383838
+  925: "0 0% 17.25%", // #2C2C2C
+  950: "0 0% 11.76%", // #1E1E1E
+  975: "0 0% 7.84%",  // #141414
 };
 
 const NEUTRAL_SCALE = {
-  "--cool-grey-50": "#F7F7F7",
-  "--cool-grey-100": "#ECECEC",
-  "--cool-grey-200": "#DCDCDC",
-  "--cool-grey-300": "#BEBEBE",
-  "--cool-grey-400": "#979797",
-  "--cool-grey-500": "#737373",
-  "--cool-grey-600": "#565656",
-  "--cool-grey-700": "#404040",
-  "--cool-grey-800": "#313131",
-  "--cool-grey-900": "#282828",
-  "--cool-grey-925": "#202020",
-  "--cool-grey-950": "#181818",
-  "--cool-grey-975": "#101010",
+  "--cool-grey-50": "#FAFAFA",
+  "--cool-grey-100": "#F5F5F5",
+  "--cool-grey-200": "#E6E6E6",
+  "--cool-grey-300": "#B2B2B2",
+  "--cool-grey-400": "#8C8C8C",
+  "--cool-grey-500": "#6E6E6E",
+  "--cool-grey-600": "#555555",
+  "--cool-grey-700": "#444444",
+  "--cool-grey-800": "#3A3A3A",
+  "--cool-grey-900": "#383838",
+  "--cool-grey-925": "#2C2C2C",
+  "--cool-grey-950": "#1E1E1E",
+  "--cool-grey-975": "#141414",
 };
 
 const NEUTRAL_HEROUI = {
@@ -62,8 +63,8 @@ const NEUTRAL_HEROUI = {
   "--heroui-background-foreground": NEUTRAL_HSL[50],
   "--heroui-foreground-50": NEUTRAL_HSL[975],
   "--heroui-foreground-100": NEUTRAL_HSL[950],
-  "--heroui-foreground-200": NEUTRAL_HSL[900],
-  "--heroui-foreground-300": NEUTRAL_HSL[850],
+  "--heroui-foreground-200": NEUTRAL_HSL[925],
+  "--heroui-foreground-300": NEUTRAL_HSL[900],
   "--heroui-foreground-400": NEUTRAL_HSL[800],
   "--heroui-foreground-500": NEUTRAL_HSL[700],
   "--heroui-foreground-600": NEUTRAL_HSL[600],
@@ -71,9 +72,9 @@ const NEUTRAL_HEROUI = {
   "--heroui-foreground-800": NEUTRAL_HSL[400],
   "--heroui-foreground-900": NEUTRAL_HSL[300],
   "--heroui-foreground": NEUTRAL_HSL[300],
-  "--heroui-content1": NEUTRAL_HSL[900],
+  "--heroui-content1": NEUTRAL_HSL[925],
   "--heroui-content1-foreground": NEUTRAL_HSL[100],
-  "--heroui-content2": NEUTRAL_HSL[850],
+  "--heroui-content2": NEUTRAL_HSL[900],
   "--heroui-content2-foreground": NEUTRAL_HSL[200],
   "--heroui-content3": NEUTRAL_HSL[800],
   "--heroui-content3-foreground": NEUTRAL_HSL[300],
@@ -81,8 +82,8 @@ const NEUTRAL_HEROUI = {
   "--heroui-content4-foreground": NEUTRAL_HSL[400],
   "--heroui-default-50": NEUTRAL_HSL[975],
   "--heroui-default-100": NEUTRAL_HSL[950],
-  "--heroui-default-200": NEUTRAL_HSL[900],
-  "--heroui-default-300": NEUTRAL_HSL[850],
+  "--heroui-default-200": NEUTRAL_HSL[925],
+  "--heroui-default-300": NEUTRAL_HSL[900],
   "--heroui-default-400": NEUTRAL_HSL[800],
   "--heroui-default-500": NEUTRAL_HSL[700],
   "--heroui-default-600": NEUTRAL_HSL[600],
@@ -285,7 +286,7 @@ const GITHUB_DARK_SCALE: ThemeScale = {
 export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
   "openhands-neutral": {
     label: "OpenHands Neutral",
-    description: "Balanced neutral dark with high-clarity greys",
+    description: "Figma-style charcoal dark with candy sticker accents",
     scale: NEUTRAL_SCALE,
     heroui: NEUTRAL_HEROUI,
     tokens: STICKER_BRAND_TOKENS,

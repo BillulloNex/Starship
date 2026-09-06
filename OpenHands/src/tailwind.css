@@ -153,7 +153,7 @@
   --oh-border-subtle: var(
     --cool-grey-800
   ); /* within-panel separators, list dividers */
-  --oh-separator: rgba(113, 120, 136, 0.5);
+  --oh-separator: rgba(255, 255, 255, 0.1);
   --oh-focus: var(--oh-sticker-agent);
   --oh-status-success: var(--oh-sticker-starship);
   --oh-status-error: var(--oh-sticker-automation);

@@ -43,6 +43,14 @@ describe("color-themes engine", () => {
     expect(readPersistedColorTheme()).toBe(DEFAULT_COLOR_THEME);
   });
 
+  it("uses Figma charcoal stops for the default Neutral theme", () => {
+    const scale = getThemeDefinition("openhands-neutral").scale;
+    expect(scale["--cool-grey-950"]).toBe("#1E1E1E");
+    expect(scale["--cool-grey-925"]).toBe("#2C2C2C");
+    expect(scale["--cool-grey-900"]).toBe("#383838");
+    expect(scale["--cool-grey-700"]).toBe("#444444");
+  });
+
   it("resolves definitions with accurate scale and tokens", () => {
     const tokyoDef = getThemeDefinition("tokyo-night");
     expect(tokyoDef.label).toBe("Tokyo Night");
