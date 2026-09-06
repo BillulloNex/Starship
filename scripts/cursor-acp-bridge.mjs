@@ -2,17 +2,17 @@
 /**
  * Cursor ACP adapter for Starship.
  *
- * Native path (default): spawn Cursor's documented ACP server (`agent acp`)
- * and rewrite its session config options to the Agent Client Protocol shape
- * that OpenHands' Pydantic `NewSessionResponse` validates.
+ * Cursor CLI 2026.09.x `agent acp` still fails prompts with
+ * `RetriableError: [internal] Failed to run step, exceeded max retries`
+ * even in an empty workspace. Verified against `agent -p`, which succeeds
+ * with the same API key and parameterized model id.
  *
- * Cursor advertises select choices as `{id, name}`. ACP (and the OpenHands
- * SDK) require `{value, name}`:
- * https://agentclientprotocol.com/protocol/v2/session-config-options
+ * Default (`CURSOR_ACP_MODE=print`): ACP JSON-RPC on stdio, execute turns
+ * with `agent -p --trust -f --model <exact-id>`. Model ads come from
+ * Cursor's `/v1/models` catalog in the ACP `{value, name}` shape.
  *
- * Print-mode fallback (`CURSOR_ACP_MODE=print`): `agent -p` JSON-RPC shim
- * used only if native ACP is unavailable. Model ids still come from
- * Cursor's `/v1/models` catalog and keep the parameterized ACP form.
+ * Optional (`CURSOR_ACP_MODE=native`): spawn documented `agent acp` and
+ * rewrite `{id, name}` select options to `{value, name}` for OpenHands.
  */
 
 import * as child_process from "node:child_process";
@@ -25,7 +25,13 @@ const AGENT_BIN = process.env.CURSOR_AGENT_BIN || "agent";
 const CURSOR_KEY = process.env.CURSOR_API_KEY || "";
 const CURSOR_API_BASE_URL =
   process.env.CURSOR_API_BASE_URL || "https://api.cursor.com";
-const ACP_MODE = (process.env.CURSOR_ACP_MODE || "native").toLowerCase();
+export function resolveCursorAcpMode(raw = process.env.CURSOR_ACP_MODE) {
+  const mode = String(raw || "print").toLowerCase();
+  if (mode === "native" || mode === "acp") return "native";
+  return "print";
+}
+
+const ACP_MODE = resolveCursorAcpMode();
 
 const debug = (...args) =>
   process.stderr.write(`[cursor-acp-bridge] ${args.join(" ")}\n`);
@@ -300,21 +306,32 @@ async function handleNewSession(id, params) {
   sendResult(id, result);
 }
 
+function applySelectedModel(value) {
+  if (typeof value !== "string" || !value.trim()) return currentModel;
+  currentModel = value.trim();
+  if (cachedConfigOptions?.[0]) {
+    cachedConfigOptions = [
+      { ...cachedConfigOptions[0], currentValue: currentModel },
+    ];
+  }
+  debug(`Model set to: ${currentModel}`);
+  return currentModel;
+}
+
 function handleSetConfigOption(id, params) {
   const configId = params?.configId || params?.id;
   if (configId === "model") {
-    currentModel = params.value || null;
-    if (cachedConfigOptions?.[0]) {
-      cachedConfigOptions = [
-        { ...cachedConfigOptions[0], currentValue: currentModel },
-      ];
-    }
-    debug(`Model set to: ${currentModel}`);
+    applySelectedModel(params.value);
   }
   sendResult(
     id,
     cachedConfigOptions ? { configOptions: cachedConfigOptions } : {},
   );
+}
+
+function handleSetModel(id, params) {
+  applySelectedModel(params?.modelId || params?.model || params?.value);
+  sendResult(id, {});
 }
 
 function handleSetMode(id, params) {
@@ -464,6 +481,9 @@ async function handlePrintModeMessage(msg) {
     case "session/set_config_option":
       handleSetConfigOption(id, params);
       break;
+    case "session/set_model":
+      handleSetModel(id, params);
+      break;
     case "session/set_mode":
       handleSetMode(id, params);
       break;
@@ -485,7 +505,7 @@ async function handlePrintModeMessage(msg) {
 }
 
 function startPrintMode() {
-  debug("Starting Cursor ACP print-mode fallback (agent -p)");
+  debug("Starting Cursor ACP print mode (agent -p); native agent acp hits RetriableError");
   if (!CURSOR_KEY) debug("WARNING: CURSOR_API_KEY not set");
 
   const rl = readline.createInterface({
@@ -582,11 +602,11 @@ function main() {
   process.on("SIGTERM", () => process.exit(0));
   process.on("SIGINT", () => process.exit(0));
 
-  if (ACP_MODE === "print" || ACP_MODE === "print-mode") {
-    startPrintMode();
+  if (ACP_MODE === "native") {
+    startNativeMode();
     return;
   }
-  startNativeMode();
+  startPrintMode();
 }
 
 const isMain =

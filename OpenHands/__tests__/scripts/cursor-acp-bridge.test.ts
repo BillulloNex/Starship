@@ -7,6 +7,7 @@ import {
   nativeAgentAcpArgs,
   normalizeAcpSelectOption,
   normalizeCursorModels,
+  resolveCursorAcpMode,
   rewriteCursorAcpMessage,
   rewriteCursorAcpStdoutLine,
 } from "../../../scripts/cursor-acp-bridge.mjs";
@@ -119,6 +120,13 @@ describe("cursor ACP schema adapter", () => {
       "key-123",
       "acp",
     ]);
+  });
+
+  it("defaults to print mode because native agent acp still hits RetriableError", () => {
+    expect(resolveCursorAcpMode(undefined)).toBe("print");
+    expect(resolveCursorAcpMode("")).toBe("print");
+    expect(resolveCursorAcpMode("print")).toBe("print");
+    expect(resolveCursorAcpMode("native")).toBe("native");
   });
 
   it("is a no-op when Cursor already speaks ACP {value, name}", () => {

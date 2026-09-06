@@ -4,11 +4,9 @@ set +x
 
 # Cursor ACP Auth Wrapper for Starship
 #
-# Resolves the API key, then runs Cursor's native ACP server (`agent acp`)
-# through cursor-acp-bridge.mjs, which remaps Cursor's `{id, name}` select
-# options to ACP `{value, name}` so OpenHands can validate NewSessionResponse.
-#
-# Fallback: CURSOR_ACP_MODE=print uses `agent -p` instead of native ACP.
+# Resolves the API key, then runs cursor-acp-bridge.mjs.
+# Default is print mode (`agent -p`) because native `agent acp` still
+# returns RetriableError on prompts. Set CURSOR_ACP_MODE=native to try ACP.
 
 CURSOR_KEY="${CURSOR_API_KEY:-}"
 if [ -z "$CURSOR_KEY" ]; then
