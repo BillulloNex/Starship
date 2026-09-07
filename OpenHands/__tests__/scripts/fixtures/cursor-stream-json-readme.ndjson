@@ -1,0 +1,19 @@
+# Fixture: Cursor CLI `agent -p --output-format stream-json --stream-partial-output`
+# Source: Cursor CLI docs (2026.09) plus synthetic partial/flush/thinking/unknown-tool lines.
+# Event types: system, user, assistant (partial + duplicate flushes), tool_call, thinking, result.
+# thinking: included only to lock the mapper; print mode is documented to suppress it.
+{"type":"system","subtype":"init","apiKeySource":"env","cwd":"/tmp/cursor-acp-fixture","session_id":"sess-fixture","model":"Composer","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Read README.md and reply OK"}]},"session_id":"sess-fixture"}
+{"type":"thinking","text":"I should read the file first.","session_id":"sess-fixture"}
+{"type":"assistant","timestamp_ms":1000,"message":{"role":"assistant","content":[{"type":"text","text":"I'll read"}]},"session_id":"sess-fixture"}
+{"type":"assistant","timestamp_ms":1001,"message":{"role":"assistant","content":[{"type":"text","text":" README.md"}]},"session_id":"sess-fixture"}
+{"type":"assistant","timestamp_ms":1002,"model_call_id":"call-pre-tool","message":{"role":"assistant","content":[{"type":"text","text":"I'll read README.md"}]},"session_id":"sess-fixture"}
+{"type":"tool_call","subtype":"started","call_id":"toolu_read_1","tool_call":{"readToolCall":{"args":{"path":"README.md"}}},"session_id":"sess-fixture"}
+{"type":"tool_call","subtype":"completed","call_id":"toolu_read_1","tool_call":{"readToolCall":{"args":{"path":"README.md"},"result":{"success":{"content":"hello fixture\n","isEmpty":false,"exceededLimit":false,"totalLines":1,"totalChars":14}}}},"session_id":"sess-fixture"}
+{"type":"tool_call","subtype":"started","call_id":"toolu_shell_1","tool_call":{"shellToolCall":{"args":{"command":"ls"}}},"session_id":"sess-fixture"}
+{"type":"tool_call","subtype":"completed","call_id":"toolu_shell_1","tool_call":{"shellToolCall":{"args":{"command":"ls"},"result":{"success":{"output":"README.md\n"}}}}}
+{"type":"tool_call","subtype":"started","call_id":"toolu_fn_1","tool_call":{"function":{"name":"mystery_tool","arguments":"{\"x\":1}"}}}
+{"type":"tool_call","subtype":"completed","call_id":"toolu_fn_1","tool_call":{"weirdToolCall":{"args":{"foo":"bar"},"result":{"success":{"ok":true}}}}}
+{"type":"assistant","timestamp_ms":2000,"message":{"role":"assistant","content":[{"type":"text","text":"OK"}]},"session_id":"sess-fixture"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll read README.mdOK"}]},"session_id":"sess-fixture"}
+{"type":"result","subtype":"success","duration_ms":1234,"duration_api_ms":1234,"is_error":false,"result":"I'll read README.mdOK","session_id":"sess-fixture","request_id":"req-fixture"}

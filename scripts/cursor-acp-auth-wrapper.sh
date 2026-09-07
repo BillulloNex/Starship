@@ -5,8 +5,9 @@ set +x
 # Cursor ACP Auth Wrapper for Starship
 #
 # Resolves the API key, then runs cursor-acp-bridge.mjs.
-# Default is print mode (`agent -p`) because native `agent acp` still
-# returns RetriableError on prompts. Set CURSOR_ACP_MODE=native to try ACP.
+# Default is print mode (`agent -p --output-format stream-json`) because
+# native `agent acp` still returns RetriableError on prompts.
+# Set CURSOR_ACP_MODE=native to try ACP.
 
 CURSOR_KEY="${CURSOR_API_KEY:-}"
 if [ -z "$CURSOR_KEY" ]; then

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   buildModelConfigOptions,
@@ -19,7 +22,19 @@ import {
   resolvePrintMaxMs,
   sanitizeErrorSnippet,
 } from "../../../scripts/cursor-acp-bridge.mjs";
+import {
+  createCursorStreamJsonState,
+  cursorPrintAgentArgs,
+  mapCursorStreamJsonEvent,
+  mapCursorStreamJsonLine,
+  truncateAcpPayload,
+} from "../../../scripts/cursor-stream-json-to-acp.mjs";
 import { normalizeCursorModels as proxyNormalizeCursorModels } from "../../scripts/cursor-api-proxy.mjs";
+
+const FIXTURE_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "fixtures/cursor-stream-json-readme.ndjson",
+);
 
 const CURSOR_SESSION_NEW_FIXTURE = {
   jsonrpc: "2.0",
@@ -171,7 +186,7 @@ describe("cursor ACP schema adapter", () => {
       },
     };
     const rewritten = rewriteCursorAcpMessage(native);
-    expect(rewritten.result.configOptions[1].options.map((o) => o.value)).toEqual(
+    expect(rewritten.result.configOptions[1].options.map((o: { value: string }) => o.value)).toEqual(
       [
         "default[]",
         "grok-4.6[effort=high,fast=true]",
@@ -373,7 +388,7 @@ describe("cursor ACP print timeout & dual-timer configuration", () => {
       expect(result.idleElapsedMs).toBe(50000);
     });
 
-    it("does not idle-timeout a silent json turn before the max ceiling", () => {
+    it("does not idle-timeout a silent stream start before the max ceiling", () => {
       const startedAt = 0;
       const lastActivityAt = 0;
       const now = 300000;
@@ -456,5 +471,160 @@ describe("cursor ACP print timeout & dual-timer configuration", () => {
       expect(result.timedOut).toBe(true);
       expect(result.reason).toBe("max");
     });
+
+    it("treats each stdout NDJSON line as activity that resets idle", () => {
+      const startedAt = 0;
+      const lastActivityAt = 290000;
+      const now = 310000;
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: true,
+      });
+      expect(result.timedOut).toBe(false);
+    });
+  });
+});
+
+describe("cursor stream-json to ACP mapper", () => {
+  it("uses stream-json with partial output for print-mode agent args", () => {
+    expect(cursorPrintAgentArgs("grok-4.6[fast=true]")).toEqual([
+      "-p",
+      "--trust",
+      "-f",
+      "--output-format",
+      "stream-json",
+      "--stream-partial-output",
+      "--model",
+      "grok-4.6[fast=true]",
+    ]);
+  });
+
+  it("maps the documented fixture without duplicating assistant text or result", () => {
+    const state = createCursorStreamJsonState();
+    const updates: Array<{
+      sessionUpdate: string;
+      content?: { type: string; text: string };
+      toolCallId?: string;
+      kind?: string;
+      title?: string;
+      status?: string;
+      rawInput?: unknown;
+      rawOutput?: unknown;
+    }> = [];
+    for (const line of readFileSync(FIXTURE_PATH, "utf8").split("\n")) {
+      if (!line.trim() || line.startsWith("#")) continue;
+      updates.push(
+        ...(mapCursorStreamJsonLine(line, state).updates as typeof updates),
+      );
+    }
+
+    expect(updates.map((update) => update.sessionUpdate)).toEqual([
+      "agent_thought_chunk",
+      "agent_message_chunk",
+      "agent_message_chunk",
+      "tool_call",
+      "tool_call_update",
+      "tool_call",
+      "tool_call_update",
+      "tool_call",
+      "tool_call_update",
+      "agent_message_chunk",
+    ]);
+    expect(
+      updates
+        .filter((update) => update.sessionUpdate === "agent_message_chunk")
+        .map((update) => update.content?.text ?? "")
+        .join(""),
+    ).toBe("I'll read README.mdOK");
+    expect(state.emittedAssistant).toBe(true);
+    expect(state.sawSuccessResult).toBe(true);
+    expect(state.isError).toBe(false);
+    expect(state.resultText).toBe("I'll read README.mdOK");
+
+    expect(updates[3]).toMatchObject({
+      sessionUpdate: "tool_call",
+      toolCallId: "toolu_read_1",
+      kind: "read",
+      title: "README.md",
+      status: "in_progress",
+      rawInput: { path: "README.md" },
+    });
+    expect(updates[4]).toMatchObject({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "toolu_read_1",
+      status: "completed",
+    });
+    expect(updates[5]).toMatchObject({
+      kind: "execute",
+      title: "ls",
+      status: "in_progress",
+    });
+    expect(updates[7]).toMatchObject({
+      kind: "other",
+      title: "mystery_tool",
+    });
+    expect(updates[8]).toMatchObject({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "toolu_fn_1",
+      status: "completed",
+    });
+  });
+
+  it("emits legacy complete assistant messages when no partial timestamps exist", () => {
+    const state = createCursorStreamJsonState();
+    const { updates } = mapCursorStreamJsonEvent(
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+      state,
+    );
+    expect(updates).toEqual([
+      {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Hello" },
+      },
+    ]);
+  });
+
+  it("maps failed tool results and ignores unknown event types", () => {
+    const state = createCursorStreamJsonState();
+    expect(
+      mapCursorStreamJsonEvent({ type: "progress", percent: 10 }, state).updates,
+    ).toEqual([]);
+    const failed = mapCursorStreamJsonEvent(
+      {
+        type: "tool_call",
+        subtype: "completed",
+        call_id: "t-fail",
+        tool_call: {
+          fetchToolCall: {
+            args: { url: "https://example.com" },
+            result: { error: "timeout" },
+          },
+        },
+      },
+      state,
+    );
+    expect(failed.updates[0]).toMatchObject({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "t-fail",
+      status: "failed",
+      rawOutput: "timeout",
+    });
+  });
+
+  it("truncates huge tool output", () => {
+    const truncated = truncateAcpPayload("x".repeat(9000));
+    expect(truncated.endsWith("…")).toBe(true);
+    expect(truncated.length).toBe(8001);
   });
 });

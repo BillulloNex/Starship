@@ -6,7 +6,8 @@ export type PresetThemeKey =
   | "vesper"
   | "gruvbox-dark"
   | "rose-pine"
-  | "github-dark";
+  | "github-dark"
+  | "emmiwu";
 
 export type ColorThemeKey = PresetThemeKey;
 
@@ -283,6 +284,22 @@ const GITHUB_DARK_SCALE: ThemeScale = {
   975: "#010409",
 };
 
+const EMMIWU_SCALE: ThemeScale = {
+  50:  "#FFFDF5",
+  100: "#F5F3EB",
+  200: "#E8E5DC",
+  300: "#B5B0A8",
+  400: "#8A8580",
+  500: "#6B6560",
+  600: "#4E4A45",
+  700: "#3A3640",
+  800: "#2A2535",
+  900: "#1E1A2E",
+  925: "#171328",
+  950: "#100D20",
+  975: "#0A0818",
+};
+
 export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
   "openhands-neutral": {
     label: "OpenHands Neutral",
@@ -418,6 +435,18 @@ export const COLOR_THEMES: Record<PresetThemeKey, ColorThemeDefinition> = {
       "--oh-warning": "#D29922",
     },
   },
+
+  emmiwu: {
+    label: "Emmi Wu",
+    description: "Electric indigo canvas with warm cream and chartreuse pops",
+    scale: createThemeScale(EMMIWU_SCALE),
+    heroui: createHeroUITheme(EMMIWU_SCALE),
+    tokens: {
+      "--oh-color-primary": "#5B54F0",
+      "--oh-accent": "#D4F060",
+      "--oh-warning": "#FF8EC0",
+    },
+  },
 };
 
 export const DEFAULT_COLOR_THEME: PresetThemeKey = "openhands-neutral";
@@ -519,6 +548,9 @@ export function applyColorTheme(key: ColorThemeKey): void {
   }
   styleEl.textContent = css;
   document.head.appendChild(styleEl);
+
+  // Set data-color-theme on <html> so per-theme CSS (e.g. font overrides) can scope.
+  document.documentElement.setAttribute("data-color-theme", key);
 
   syncColorThemeTokensOnScopeRoots(tokens);
 }

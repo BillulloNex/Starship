@@ -8,8 +8,9 @@
  * with the same API key and parameterized model id.
  *
  * Default (`CURSOR_ACP_MODE=print`): ACP JSON-RPC on stdio, execute turns
- * with `agent -p --trust -f --model <exact-id>`. Model ads come from
- * Cursor's `/v1/models` catalog in the ACP `{value, name}` shape.
+ * with `agent -p --trust -f --output-format stream-json --stream-partial-output`.
+ * Stream-json events are mapped to ACP `session/update` (tools + text).
+ * Model ads come from Cursor's `/v1/models` catalog in the ACP `{value, name}` shape.
  *
  * Optional (`CURSOR_ACP_MODE=native`): spawn documented `agent acp` and
  * rewrite `{id, name}` select options to `{value, name}` for OpenHands.
@@ -20,6 +21,11 @@ import * as readline from "node:readline";
 import * as crypto from "node:crypto";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  createCursorStreamJsonState,
+  cursorPrintAgentArgs,
+  mapCursorStreamJsonLine,
+} from "./cursor-stream-json-to-acp.mjs";
 
 const AGENT_BIN = process.env.CURSOR_AGENT_BIN || "agent";
 const CURSOR_KEY = process.env.CURSOR_API_KEY || "";
@@ -95,8 +101,9 @@ export function evaluatePrintTimeout({
 }) {
   const elapsedMs = now - startedAt;
   const idleElapsedMs = now - lastActivityAt;
-  // `--output-format json` often stays silent until the turn ends. Treat a
-  // process with zero stdout/stderr as still running until the max ceiling.
+  // Stream-json usually emits a system/init line quickly, then may sit in
+  // prefill. Treat a process with zero stdout/stderr as still running until
+  // the max ceiling so we do not idle-kill a silent start.
   if (elapsedMs >= maxMs) {
     return { timedOut: true, reason: "max", elapsedMs, idleElapsedMs };
   }
@@ -488,14 +495,21 @@ async function handlePrompt(id, params) {
   });
 
   try {
-    const result = await callAgentPrint(userText, sessionCwd);
-    sendNotification("session/update", {
-      sessionId: sid,
-      update: {
-        sessionUpdate: "agent_message_chunk",
-        content: { type: "text", text: result.text },
-      },
+    const result = await callAgentPrint(userText, sessionCwd, (update) => {
+      sendNotification("session/update", {
+        sessionId: sid,
+        update,
+      });
     });
+    if (!result.emittedAssistant && result.resultText) {
+      sendNotification("session/update", {
+        sessionId: sid,
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: result.resultText },
+        },
+      });
+    }
     sendResult(id, { stopReason: "end_turn" });
   } catch (err) {
     debug(`Error calling agent -p: ${err.message}`);
@@ -510,18 +524,14 @@ async function handlePrompt(id, params) {
   }
 }
 
-function callAgentPrint(text, cwd) {
+function callAgentPrint(text, cwd, onUpdate = () => {}) {
   return new Promise((resolve, reject) => {
     const idleMs = resolvePrintIdleMs();
     const maxMs = resolvePrintMaxMs(undefined, idleMs);
-    const args = ["-p", "--trust", "-f", "--output-format", "json"];
-    if (currentModel) {
-      args.push("--model", currentModel);
-    }
-    args.push(text);
+    const args = [...cursorPrintAgentArgs(currentModel), text];
 
     debug(
-      `Spawning: ${AGENT_BIN} ${args.slice(0, 6).join(" ")}… (idleLimit=${Math.round(idleMs / 1000)}s, maxLimit=${Math.round(maxMs / 1000)}s)`,
+      `Spawning: ${AGENT_BIN} ${args.slice(0, 8).join(" ")}… (idleLimit=${Math.round(idleMs / 1000)}s, maxLimit=${Math.round(maxMs / 1000)}s)`,
     );
 
     const proc = child_process.spawn(AGENT_BIN, args, {
@@ -537,62 +547,28 @@ function callAgentPrint(text, cwd) {
       proc.stdin.end();
     }
 
-    let stdout = "";
+    let stdoutBytes = 0;
     let stderr = "";
     const startedAt = Date.now();
     let lastActivityAt = startedAt;
+    const streamState = createCursorStreamJsonState();
 
-    const debugAgentPrint = (hypothesisId, message, data) => {
-      // #region agent log
-      fetch("http://127.0.0.1:7465/ingest/cb8891d5-060d-4344-898b-0c8f526eb385", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "c8530c",
-        },
-        body: JSON.stringify({
-          sessionId: "c8530c",
-          runId: "cursor-acp-timeout",
-          hypothesisId,
-          location: "scripts/cursor-acp-bridge.mjs:callAgentPrint",
-          message,
-          data,
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      debug(
-        `${message} ${JSON.stringify({ hypothesisId, ...data })}`,
-      );
-    };
-    debugAgentPrint("A", "agent -p spawned", {
-      pid: proc.pid ?? null,
-      cwd,
-      model: currentModel || "default",
-      promptChars: String(text || "").length,
-      stdinEnded: true,
-      hasApiKey: Boolean(CURSOR_KEY),
-      idleMs,
-      maxMs,
+    const stdoutRl = readline.createInterface({
+      input: proc.stdout,
+      crlfDelay: Infinity,
     });
-
-    proc.stdout.on("data", (chunk) => {
+    stdoutRl.on("line", (line) => {
       lastActivityAt = Date.now();
-      stdout += chunk.toString();
-      debugAgentPrint("B", "agent -p stdout chunk", {
-        elapsedMs: Date.now() - startedAt,
-        stdoutChars: stdout.length,
-        chunkChars: chunk.length,
-      });
+      stdoutBytes += Buffer.byteLength(line, "utf8") + 1;
+      const { updates } = mapCursorStreamJsonLine(line, streamState);
+      for (const update of updates) {
+        onUpdate(update);
+      }
     });
+
     proc.stderr.on("data", (chunk) => {
       lastActivityAt = Date.now();
       stderr += chunk.toString();
-      debugAgentPrint("C", "agent -p stderr chunk", {
-        elapsedMs: Date.now() - startedAt,
-        stderrChars: stderr.length,
-        chunkPreview: chunk.toString().slice(0, 160),
-      });
     });
 
     let timedOut = false;
@@ -604,7 +580,7 @@ function callAgentPrint(text, cwd) {
         now,
         idleMs,
         maxMs,
-        hadActivity: stdout.length > 0 || stderr.length > 0,
+        hadActivity: stdoutBytes > 0 || stderr.length > 0,
       });
 
       if (timeoutStatus.timedOut) {
@@ -619,19 +595,21 @@ function callAgentPrint(text, cwd) {
           elapsedMs: timeoutStatus.elapsedMs,
           idleMs,
           maxMs,
-          stdoutBytes: Buffer.byteLength(stdout, "utf8"),
+          stdoutBytes,
           stderrBytes: Buffer.byteLength(stderr, "utf8"),
           stderrSnippet: snippet,
         });
-        debugAgentPrint("A", `agent -p ${timeoutStatus.reason} timeout killing process`, {
-          elapsedMs: timeoutStatus.elapsedMs,
-          idleElapsedMs: timeoutStatus.idleElapsedMs,
-          pid: proc.pid ?? null,
-          stdoutChars: stdout.length,
-          stderrChars: stderr.length,
-          exitCode: proc.exitCode,
-          killed: proc.killed,
-        });
+        debug(
+          `agent -p ${timeoutStatus.reason} timeout killing process ${JSON.stringify(
+            {
+              elapsedMs: timeoutStatus.elapsedMs,
+              idleElapsedMs: timeoutStatus.idleElapsedMs,
+              pid: proc.pid ?? null,
+              stdoutBytes,
+              stderrChars: stderr.length,
+            },
+          )}`,
+        );
         proc.kill("SIGTERM");
         reject(new Error(errMessage));
       }
@@ -646,13 +624,18 @@ function callAgentPrint(text, cwd) {
 
     proc.on("close", (code) => {
       stopTimer();
+      stdoutRl.close();
       if (timedOut) return;
-      debugAgentPrint("D", "agent -p process closed", {
-        elapsedMs: Date.now() - startedAt,
-        code,
-        stdoutChars: stdout.length,
-        stderrChars: stderr.length,
-      });
+      debug(
+        `agent -p closed ${JSON.stringify({
+          elapsedMs: Date.now() - startedAt,
+          code,
+          stdoutBytes,
+          stderrChars: stderr.length,
+          emittedAssistant: streamState.emittedAssistant,
+          sawSuccessResult: streamState.sawSuccessResult,
+        })}`,
+      );
       if (code !== 0) {
         debug(
           `agent -p exited with code ${code}. stderr: ${stderr.slice(0, 200)}`,
@@ -662,20 +645,14 @@ function callAgentPrint(text, cwd) {
         );
         return;
       }
-      try {
-        const parsed = JSON.parse(stdout.trim());
-        if (parsed.is_error) {
-          reject(new Error(parsed.result || "Unknown error from agent -p"));
-          return;
-        }
-        resolve({
-          text: parsed.result || "",
-          usage: parsed.usage || {},
-          sessionId: parsed.session_id,
-        });
-      } catch {
-        resolve({ text: stdout.trim(), usage: {} });
+      if (streamState.isError) {
+        reject(new Error(streamState.errorMessage || "Unknown error from agent -p"));
+        return;
       }
+      resolve({
+        emittedAssistant: streamState.emittedAssistant,
+        resultText: streamState.resultText || "",
+      });
     });
 
     proc.on("error", (err) => {

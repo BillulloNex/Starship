@@ -1,5 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Spline+Sans+Mono:wght@400;500;600&display=swap");
 @import "./styles/agent-phase-glow.css";
 
 :root {
@@ -148,4 +150,22 @@ code {
 
 .environment-switch-overlay > div {
   animation: environment-switch-overlay-fade 980ms ease-in-out forwards;
+}
+
+/* ── Emmi Wu theme: geometric sans + geometric monospace font pairing ── */
+[data-color-theme="emmiwu"] body {
+  font-family:
+    "DM Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    "Roboto",
+    sans-serif;
+}
+
+[data-color-theme="emmiwu"] code {
+  font-family:
+    "Spline Sans Mono", source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
 }

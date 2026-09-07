@@ -15,7 +15,7 @@ describe("color-themes engine", () => {
     if (existing) existing.remove();
   });
 
-  it("exports all 8 WCAG AAA Golden Standard themes", () => {
+  it("exports all 9 WCAG AAA Golden Standard themes", () => {
     const keys = AVAILABLE_COLOR_THEMES.map((t) => t.key);
     expect(keys).toEqual([
       "openhands-neutral",
@@ -26,6 +26,7 @@ describe("color-themes engine", () => {
       "gruvbox-dark",
       "rose-pine",
       "github-dark",
+      "emmiwu",
     ]);
   });
 
