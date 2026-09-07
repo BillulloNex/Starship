@@ -2,8 +2,6 @@ import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { isArchivedSandboxStatus } from "#/utils/conversation-archive-status";
 import { ConversationCardTitle } from "./conversation-card-title";
-import { ConversationStatusDot } from "../conversation-status-dot";
-
 interface ConversationCardHeaderProps {
   title: string;
   titleMode: "view" | "edit";
@@ -16,7 +14,6 @@ export function ConversationCardHeader({
   title,
   titleMode,
   onTitleSave,
-  executionStatus,
   sandboxStatus,
 }: ConversationCardHeaderProps) {
   const isArchived = isArchivedSandboxStatus(sandboxStatus);
@@ -28,13 +25,6 @@ export function ConversationCardHeader({
         onSave={onTitleSave}
         isConversationArchived={isArchived}
       />
-      {executionStatus !== undefined && (
-        <ConversationStatusDot
-          executionStatus={executionStatus}
-          sandboxStatus={sandboxStatus}
-          showTooltip={false}
-        />
-      )}
     </div>
   );
 }

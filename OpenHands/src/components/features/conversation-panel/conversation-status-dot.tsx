@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { FaArchive } from "react-icons/fa";
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
@@ -21,9 +20,11 @@ interface ConversationStatusDotProps {
   showTooltip?: boolean;
 }
 
-type Visual = "working" | "error" | "none";
+export type ConversationVisualStatus = "working" | "error" | "none";
 
-const visualFor = (status: ExecutionStatus | null | undefined): Visual => {
+const visualFor = (
+  status: ExecutionStatus | null | undefined,
+): ConversationVisualStatus => {
   switch (status) {
     case ExecutionStatus.RUNNING:
       return "working";
@@ -35,7 +36,17 @@ const visualFor = (status: ExecutionStatus | null | undefined): Visual => {
   }
 };
 
-const labelKeyFor = (visual: Visual): string => {
+export const getConversationStatusVisual = (
+  executionStatus: ExecutionStatus | null | undefined,
+  sandboxStatus?: SandboxStatus | null,
+): ConversationVisualStatus => {
+  if (sandboxStatus === "ERROR") {
+    return "error";
+  }
+  return visualFor(executionStatus);
+};
+
+const labelKeyFor = (visual: ConversationVisualStatus): string => {
   switch (visual) {
     case "working":
       return "COMMON$WORKING";
@@ -46,7 +57,7 @@ const labelKeyFor = (visual: Visual): string => {
   }
 };
 
-function renderIndicator(visual: Visual) {
+function renderIndicator(visual: ConversationVisualStatus) {
   switch (visual) {
     case "working":
       return (
@@ -91,10 +102,7 @@ export function ConversationStatusDot({
 }: ConversationStatusDotProps) {
   const { t } = useTranslation("openhands");
 
-  const effectiveVisual: Visual =
-    sandboxStatus === "ERROR" ? "error" : visualFor(executionStatus);
-
-  const visual = effectiveVisual;
+  const visual = getConversationStatusVisual(executionStatus, sandboxStatus);
   const indicator = renderIndicator(visual);
 
   if (!indicator) return null;

@@ -22,6 +22,10 @@ import { ConversationCardActions } from "./conversation-card-actions";
 import { ConversationCardFooter } from "./conversation-card-footer";
 import { ConversationStatusBadges } from "./conversation-status-badges";
 import { useDownloadConversation } from "#/hooks/use-download-conversation";
+import {
+  ConversationStatusDot,
+  getConversationStatusVisual,
+} from "../conversation-status-dot";
 
 interface ConversationCardProps {
   onClick?: () => void;
@@ -226,6 +230,12 @@ export function ConversationCard({
     (showLlmProfiles && (agentKind === "acp" || !!llmModel)) ||
     (showTags && getDisplayConversationTags(tags).length > 0);
 
+  const statusVisual = getConversationStatusVisual(
+    executionStatus,
+    sandboxStatus,
+  );
+  const showStatusIndicator = statusVisual !== "none";
+
   return (
     <div
       data-testid="conversation-card"
@@ -264,16 +274,30 @@ export function ConversationCard({
               : hasHoverActions && hoverRevealReserveClassName(contextMenuOpen),
           )}
         >
-          {!showPersistentPinIcon && (createdAt ?? lastUpdatedAt) && (
-            <p
-              className={cn(
-                "text-sm font-medium text-[var(--oh-text-secondary)] text-right whitespace-nowrap transition-opacity -translate-x-1.5",
-                hasHoverActions && hoverRevealYieldClassName(contextMenuOpen),
-              )}
-            >
-              <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
-            </p>
-          )}
+          {!showPersistentPinIcon &&
+            (showStatusIndicator ? (
+              <div
+                className={cn(
+                  "flex h-5 items-center justify-end transition-opacity -translate-x-1.5",
+                  hasHoverActions && hoverRevealYieldClassName(contextMenuOpen),
+                )}
+              >
+                <ConversationStatusDot
+                  executionStatus={executionStatus}
+                  sandboxStatus={sandboxStatus}
+                  showTooltip={false}
+                />
+              </div>
+            ) : (createdAt ?? lastUpdatedAt) ? (
+              <p
+                className={cn(
+                  "text-sm font-medium text-[var(--oh-text-secondary)] text-right whitespace-nowrap transition-opacity -translate-x-1.5",
+                  hasHoverActions && hoverRevealYieldClassName(contextMenuOpen),
+                )}
+              >
+                <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
+              </p>
+            ) : null)}
 
           {hasHoverActions ? (
             <div
@@ -286,7 +310,7 @@ export function ConversationCard({
             >
               {onTogglePin ? renderPinButton() : null}
               {showPersistentPinIcon &&
-              (createdAt ?? lastUpdatedAt) &&
+              (showStatusIndicator || createdAt || lastUpdatedAt) &&
               hasContextMenu ? (
                 <div className="relative shrink-0">
                   <div className={hoverRevealActionClassName(contextMenuOpen)}>
@@ -305,15 +329,31 @@ export function ConversationCard({
                       showOptions={showOptions}
                     />
                   </div>
-                  <p
-                    className={cn(
-                      "pointer-events-none absolute inset-0 items-center justify-end",
-                      "text-sm font-medium text-[var(--oh-text-secondary)] whitespace-nowrap -translate-x-1.5",
-                      hoverRevealPinnedTimestampClassName(contextMenuOpen),
-                    )}
-                  >
-                    <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
-                  </p>
+                  {showStatusIndicator ? (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute inset-0 flex items-center justify-end",
+                        "-translate-x-1.5",
+                        hoverRevealPinnedTimestampClassName(contextMenuOpen),
+                      )}
+                    >
+                      <ConversationStatusDot
+                        executionStatus={executionStatus}
+                        sandboxStatus={sandboxStatus}
+                        showTooltip={false}
+                      />
+                    </div>
+                  ) : (
+                    <p
+                      className={cn(
+                        "pointer-events-none absolute inset-0 items-center justify-end",
+                        "text-sm font-medium text-[var(--oh-text-secondary)] whitespace-nowrap -translate-x-1.5",
+                        hoverRevealPinnedTimestampClassName(contextMenuOpen),
+                      )}
+                    >
+                      <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
+                    </p>
+                  )}
                 </div>
               ) : null}
               {!showPersistentPinIcon && hasContextMenu ? (

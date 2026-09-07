@@ -648,7 +648,7 @@ describe("ConversationCard", () => {
     expect(screen.queryByTestId("ellipsis-button")).not.toBeInTheDocument();
   });
 
-  it("renders the status dot in the header when executionStatus is provided", () => {
+  it("renders loading indicator and hides timestamp when executionStatus is RUNNING", () => {
     renderWithProviders(
       <ConversationCard
         title="Conversation 1"
@@ -661,6 +661,42 @@ describe("ConversationCard", () => {
     expect(
       screen.getByTestId("conversation-status-working"),
     ).toBeInTheDocument();
+    expect(screen.queryByText("5y")).not.toBeInTheDocument();
+  });
+
+  it("renders red error dot and hides timestamp when executionStatus is ERROR", () => {
+    renderWithProviders(
+      <ConversationCard
+        title="Conversation 1"
+        selectedRepository={null}
+        lastUpdatedAt="2021-10-01T12:00:00Z"
+        executionStatus={ExecutionStatus.ERROR}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("conversation-status-error"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("5y")).not.toBeInTheDocument();
+  });
+
+  it("renders timestamp and hides status dot when executionStatus is FINISHED (completed and successful)", () => {
+    renderWithProviders(
+      <ConversationCard
+        title="Conversation 1"
+        selectedRepository={null}
+        lastUpdatedAt="2021-10-01T12:00:00Z"
+        executionStatus={ExecutionStatus.FINISHED}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("conversation-status-working"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("conversation-status-error"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("5y")).toBeInTheDocument();
   });
 
   const statusTable: [ExecutionStatus, boolean][] = [
