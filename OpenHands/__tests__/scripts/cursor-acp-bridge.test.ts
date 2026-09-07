@@ -10,6 +10,14 @@ import {
   resolveCursorAcpMode,
   rewriteCursorAcpMessage,
   rewriteCursorAcpStdoutLine,
+  DEFAULT_CURSOR_ACP_PRINT_IDLE_MS,
+  DEFAULT_CURSOR_ACP_PRINT_MAX_MS,
+  MIN_CURSOR_ACP_PRINT_IDLE_MS,
+  evaluatePrintTimeout,
+  formatPrintTimeoutError,
+  resolvePrintIdleMs,
+  resolvePrintMaxMs,
+  sanitizeErrorSnippet,
 } from "../../../scripts/cursor-acp-bridge.mjs";
 import { normalizeCursorModels as proxyNormalizeCursorModels } from "../../scripts/cursor-api-proxy.mjs";
 
@@ -267,5 +275,186 @@ describe("cursor model catalog used by ACP print-mode", () => {
         { id: "fast", value: true },
       ]),
     ).toBe("grok-4.6[effort=high,fast=true]");
+  });
+});
+
+describe("cursor ACP print timeout & dual-timer configuration", () => {
+  it("resolves default idle and max timeout values", () => {
+    expect(resolvePrintIdleMs(undefined)).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS).toBe(300000); // 5 minutes
+    expect(resolvePrintMaxMs(undefined, 300000)).toBe(DEFAULT_CURSOR_ACP_PRINT_MAX_MS);
+    expect(DEFAULT_CURSOR_ACP_PRINT_MAX_MS).toBe(1800000); // 30 minutes
+  });
+
+  it("parses custom numeric strings from env", () => {
+    expect(resolvePrintIdleMs("180000")).toBe(180000);
+    expect(resolvePrintMaxMs("900000", 180000)).toBe(900000);
+  });
+
+  it("enforces minimum floor for idle timeout", () => {
+    expect(resolvePrintIdleMs("1000")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(resolvePrintIdleMs("0")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(resolvePrintIdleMs("-5000")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(resolvePrintIdleMs("not-a-number")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(resolvePrintIdleMs(String(MIN_CURSOR_ACP_PRINT_IDLE_MS))).toBe(30000);
+  });
+
+  it("enforces max timeout >= idle timeout", () => {
+    const idleMs = 400000;
+    expect(resolvePrintMaxMs("200000", idleMs)).toBe(DEFAULT_CURSOR_ACP_PRINT_MAX_MS);
+    const hugeIdle = 2000000;
+    expect(resolvePrintMaxMs("1000", hugeIdle)).toBe(hugeIdle);
+  });
+
+  it("sanitizes error snippets and truncates to limit", () => {
+    expect(sanitizeErrorSnippet("")).toBe("");
+    expect(sanitizeErrorSnippet("  short clean message  ")).toBe("short clean message");
+    const long = "a".repeat(400);
+    const sanitized = sanitizeErrorSnippet(long, 50);
+    expect(sanitized.startsWith("…")).toBe(true);
+    expect(sanitized.length).toBe(51); // ellipsis + 50 chars
+  });
+
+  it("formats informative timeout error messages", () => {
+    const msg = formatPrintTimeoutError({
+      reason: "idle",
+      elapsedMs: 305120,
+      idleMs: 300000,
+      maxMs: 1800000,
+      stdoutBytes: 0,
+      stderrBytes: 42,
+      stderrSnippet: "connecting to model...",
+    });
+
+    expect(msg).toContain("agent -p timed out (idle)");
+    expect(msg).toContain("elapsed=305.1s");
+    expect(msg).toContain("idleLimit=300s");
+    expect(msg).toContain("maxLimit=1800s");
+    expect(msg).toContain("stdoutBytes=0");
+    expect(msg).toContain("stderrBytes=42");
+    expect(msg).toContain("stderr: connecting to model...");
+  });
+
+  it("formats timeout error messages without stderr snippet when stderr is empty", () => {
+    const msg = formatPrintTimeoutError({
+      reason: "max",
+      elapsedMs: 1800500,
+      idleMs: 300000,
+      maxMs: 1800000,
+      stdoutBytes: 120,
+      stderrBytes: 0,
+      stderrSnippet: "",
+    });
+
+    expect(msg).toContain("agent -p timed out (max)");
+    expect(msg).not.toContain("stderr:");
+  });
+
+  describe("evaluatePrintTimeout timer logic", () => {
+    const idleMs = 300000; // 5m
+    const maxMs = 1800000; // 30m
+
+    it("does not time out while running normally within idle and max limits", () => {
+      const startedAt = 100000;
+      const lastActivityAt = 150000;
+      const now = 200000; // 100s elapsed, 50s idle
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: true,
+      });
+      expect(result.timedOut).toBe(false);
+      expect(result.reason).toBeNull();
+      expect(result.elapsedMs).toBe(100000);
+      expect(result.idleElapsedMs).toBe(50000);
+    });
+
+    it("does not idle-timeout a silent json turn before the max ceiling", () => {
+      const startedAt = 0;
+      const lastActivityAt = 0;
+      const now = 300000;
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: false,
+      });
+      expect(result.timedOut).toBe(false);
+      expect(result.reason).toBeNull();
+    });
+
+    it("times out on idle only after output has been seen, then silence lasts idleMs", () => {
+      const startedAt = 100000;
+      const lastActivityAt = 100000;
+      const now = 400000; // 300s since last stderr/stdout
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: true,
+      });
+      expect(result.timedOut).toBe(true);
+      expect(result.reason).toBe("idle");
+      expect(result.idleElapsedMs).toBe(300000);
+    });
+
+    it("does NOT time out at 122s if idle limit is 300s (resolves previous 120s bug)", () => {
+      const startedAt = 0;
+      const lastActivityAt = 0;
+      const now = 122000; // 122s elapsed, exactly where previous hard timeout killed the process
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+      });
+      expect(result.timedOut).toBe(false);
+      expect(result.reason).toBeNull();
+    });
+
+    it("allows execution past 120s as long as activity resets lastActivityAt", () => {
+      const startedAt = 0;
+      const lastActivityAt = 130000; // activity at 130s
+      const now = 200000; // 200s elapsed, 70s idle
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: true,
+      });
+      expect(result.timedOut).toBe(false);
+      expect(result.reason).toBeNull();
+    });
+
+    it("triggers max ceiling timeout when total elapsed >= maxMs even with recent activity", () => {
+      const startedAt = 0;
+      const lastActivityAt = 1795000; // activity 5s ago
+      const now = 1800001; // 1800.001s elapsed (exceeds 30m max)
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+      });
+      expect(result.timedOut).toBe(true);
+      expect(result.reason).toBe("max");
+    });
   });
 });

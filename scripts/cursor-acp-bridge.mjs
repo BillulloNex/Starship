@@ -31,6 +31,81 @@ export function resolveCursorAcpMode(raw = process.env.CURSOR_ACP_MODE) {
   return "print";
 }
 
+export const DEFAULT_CURSOR_ACP_PRINT_IDLE_MS = 300000; // 5 minutes
+export const DEFAULT_CURSOR_ACP_PRINT_MAX_MS = 1800000; // 30 minutes
+export const MIN_CURSOR_ACP_PRINT_IDLE_MS = 30000; // 30 seconds
+
+export function resolvePrintIdleMs(raw = process.env.CURSOR_ACP_PRINT_IDLE_MS) {
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed >= MIN_CURSOR_ACP_PRINT_IDLE_MS) {
+    return Math.floor(parsed);
+  }
+  return DEFAULT_CURSOR_ACP_PRINT_IDLE_MS;
+}
+
+export function resolvePrintMaxMs(
+  raw = process.env.CURSOR_ACP_PRINT_MAX_MS,
+  idleMs = resolvePrintIdleMs(),
+) {
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed >= idleMs) {
+    return Math.floor(parsed);
+  }
+  return Math.max(DEFAULT_CURSOR_ACP_PRINT_MAX_MS, idleMs);
+}
+
+export function sanitizeErrorSnippet(raw, maxLen = 300) {
+  if (!raw) return "";
+  let clean = String(raw).trim();
+  if (CURSOR_KEY) {
+    clean = clean.replaceAll(CURSOR_KEY, "[REDACTED_API_KEY]");
+  }
+  if (clean.length > maxLen) {
+    clean = `…${clean.slice(-maxLen)}`;
+  }
+  return clean;
+}
+
+export function formatPrintTimeoutError({
+  reason,
+  elapsedMs,
+  idleMs,
+  maxMs,
+  stdoutBytes,
+  stderrBytes,
+  stderrSnippet,
+}) {
+  const elapsedSec = (elapsedMs / 1000).toFixed(1);
+  const idleSec = Math.round(idleMs / 1000);
+  const maxSec = Math.round(maxMs / 1000);
+  let msg = `agent -p timed out (${reason}): elapsed=${elapsedSec}s, idleLimit=${idleSec}s, maxLimit=${maxSec}s, stdoutBytes=${stdoutBytes}, stderrBytes=${stderrBytes}`;
+  if (stderrSnippet) {
+    msg += ` | stderr: ${stderrSnippet}`;
+  }
+  return msg;
+}
+
+export function evaluatePrintTimeout({
+  startedAt,
+  lastActivityAt,
+  now = Date.now(),
+  idleMs = resolvePrintIdleMs(),
+  maxMs = resolvePrintMaxMs(undefined, idleMs),
+  hadActivity = false,
+}) {
+  const elapsedMs = now - startedAt;
+  const idleElapsedMs = now - lastActivityAt;
+  // `--output-format json` often stays silent until the turn ends. Treat a
+  // process with zero stdout/stderr as still running until the max ceiling.
+  if (elapsedMs >= maxMs) {
+    return { timedOut: true, reason: "max", elapsedMs, idleElapsedMs };
+  }
+  if (hadActivity && idleElapsedMs >= idleMs) {
+    return { timedOut: true, reason: "idle", elapsedMs, idleElapsedMs };
+  }
+  return { timedOut: false, reason: null, elapsedMs, idleElapsedMs };
+}
+
 const ACP_MODE = resolveCursorAcpMode();
 
 const debug = (...args) =>
@@ -437,13 +512,17 @@ async function handlePrompt(id, params) {
 
 function callAgentPrint(text, cwd) {
   return new Promise((resolve, reject) => {
+    const idleMs = resolvePrintIdleMs();
+    const maxMs = resolvePrintMaxMs(undefined, idleMs);
     const args = ["-p", "--trust", "-f", "--output-format", "json"];
     if (currentModel) {
       args.push("--model", currentModel);
     }
     args.push(text);
 
-    debug(`Spawning: ${AGENT_BIN} ${args.slice(0, 6).join(" ")}…`);
+    debug(
+      `Spawning: ${AGENT_BIN} ${args.slice(0, 6).join(" ")}… (idleLimit=${Math.round(idleMs / 1000)}s, maxLimit=${Math.round(maxMs / 1000)}s)`,
+    );
 
     const proc = child_process.spawn(AGENT_BIN, args, {
       cwd,
@@ -454,23 +533,126 @@ function callAgentPrint(text, cwd) {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
+    if (proc.stdin && !proc.stdin.destroyed) {
+      proc.stdin.end();
+    }
+
     let stdout = "";
     let stderr = "";
+    const startedAt = Date.now();
+    let lastActivityAt = startedAt;
+
+    const debugAgentPrint = (hypothesisId, message, data) => {
+      // #region agent log
+      fetch("http://127.0.0.1:7465/ingest/cb8891d5-060d-4344-898b-0c8f526eb385", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "c8530c",
+        },
+        body: JSON.stringify({
+          sessionId: "c8530c",
+          runId: "cursor-acp-timeout",
+          hypothesisId,
+          location: "scripts/cursor-acp-bridge.mjs:callAgentPrint",
+          message,
+          data,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      debug(
+        `${message} ${JSON.stringify({ hypothesisId, ...data })}`,
+      );
+    };
+    debugAgentPrint("A", "agent -p spawned", {
+      pid: proc.pid ?? null,
+      cwd,
+      model: currentModel || "default",
+      promptChars: String(text || "").length,
+      stdinEnded: true,
+      hasApiKey: Boolean(CURSOR_KEY),
+      idleMs,
+      maxMs,
+    });
 
     proc.stdout.on("data", (chunk) => {
+      lastActivityAt = Date.now();
       stdout += chunk.toString();
+      debugAgentPrint("B", "agent -p stdout chunk", {
+        elapsedMs: Date.now() - startedAt,
+        stdoutChars: stdout.length,
+        chunkChars: chunk.length,
+      });
     });
     proc.stderr.on("data", (chunk) => {
+      lastActivityAt = Date.now();
       stderr += chunk.toString();
+      debugAgentPrint("C", "agent -p stderr chunk", {
+        elapsedMs: Date.now() - startedAt,
+        stderrChars: stderr.length,
+        chunkPreview: chunk.toString().slice(0, 160),
+      });
     });
 
-    const timeout = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error("agent -p timed out after 120s"));
-    }, 120000);
+    let timedOut = false;
+    let timer = setInterval(() => {
+      const now = Date.now();
+      const timeoutStatus = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs,
+        maxMs,
+        hadActivity: stdout.length > 0 || stderr.length > 0,
+      });
+
+      if (timeoutStatus.timedOut) {
+        timedOut = true;
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+        const snippet = sanitizeErrorSnippet(stderr);
+        const errMessage = formatPrintTimeoutError({
+          reason: timeoutStatus.reason,
+          elapsedMs: timeoutStatus.elapsedMs,
+          idleMs,
+          maxMs,
+          stdoutBytes: Buffer.byteLength(stdout, "utf8"),
+          stderrBytes: Buffer.byteLength(stderr, "utf8"),
+          stderrSnippet: snippet,
+        });
+        debugAgentPrint("A", `agent -p ${timeoutStatus.reason} timeout killing process`, {
+          elapsedMs: timeoutStatus.elapsedMs,
+          idleElapsedMs: timeoutStatus.idleElapsedMs,
+          pid: proc.pid ?? null,
+          stdoutChars: stdout.length,
+          stderrChars: stderr.length,
+          exitCode: proc.exitCode,
+          killed: proc.killed,
+        });
+        proc.kill("SIGTERM");
+        reject(new Error(errMessage));
+      }
+    }, 1000);
+
+    const stopTimer = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
 
     proc.on("close", (code) => {
-      clearTimeout(timeout);
+      stopTimer();
+      if (timedOut) return;
+      debugAgentPrint("D", "agent -p process closed", {
+        elapsedMs: Date.now() - startedAt,
+        code,
+        stdoutChars: stdout.length,
+        stderrChars: stderr.length,
+      });
       if (code !== 0) {
         debug(
           `agent -p exited with code ${code}. stderr: ${stderr.slice(0, 200)}`,
@@ -497,7 +679,8 @@ function callAgentPrint(text, cwd) {
     });
 
     proc.on("error", (err) => {
-      clearTimeout(timeout);
+      stopTimer();
+      if (timedOut) return;
       reject(err);
     });
   });
