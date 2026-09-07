@@ -108,6 +108,37 @@ export function getMcpOAuthAuthenticationConfig(
   return Object.keys(authentication).length > 1 ? authentication : undefined;
 }
 
+/**
+ * Google Workspace remote MCP (and similar confidential clients) need the
+ * user to paste an OAuth client ID + secret. Public MCP OAuth (`none` /
+ * omitted) still uses the click-to-authorize popup with no extra fields.
+ */
+export function oauthRequiresClientCredentials(
+  option: McpMarketplaceConnectionOption | undefined,
+): boolean {
+  if (option?.auth.strategy !== "oauth2") return false;
+  const method = option.auth.oauth?.clientAuthentication;
+  return method === "body" || method === "basic";
+}
+
+export function buildMcpOAuthAuthentication(
+  option: McpMarketplaceConnectionOption,
+  credentials: { clientId?: string; clientSecret?: string } = {},
+): MCPAuthenticationConfig {
+  const base = getMcpOAuthAuthenticationConfig(option);
+  return {
+    type: "oauth",
+    ...(base?.client_auth_method && {
+      client_auth_method: base.client_auth_method,
+    }),
+    ...(base?.scopes?.length && { scopes: base.scopes }),
+    ...(credentials.clientId && { client_id: credentials.clientId }),
+    ...(credentials.clientSecret && {
+      client_secret: credentials.clientSecret,
+    }),
+  };
+}
+
 export function getMcpMarketplaceCatalog(
   catalog: MarketplaceEntry[],
 ): MarketplaceEntry[] {

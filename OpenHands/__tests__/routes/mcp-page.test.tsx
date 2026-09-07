@@ -60,7 +60,7 @@ describe("MCPPage", () => {
     expect(screen.getByTestId("mcp-marketplace-grid")).toBeInTheDocument();
   });
 
-  it("lists GitHub, Slack, and Tavily as the first three marketplace tiles", async () => {
+  it("lists Grokbot Workspace cards ahead of GitHub in the marketplace", async () => {
     vi.spyOn(SettingsService, "getSettings").mockResolvedValue(buildSettings());
 
     renderPage();
@@ -71,16 +71,19 @@ describe("MCPPage", () => {
     expect(cards.length).toBeGreaterThan(3);
     expect(cards[0]).toHaveAttribute(
       "data-testid",
-      "mcp-marketplace-card-github",
+      "mcp-marketplace-card-gmail",
     );
     expect(cards[1]).toHaveAttribute(
       "data-testid",
-      "mcp-marketplace-card-slack",
+      "mcp-marketplace-card-google-drive",
     );
     expect(cards[2]).toHaveAttribute(
       "data-testid",
-      "mcp-marketplace-card-tavily",
+      "mcp-marketplace-card-google-docs",
     );
+    expect(
+      screen.getByTestId("mcp-marketplace-card-github"),
+    ).toBeInTheDocument();
   });
 
   it("opens the install modal when clicking a marketplace tile", async () => {

@@ -20,8 +20,9 @@ import { useAddMcpServer } from "#/hooks/mutation/use-add-mcp-server";
 import { useTestMcpServer } from "#/hooks/mutation/use-test-mcp-server";
 import { displaySuccessToast } from "#/utils/custom-toast-handlers";
 import {
-  getMcpOAuthAuthenticationConfig,
+  buildMcpOAuthAuthentication,
   getInstallableMcpConnectionOption,
+  oauthRequiresClientCredentials,
   type McpMarketplaceConnectionOption,
 } from "#/utils/mcp-marketplace-utils";
 import { retrieveAxiosErrorMessage } from "#/utils/retrieve-axios-error-message";
@@ -135,6 +136,10 @@ function makeInitialState(entry: MarketplaceEntry): FieldState {
         savedAsSecret.api_key =
           option.auth.saveCredentialAsSecretByDefault ?? false;
       }
+    }
+    if (oauthRequiresClientCredentials(option)) {
+      values.oauth_client_id = "";
+      values.oauth_client_secret = "";
     }
   }
   return { values, errors: {}, savedAsSecret };
@@ -371,12 +376,25 @@ export function InstallServerModal({
     ) {
       headerErrors.api_key = t(I18nKey.MCP$ERROR_FIELD_REQUIRED);
     }
+    const clientId = state.values.oauth_client_id?.trim() ?? "";
+    const clientSecret = state.values.oauth_client_secret?.trim() ?? "";
+    if (oauthRequiresClientCredentials(option)) {
+      if (!clientId) {
+        headerErrors.oauth_client_id = t(I18nKey.MCP$ERROR_FIELD_REQUIRED);
+      }
+      if (!clientSecret) {
+        headerErrors.oauth_client_secret = t(I18nKey.MCP$ERROR_FIELD_REQUIRED);
+      }
+    }
     if (Object.values(headerErrors).some(Boolean)) {
       setState((prev) => ({ ...prev, errors: headerErrors }));
       return;
     }
     const oauthAuthentication = oauthMode
-      ? getMcpOAuthAuthenticationConfig(option)
+      ? buildMcpOAuthAuthentication(option, {
+          clientId: clientId || undefined,
+          clientSecret: clientSecret || undefined,
+        })
       : undefined;
     const fieldHeaders = Object.fromEntries(
       headerFields
@@ -388,7 +406,7 @@ export function InstallServerModal({
     if (oauthMode) {
       auth = {
         strategy: "oauth2",
-        ...(oauthAuthentication && { authentication: oauthAuthentication }),
+        authentication: oauthAuthentication,
       };
     } else if (needsCredential && apiKey) {
       auth =
@@ -543,7 +561,52 @@ export function InstallServerModal({
                 {t(I18nKey.MCP$OAUTH_CONNECT_HINT)}
               </p>
             </div>
-          ) : shouldRenderCredential ? (
+          ) : null}
+          {oauthRequiresClientCredentials(option) ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <SettingsInput
+                  testId="mcp-install-field-oauth_client_id"
+                  name="oauth_client_id"
+                  type="text"
+                  label={t(I18nKey.SETTINGS$MCP_OAUTH_CLIENT_ID)}
+                  value={state.values.oauth_client_id ?? ""}
+                  onChange={(v) => setValue("oauth_client_id", v)}
+                  placeholder={t(
+                    I18nKey.SETTINGS$MCP_OAUTH_CLIENT_ID_PLACEHOLDER,
+                  )}
+                  required
+                  className="w-full"
+                />
+                {state.errors.oauth_client_id && (
+                  <p className="text-xs text-red-500">
+                    {state.errors.oauth_client_id}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <SettingsInput
+                  testId="mcp-install-field-oauth_client_secret"
+                  name="oauth_client_secret"
+                  type="password"
+                  label={t(I18nKey.SETTINGS$MCP_OAUTH_CLIENT_SECRET)}
+                  value={state.values.oauth_client_secret ?? ""}
+                  onChange={(v) => setValue("oauth_client_secret", v)}
+                  placeholder={t(
+                    I18nKey.SETTINGS$MCP_OAUTH_CLIENT_SECRET_PLACEHOLDER,
+                  )}
+                  required
+                  className="w-full"
+                />
+                {state.errors.oauth_client_secret && (
+                  <p className="text-xs text-red-500">
+                    {state.errors.oauth_client_secret}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
+          {!oauthMode && shouldRenderCredential ? (
             <div className="flex flex-col gap-1">
               <SettingsInput
                 testId="mcp-install-field-api_key"

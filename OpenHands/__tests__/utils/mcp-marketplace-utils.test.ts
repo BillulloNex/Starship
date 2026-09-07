@@ -7,6 +7,8 @@ import {
   getMcpMarketplaceCatalog,
   installedServerMatchesQuery,
   marketplaceEntryMatchesQuery,
+  oauthRequiresClientCredentials,
+  buildMcpOAuthAuthentication,
 } from "#/utils/mcp-marketplace-utils";
 import { INTEGRATION_CATALOG as MCP_MARKETPLACE } from "@openhands/extensions/integrations";
 
@@ -14,7 +16,6 @@ const mcpMarketplace = getMcpMarketplaceCatalog(MCP_MARKETPLACE);
 const slackEntry = mcpMarketplace.find((e) => e.id === "slack")!;
 const tavilyEntry = mcpMarketplace.find((e) => e.id === "tavily")!;
 const linearEntry = mcpMarketplace.find((e) => e.id === "linear")!;
-const filesystemEntry = mcpMarketplace.find((e) => e.id === "filesystem")!;
 
 function optionTransport(entry: typeof slackEntry, optionId = "api") {
   const transport = entry.connectionOptions.find(
@@ -142,6 +143,51 @@ describe("getInstallableMcpConnectionOption", () => {
     expect(option).toBeDefined();
     expect(option?.auth.strategy).toBe("oauth2");
     expect(option?.transport.kind).toBe("shttp");
+  });
+
+  it("treats Google-style confidential OAuth as locally installable", () => {
+    const gmail = mcpMarketplace.find((e) => e.id === "gmail")!;
+    const option = getInstallableMcpConnectionOption(gmail);
+    expect(option).toBeDefined();
+    expect(oauthRequiresClientCredentials(option)).toBe(true);
+    expect(
+      buildMcpOAuthAuthentication(option!, {
+        clientId: "id.apps.googleusercontent.com",
+        clientSecret: "secret",
+      }),
+    ).toMatchObject({
+      type: "oauth",
+      client_auth_method: "client_secret_post",
+      client_id: "id.apps.googleusercontent.com",
+      client_secret: "secret",
+    });
+  });
+
+  it("does not require client credentials for public MCP OAuth", () => {
+    const oauthOnlyEntry: Parameters<
+      typeof getInstallableMcpConnectionOption
+    >[0] = {
+      ...slackEntry,
+      id: "oauth-only",
+      connectionOptions: [
+        {
+          id: "oauth",
+          provider: "mcp",
+          auth: {
+            strategy: "oauth2",
+            oauth: { clientAuthentication: "none" },
+          },
+          transport: { kind: "shttp", url: "https://example.com/mcp" },
+        } as Parameters<
+          typeof getInstallableMcpConnectionOption
+        >[0]["connectionOptions"][number],
+      ],
+    };
+    expect(
+      oauthRequiresClientCredentials(
+        getInstallableMcpConnectionOption(oauthOnlyEntry),
+      ),
+    ).toBe(false);
   });
 
   it("returns undefined when the entry has no MCP connection options", () => {

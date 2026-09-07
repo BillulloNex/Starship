@@ -1,5 +1,52 @@
 import type { IntegrationCatalogEntry as MarketplaceEntry } from "@openhands/extensions/integrations";
 
+const GOOGLE_WORKSPACE_INSTALL_HINT =
+  "Create a Google Cloud OAuth 2.0 Web application client, enable this product's API and MCP API, then paste the client ID and secret. Add any redirect URI shown in the OAuth popup error to Authorized redirect URIs. Use Internal audience, or External with your account as a test user. One client can be reused for Gmail, Drive, and Docs.";
+
+function googleWorkspaceRemoteMcp(options: {
+  id: string;
+  name: string;
+  description: string;
+  docsUrl: string;
+  url: string;
+  logoSlug: string;
+  popularityRank: number;
+  keywords: string[];
+  scopes: string[];
+}): MarketplaceEntry {
+  return {
+    id: options.id,
+    name: options.name,
+    description: options.description,
+    categories: ["Productivity", "Business"],
+    docsUrl: options.docsUrl,
+    iconBg: "#4285F4",
+    logoUrl: `https://cdn.simpleicons.org/${options.logoSlug}/FFFFFF`,
+    popularityRank: options.popularityRank,
+    keywords: options.keywords,
+    installHint: GOOGLE_WORKSPACE_INSTALL_HINT,
+    connectionOptions: [
+      {
+        id: "oauth",
+        provider: "mcp",
+        transport: {
+          kind: "shttp",
+          url: options.url,
+        },
+        auth: {
+          strategy: "oauth2",
+          oauth: {
+            // Confidential web client — install modal collects ID + secret.
+            // Omitting authorizationUrl keeps this locally installable.
+            clientAuthentication: "body",
+            scopes: options.scopes,
+          },
+        },
+      },
+    ],
+  };
+}
+
 export const GROKBOT_BUILTIN_INTEGRATIONS: MarketplaceEntry[] = [
   {
     id: "playwright-browser",
@@ -202,4 +249,66 @@ export const GROKBOT_BUILTIN_INTEGRATIONS: MarketplaceEntry[] = [
       },
     ],
   },
+
+  // ── Google Workspace remote MCP (official, developer preview) ─────────
+  // Verified: https://developers.google.com/workspace/guides/configure-mcp-servers
+  // Auth: Google Cloud OAuth web client (client ID + secret). Do NOT set
+  // authorizationUrl/tokenUrl — those hide the card from local /mcp installs.
+  googleWorkspaceRemoteMcp({
+    id: "gmail",
+    name: "Gmail",
+    description:
+      "Search threads, read mail, list labels, and create drafts in your Gmail inbox.",
+    docsUrl:
+      "https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server",
+    url: "https://gmailmcp.googleapis.com/mcp/v1",
+    logoSlug: "gmail",
+    popularityRank: 110,
+    keywords: ["gmail", "email", "inbox", "mail", "google", "workspace"],
+    scopes: [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose",
+    ],
+  }),
+  googleWorkspaceRemoteMcp({
+    id: "google-drive",
+    name: "Google Drive",
+    description:
+      "Search Drive, list recent files, and read file content — including Meet notes stored as Docs.",
+    docsUrl:
+      "https://developers.google.com/workspace/drive/api/guides/configure-mcp-server",
+    url: "https://drivemcp.googleapis.com/mcp/v1",
+    logoSlug: "googledrive",
+    popularityRank: 109,
+    keywords: [
+      "drive",
+      "google-drive",
+      "files",
+      "meet notes",
+      "google",
+      "workspace",
+    ],
+    scopes: [
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file",
+    ],
+  }),
+  googleWorkspaceRemoteMcp({
+    id: "google-docs",
+    name: "Google Docs",
+    description:
+      "Read Google Docs bodies. Use with Drive to open Meet notes and other documents.",
+    docsUrl:
+      "https://developers.google.com/workspace/docs/api/guides/configure-mcp-server",
+    url: "https://docsmcp.googleapis.com/mcp/v1",
+    logoSlug: "googledocs",
+    popularityRank: 108,
+    keywords: ["docs", "google-docs", "meet notes", "google", "workspace"],
+    scopes: [
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/documents.readonly",
+      "https://www.googleapis.com/auth/documents",
+    ],
+  }),
 ];

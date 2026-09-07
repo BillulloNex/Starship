@@ -50,7 +50,9 @@ describe("OpenHands extensions catalogs", () => {
     expect(linear.docsUrl).toBe("https://linear.app/docs/mcp");
     expect(mcpOption.auth.strategy).toBe("bearer");
     expect(
-      linear.connectionOptions.some((option) => option.transport?.kind === "sse"),
+      linear.connectionOptions.some(
+        (option) => option.transport?.kind === "sse",
+      ),
     ).toBe(false);
   });
 
@@ -162,5 +164,52 @@ describe("OpenHands extensions catalogs", () => {
     expect(token).toBeDefined();
     expect(token!.required).toBe(true);
     expect(token!.type).toBe("password");
+  });
+
+  it("replaces Gmail/Drive/Docs HTTP stubs with official remote MCP OAuth", () => {
+    const catalog = getMcpMarketplaceCatalog(INTEGRATION_CATALOG);
+    const gmail = catalog.find((entry) => entry.id === "gmail")!;
+    const drive = catalog.find((entry) => entry.id === "google-drive")!;
+    const docs = catalog.find((entry) => entry.id === "google-docs")!;
+
+    const gmailOption = getInstallableMcpConnectionOption(gmail)!;
+    expect(gmailOption.transport.kind).toBe("shttp");
+    if (gmailOption.transport.kind !== "shttp") {
+      throw new Error("expected shttp");
+    }
+    expect(gmailOption.transport.url).toBe(
+      "https://gmailmcp.googleapis.com/mcp/v1",
+    );
+    expect(gmailOption.auth.strategy).toBe("oauth2");
+    expect(gmailOption.auth.oauth?.clientAuthentication).toBe("body");
+    expect(gmailOption.auth.oauth?.authorizationUrl).toBeUndefined();
+    expect(gmailOption.auth.oauth?.scopes).toContain(
+      "https://www.googleapis.com/auth/gmail.readonly",
+    );
+    expect(gmailOption.auth.oauth?.scopes).toContain(
+      "https://www.googleapis.com/auth/gmail.compose",
+    );
+
+    const driveOption = getInstallableMcpConnectionOption(drive)!;
+    expect(driveOption.transport.kind).toBe("shttp");
+    if (driveOption.transport.kind !== "shttp") {
+      throw new Error("expected shttp");
+    }
+    expect(driveOption.transport.url).toBe(
+      "https://drivemcp.googleapis.com/mcp/v1",
+    );
+    expect(driveOption.auth.oauth?.clientAuthentication).toBe("body");
+
+    const docsOption = getInstallableMcpConnectionOption(docs)!;
+    expect(docsOption.transport.kind).toBe("shttp");
+    if (docsOption.transport.kind !== "shttp") {
+      throw new Error("expected shttp");
+    }
+    expect(docsOption.transport.url).toBe(
+      "https://docsmcp.googleapis.com/mcp/v1",
+    );
+    expect(docsOption.auth.oauth?.scopes).toContain(
+      "https://www.googleapis.com/auth/documents.readonly",
+    );
   });
 });

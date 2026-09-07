@@ -62,6 +62,16 @@ const VALIDATION_BY_ENTRY_ID: Record<string, CredentialValidation> = {
     toolCall: { name: "list_teams", arguments: {} },
     interpret: interpretReadOnlyToolResult,
   },
+  gmail: {
+    // Official Gmail MCP (gmailmcp.googleapis.com): read-only label list.
+    toolCall: { name: "list_labels", arguments: {} },
+    interpret: interpretReadOnlyToolResult,
+  },
+  "google-drive": {
+    // Official Drive MCP (drivemcp.googleapis.com): read-only recent files.
+    toolCall: { name: "list_recent_files", arguments: {} },
+    interpret: interpretReadOnlyToolResult,
+  },
   slack: {
     // Read-only: lists at most one channel. The Slack MCP server returns
     // the raw Slack API JSON ({ok: boolean, error?: string}) as text.
