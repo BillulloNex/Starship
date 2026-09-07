@@ -2076,7 +2076,7 @@ describe("ConversationPanel", () => {
         within(noWorkspaceFolder).getByTestId(
           "thread-folder-children-__none_workspace",
         ),
-      ).toHaveClass("ml-5", "pl-3");
+      ).not.toHaveClass("ml-5");
       expect(
         within(noWorkspaceFolder).getByTestId(
           "thread-folder-children-__none_workspace",

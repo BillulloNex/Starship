@@ -209,7 +209,7 @@ export function ConversationGroupFolderRow({
           <div
             id={`thread-folder-content-${groupTestIdSuffix}`}
             data-testid={`thread-folder-children-${groupTestIdSuffix}`}
-            className="mt-0.5 ml-5 space-y-0.5 pl-3"
+            className="mt-0.5 space-y-0.5"
           >
             {visibleConversations.map(renderConversationCard)}
             {isPreviewTruncated ? (
