@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   getGoogleWorkspaceOAuthClient,
   getMcpOAuthCallbackPort,
+  getMcpOAuthRedirectUri,
   injectGoogleWorkspaceOAuthClient,
   isGoogleWorkspaceMcpUrl,
+  rewriteOAuthAuthorizationUrl,
   shouldInterceptGoogleWorkspaceMcp,
   shouldProxyMcpOAuthPublicCallback,
 } from "../../scripts/google-workspace-oauth.mjs";
@@ -137,5 +139,23 @@ describe("google-workspace-oauth.mjs", () => {
     expect(
       getMcpOAuthCallbackPort({ GROKBOT_MCP_OAUTH_CALLBACK_PORT: "nope" }),
     ).toBe(18765);
+  });
+
+  it("rewrites FastMCP's loopback redirect_uri onto the public Starship callback", () => {
+    expect(getMcpOAuthRedirectUri({})).toBe("");
+    expect(
+      getMcpOAuthRedirectUri({
+        GOOGLE_OAUTH_CLIENT_ID: "id.apps.googleusercontent.com",
+      }),
+    ).toBe("https://ship.beenex.org/callback");
+    const rewritten = rewriteOAuthAuthorizationUrl(
+      "https://accounts.google.com/o/oauth2/v2/auth?client_id=x&redirect_uri=http%3A%2F%2Flocalhost%3A58845%2Fcallback&state=abc",
+      "https://ship.beenex.org/callback",
+    );
+    const parsed = new URL(rewritten);
+    expect(parsed.searchParams.get("redirect_uri")).toBe(
+      "https://ship.beenex.org/callback",
+    );
+    expect(parsed.searchParams.get("state")).toBe("abc");
   });
 });

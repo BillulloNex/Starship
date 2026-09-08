@@ -61,6 +61,9 @@ export function getGoogleWorkspaceOAuthClient(env = process.env) {
   return { clientId, clientSecret };
 }
 
+export const DEFAULT_MCP_OAUTH_REDIRECT_URI =
+  "https://ship.beenex.org/callback";
+
 export function getMcpOAuthCallbackPort(env = process.env) {
   const raw = String(
     env.GROKBOT_MCP_OAUTH_CALLBACK_PORT ?? DEFAULT_MCP_OAUTH_CALLBACK_PORT,
@@ -70,6 +73,48 @@ export function getMcpOAuthCallbackPort(env = process.env) {
     return DEFAULT_MCP_OAUTH_CALLBACK_PORT;
   }
   return port;
+}
+
+export function getMcpOAuthRedirectUri(env = process.env) {
+  const explicit = String(env.GROKBOT_MCP_OAUTH_REDIRECT_URI ?? "").trim();
+  if (explicit) return explicit;
+  if (String(env.GOOGLE_OAUTH_CLIENT_ID ?? "").trim()) {
+    return DEFAULT_MCP_OAUTH_REDIRECT_URI;
+  }
+  return "";
+}
+
+export function rewriteOAuthAuthorizationUrl(authorizationUrl, redirectUri) {
+  if (typeof authorizationUrl !== "string" || !authorizationUrl) {
+    return authorizationUrl;
+  }
+  if (typeof redirectUri !== "string" || !redirectUri) {
+    return authorizationUrl;
+  }
+  try {
+    const url = new URL(authorizationUrl);
+    if (url.searchParams.has("redirect_uri")) {
+      url.searchParams.set("redirect_uri", redirectUri);
+    }
+    return url.toString();
+  } catch {
+    return authorizationUrl;
+  }
+}
+
+export function rewriteGoogleOAuthStartResponse(payload, env = process.env) {
+  if (!isRecord(payload) || typeof payload.authorization_url !== "string") {
+    return payload;
+  }
+  const redirectUri = getMcpOAuthRedirectUri(env);
+  if (!redirectUri) return payload;
+  return {
+    ...payload,
+    authorization_url: rewriteOAuthAuthorizationUrl(
+      payload.authorization_url,
+      redirectUri,
+    ),
+  };
 }
 
 function normalizeCallbackPath(pathname) {
@@ -160,7 +205,7 @@ function parseBackendUrl(backendUrl) {
   };
 }
 
-function forwardJson(req, res, backendUrl, jsonBody) {
+function forwardJson(req, res, backendUrl, jsonBody, transformResponse) {
   const backend = parseBackendUrl(backendUrl);
   const payload = Buffer.from(jsonBody, "utf8");
   const headers = {
@@ -183,8 +228,27 @@ function forwardJson(req, res, backendUrl, jsonBody) {
       timeout: PROXY_TIMEOUT_MS,
     },
     (proxyRes) => {
-      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-      proxyRes.pipe(res);
+      if (!transformResponse) {
+        res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+        proxyRes.pipe(res);
+        return;
+      }
+      const chunks = [];
+      proxyRes.on("data", (chunk) => chunks.push(chunk));
+      proxyRes.on("end", () => {
+        let body = Buffer.concat(chunks).toString("utf8");
+        try {
+          body = JSON.stringify(transformResponse(JSON.parse(body)));
+        } catch {
+          // Keep the upstream body if it is not JSON.
+        }
+        const outHeaders = { ...proxyRes.headers };
+        delete outHeaders["content-length"];
+        delete outHeaders["transfer-encoding"];
+        outHeaders["content-length"] = String(Buffer.byteLength(body));
+        res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
+        res.end(body);
+      });
     },
   );
   proxyReq.on("timeout", () => {
@@ -229,7 +293,23 @@ export async function handleGoogleWorkspaceMcpProxy(req, res, backendUrl) {
     return true;
   }
 
-  forwardJson(req, res, backendUrl, JSON.stringify(result.body));
+  let transformResponse;
+  try {
+    const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (pathname === "/api/mcp/oauth/start") {
+      transformResponse = (payload) => rewriteGoogleOAuthStartResponse(payload);
+    }
+  } catch {
+    transformResponse = undefined;
+  }
+
+  forwardJson(
+    req,
+    res,
+    backendUrl,
+    JSON.stringify(result.body),
+    transformResponse,
+  );
   return true;
 }
 
