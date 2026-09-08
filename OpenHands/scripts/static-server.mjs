@@ -51,6 +51,7 @@ import { handleOpencodeApiProxy } from "./opencode-api-proxy.mjs";
 import {
   handleGoogleWorkspaceMcpProxy,
   handleMcpOAuthPublicCallback,
+  handleMcpOAuthStatusSniff,
 } from "./google-workspace-oauth.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
@@ -1152,6 +1153,9 @@ export function startStaticServer(config) {
       }
       try {
         if (await handleGoogleWorkspaceMcpProxy(req, res, backend)) {
+          return;
+        }
+        if (handleMcpOAuthStatusSniff(req, res, backend)) {
           return;
         }
       } catch (err) {

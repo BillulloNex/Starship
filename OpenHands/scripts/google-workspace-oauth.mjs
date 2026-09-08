@@ -165,10 +165,50 @@ export function injectGoogleWorkspaceOAuthClient(body, env = process.env) {
     authentication.client_auth_method || "client_secret_post";
   authentication.client_id = client.clientId;
   authentication.client_secret = client.clientSecret;
+  const redirectUri =
+    getMcpOAuthRedirectUri(env) || DEFAULT_MCP_OAUTH_REDIRECT_URI;
+  authentication.additional_client_metadata = {
+    ...(isRecord(authentication.additional_client_metadata)
+      ? authentication.additional_client_metadata
+      : {}),
+    redirect_uris: [redirectUri],
+  };
   auth.strategy = "oauth2";
   auth.authentication = authentication;
   server.auth = auth;
   return { ok: true, injected: true, body: { ...body, server } };
+}
+
+let activeCallbackPort = null;
+
+export function rememberMcpOAuthCallbackUrl(callbackUrl) {
+  if (typeof callbackUrl !== "string" || !callbackUrl) return null;
+  try {
+    const url = new URL(callbackUrl);
+    if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+      return null;
+    }
+    const port = Number.parseInt(url.port, 10);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) return null;
+    activeCallbackPort = port;
+    return port;
+  } catch {
+    return null;
+  }
+}
+
+export function getActiveMcpOAuthCallbackPort(env = process.env) {
+  return activeCallbackPort ?? getMcpOAuthCallbackPort(env);
+}
+
+export function shouldSniffMcpOAuthStatus(req) {
+  if (req?.method !== "GET") return false;
+  try {
+    const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+    return /^\/api\/mcp\/oauth\/status\/[^/]+$/.test(pathname);
+  } catch {
+    return false;
+  }
 }
 
 async function readBody(req) {
@@ -313,6 +353,70 @@ export async function handleGoogleWorkspaceMcpProxy(req, res, backendUrl) {
   return true;
 }
 
+function forwardGet(req, res, backendUrl, transformResponse) {
+  const backend = parseBackendUrl(backendUrl);
+  const headers = {
+    ...req.headers,
+    host: `${backend.hostname}:${backend.port}`,
+  };
+  delete headers["content-length"];
+  delete headers["transfer-encoding"];
+
+  const request = backend.protocol === "https:" ? httpsRequest : httpRequest;
+  const proxyReq = request(
+    {
+      hostname: backend.hostname,
+      port: backend.port,
+      path: req.url,
+      method: "GET",
+      headers,
+      timeout: PROXY_TIMEOUT_MS,
+    },
+    (proxyRes) => {
+      const chunks = [];
+      proxyRes.on("data", (chunk) => chunks.push(chunk));
+      proxyRes.on("end", () => {
+        let body = Buffer.concat(chunks).toString("utf8");
+        try {
+          body = JSON.stringify(transformResponse(JSON.parse(body)));
+        } catch {
+          // Keep the upstream body if it is not JSON.
+        }
+        const outHeaders = { ...proxyRes.headers };
+        delete outHeaders["content-length"];
+        delete outHeaders["transfer-encoding"];
+        outHeaders["content-length"] = String(Buffer.byteLength(body));
+        res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
+        res.end(body);
+      });
+    },
+  );
+  proxyReq.on("timeout", () => {
+    proxyReq.destroy();
+    writeJson(res, 504, { error: "OAuth status timed out" });
+  });
+  proxyReq.on("error", (err) => {
+    writeJson(res, 502, {
+      error: `Bad Gateway: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  });
+  proxyReq.end();
+}
+
+export function handleMcpOAuthStatusSniff(req, res, backendUrl) {
+  if (!shouldSniffMcpOAuthStatus(req)) return false;
+  forwardGet(req, res, backendUrl, (payload) => {
+    if (isRecord(payload) && typeof payload.callback_url === "string") {
+      const port = rememberMcpOAuthCallbackUrl(payload.callback_url);
+      if (port) {
+        console.log(`[oauth-callback] FastMCP listener on 127.0.0.1:${port}`);
+      }
+    }
+    return payload;
+  });
+  return true;
+}
+
 function writeCallbackUnavailable(res, status, message) {
   if (res.headersSent) return;
   const body = `<!doctype html>
@@ -336,7 +440,7 @@ function writeCallbackUnavailable(res, status, message) {
 export function handleMcpOAuthPublicCallback(req, res, env = process.env) {
   if (!shouldProxyMcpOAuthPublicCallback(req)) return false;
 
-  const port = getMcpOAuthCallbackPort(env);
+  const port = getActiveMcpOAuthCallbackPort(env);
   const incoming = new URL(req.url ?? "/", "http://localhost");
   const path = `/callback${incoming.search}`;
   const proxyReq = httpRequest(

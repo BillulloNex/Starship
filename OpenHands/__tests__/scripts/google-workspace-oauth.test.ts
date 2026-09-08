@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  getActiveMcpOAuthCallbackPort,
   getGoogleWorkspaceOAuthClient,
   getMcpOAuthCallbackPort,
   getMcpOAuthRedirectUri,
   injectGoogleWorkspaceOAuthClient,
   isGoogleWorkspaceMcpUrl,
+  rememberMcpOAuthCallbackUrl,
   rewriteOAuthAuthorizationUrl,
   shouldInterceptGoogleWorkspaceMcp,
   shouldProxyMcpOAuthPublicCallback,
+  shouldSniffMcpOAuthStatus,
 } from "../../scripts/google-workspace-oauth.mjs";
 
 describe("google-workspace-oauth.mjs", () => {
@@ -69,6 +72,9 @@ describe("google-workspace-oauth.mjs", () => {
     expect(result.body.server.auth.authentication).toMatchObject({
       client_id: "id.apps.googleusercontent.com",
       client_secret: "gsecret",
+      additional_client_metadata: {
+        redirect_uris: ["https://ship.beenex.org/callback"],
+      },
     });
   });
 
@@ -157,5 +163,24 @@ describe("google-workspace-oauth.mjs", () => {
       "https://ship.beenex.org/callback",
     );
     expect(parsed.searchParams.get("state")).toBe("abc");
+  });
+
+  it("forwards Google's public callback to the live FastMCP listener port", () => {
+    expect(
+      shouldSniffMcpOAuthStatus({
+        method: "GET",
+        url: "/api/mcp/oauth/status/job-1",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSniffMcpOAuthStatus({
+        method: "POST",
+        url: "/api/mcp/oauth/status/job-1",
+      }),
+    ).toBe(false);
+    expect(rememberMcpOAuthCallbackUrl("http://localhost:54207/callback")).toBe(
+      54207,
+    );
+    expect(getActiveMcpOAuthCallbackPort({})).toBe(54207);
   });
 });
