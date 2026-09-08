@@ -256,10 +256,16 @@ trap cleanup EXIT SIGINT SIGTERM
 # ── 1. Start Agent Server ────────────────────────────────────────────────────
 log "Starting agent-server on port $AGENT_SERVER_PORT..."
 
-# LLMObs initialization + litellm monkey-patching is handled by
-# sitecustomize.py (auto-loaded via PYTHONPATH=/opt/agent-canvas/tools).
-# It wraps litellm.completion/acompletion to create Datadog LLMObs spans.
-if command -v openhands-agent-server >/dev/null 2>&1; then
+# LLMObs + FastMCP public OAuth callback are in sitecustomize.py.
+# Launch via grokbot_agent_server.py so that file is imported even when the
+# console script would skip PYTHONPATH sitecustomize.
+AGENT_SERVER_LAUNCHER="/opt/agent-canvas/tools/grokbot_agent_server.py"
+if [ -x /agent-server/.venv/bin/python ] && [ -f "$AGENT_SERVER_LAUNCHER" ]; then
+  if [ "$DD_ENABLED" = "true" ]; then
+    log "Agent server will be traced by Datadog (monkey-patch via sitecustomize.py)"
+  fi
+  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python "$AGENT_SERVER_LAUNCHER" --port "$AGENT_SERVER_PORT" &
+elif command -v openhands-agent-server >/dev/null 2>&1; then
   if [ "$DD_ENABLED" = "true" ]; then
     log "Agent server will be traced by Datadog (monkey-patch via sitecustomize.py)"
   fi

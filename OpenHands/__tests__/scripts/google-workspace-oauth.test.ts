@@ -7,6 +7,7 @@ import {
   injectGoogleWorkspaceOAuthClient,
   isGoogleWorkspaceMcpUrl,
   rememberMcpOAuthCallbackUrl,
+  rewriteGoogleOAuthStartResponse,
   rewriteOAuthAuthorizationUrl,
   shouldInterceptGoogleWorkspaceMcp,
   shouldProxyMcpOAuthPublicCallback,
@@ -182,5 +183,34 @@ describe("google-workspace-oauth.mjs", () => {
       54207,
     );
     expect(getActiveMcpOAuthCallbackPort({})).toBe(54207);
+  });
+
+  it("learns the FastMCP port from the authorize URL before rewriting it", () => {
+    const payload = rewriteGoogleOAuthStartResponse(
+      {
+        ok: true,
+        authorization_url:
+          "https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=http%3A%2F%2Flocalhost%3A41643%2Fcallback&state=abc",
+      },
+      { GOOGLE_OAUTH_CLIENT_ID: "id.apps.googleusercontent.com" },
+    );
+    expect(getActiveMcpOAuthCallbackPort({})).toBe(41643);
+    expect(new URL(payload.authorization_url).searchParams.get("redirect_uri")).toBe(
+      "https://ship.beenex.org/callback",
+    );
+  });
+
+  it("does not rewrite non-Google MCP OAuth start URLs", () => {
+    const result = injectGoogleWorkspaceOAuthClient(
+      {
+        server: { type: "http", url: "https://mcp.linear.app/mcp" },
+      },
+      {
+        GOOGLE_OAUTH_CLIENT_ID: "id.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET: "gsecret",
+      },
+    );
+    expect(result.injected).toBe(false);
+    expect(isGoogleWorkspaceMcpUrl(result.body.server.url)).toBe(false);
   });
 });

@@ -11,14 +11,14 @@ loopback listener to a fixed port so static-server can proxy ``GET /callback``.
 
 from __future__ import annotations
 
+import builtins
 import os
 import sys
-import threading
-import time
 from typing import Any
 
 DEFAULT_CALLBACK_PORT = 18765
 DEFAULT_PUBLIC_REDIRECT_URI = "https://ship.beenex.org/callback"
+_PATCH_CONFIG: dict[str, Any] | None = None
 
 
 def resolve_public_oauth_callback(
@@ -55,6 +55,20 @@ def apply_public_oauth_callback(oauth: Any, config: dict[str, Any]) -> None:
     oauth._callback_port = config["callback_port"]
 
 
+def _set_redirect_uris(obj: Any, urls: list[Any]) -> None:
+    if obj is None or not hasattr(obj, "redirect_uris"):
+        return
+    try:
+        obj.redirect_uris = urls
+        return
+    except Exception:
+        pass
+    try:
+        object.__setattr__(obj, "redirect_uris", urls)
+    except Exception:
+        pass
+
+
 def rewrite_bound_redirect_uris(oauth: Any, redirect_uri: str) -> None:
     """Force the public URI onto every metadata object FastMCP may use."""
     urls: list[Any]
@@ -65,46 +79,47 @@ def rewrite_bound_redirect_uris(oauth: Any, redirect_uri: str) -> None:
     except Exception:
         urls = [redirect_uri]
 
+    context = getattr(oauth, "context", None)
     for obj in (
         getattr(oauth, "client_metadata", None),
         getattr(oauth, "_static_client_info", None),
-        getattr(getattr(oauth, "context", None), "client_metadata", None),
-        getattr(getattr(oauth, "context", None), "client_info", None),
+        getattr(context, "client_metadata", None) if context is not None else None,
+        getattr(context, "client_info", None) if context is not None else None,
     ):
-        if obj is not None and hasattr(obj, "redirect_uris"):
-            try:
-                obj.redirect_uris = urls
-            except Exception:
-                continue
+        _set_redirect_uris(obj, urls)
 
 
 def _patch_fastmcp_oauth(config: dict[str, Any]) -> None:
     from fastmcp.client.auth.oauth import OAuth
 
-    orig_init = OAuth.__init__
+    if not getattr(OAuth.__init__, "_grokbot_public_callback", False):
+        orig_init = OAuth.__init__
 
-    def _init(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["callback_port"] = kwargs.get("callback_port") or config["callback_port"]
-        orig_init(self, *args, **kwargs)
-        apply_public_oauth_callback(self, config)
-        rewrite_bound_redirect_uris(self, config["redirect_uri"])
+        def _init(self, *args: Any, **kwargs: Any) -> None:
+            kwargs["callback_port"] = kwargs.get("callback_port") or config["callback_port"]
+            orig_init(self, *args, **kwargs)
+            apply_public_oauth_callback(self, config)
+            rewrite_bound_redirect_uris(self, config["redirect_uri"])
 
-    OAuth.__init__ = _init  # type: ignore[method-assign]
+        _init._grokbot_public_callback = True  # type: ignore[attr-defined]
+        OAuth.__init__ = _init  # type: ignore[method-assign]
 
     orig_bind = getattr(OAuth, "_bind", None)
-    if callable(orig_bind):
+    if callable(orig_bind) and not getattr(orig_bind, "_grokbot_public_callback", False):
 
-        def _bind(self, mcp_url: str) -> None:
+        def _bind(self, *args: Any, **kwargs: Any) -> None:
             apply_public_oauth_callback(self, config)
-            orig_bind(self, mcp_url)
+            orig_bind(self, *args, **kwargs)
             rewrite_bound_redirect_uris(self, config["redirect_uri"])
             print(
                 "[grokbot-sitecustomize] FastMCP OAuth bound "
-                f"redirect_uri={config['redirect_uri']} port={self.redirect_port}",
+                f"redirect_uri={config['redirect_uri']} "
+                f"port={getattr(self, 'redirect_port', config['callback_port'])}",
                 file=sys.stderr,
                 flush=True,
             )
 
+        _bind._grokbot_public_callback = True  # type: ignore[attr-defined]
         OAuth._bind = _bind  # type: ignore[method-assign]
 
 
@@ -113,7 +128,7 @@ def _patch_mcp_router(config: dict[str, Any]) -> bool:
 
     orig = getattr(mcp_router, "_oauth_auth_from_authentication", None)
     if not callable(orig) or getattr(orig, "_grokbot_public_callback", False):
-        return False
+        return bool(getattr(orig, "_grokbot_public_callback", False))
 
     def wrapped(authentication, *args: Any, **kwargs: Any):
         oauth = orig(authentication, *args, **kwargs)
@@ -123,23 +138,75 @@ def _patch_mcp_router(config: dict[str, Any]) -> bool:
 
     wrapped._grokbot_public_callback = True  # type: ignore[attr-defined]
     mcp_router._oauth_auth_from_authentication = wrapped
+    print(
+        "[grokbot-sitecustomize] MCP OAuth factory pinned to "
+        f"{config['redirect_uri']}",
+        file=sys.stderr,
+        flush=True,
+    )
     return True
 
 
-def _retry_mcp_router_patch(config: dict[str, Any]) -> None:
-    for _ in range(40):
-        try:
-            if _patch_mcp_router(config):
-                print(
-                    "[grokbot-sitecustomize] MCP OAuth factory pinned to "
-                    f"{config['redirect_uri']}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                return
-        except Exception:
-            pass
-        time.sleep(0.25)
+def _try_patches(config: dict[str, Any]) -> None:
+    try:
+        _patch_fastmcp_oauth(config)
+    except Exception as exc:
+        print(
+            f"[grokbot-sitecustomize] FastMCP OAuth patch deferred: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+    try:
+        _patch_mcp_router(config)
+    except Exception as exc:
+        print(
+            f"[grokbot-sitecustomize] MCP router OAuth patch deferred: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def _install_import_hook(config: dict[str, Any]) -> None:
+    global _PATCH_CONFIG
+    _PATCH_CONFIG = config
+    orig_import = builtins.__import__
+    if getattr(orig_import, "_grokbot_oauth_hook", False):
+        return
+
+    watched = {
+        "fastmcp",
+        "fastmcp.client",
+        "fastmcp.client.auth",
+        "fastmcp.client.auth.oauth",
+        "openhands.agent_server",
+        "openhands.agent_server.mcp_router",
+    }
+
+    def _import(name, globals=None, locals=None, fromlist=(), level=0):
+        module = orig_import(name, globals, locals, fromlist, level)
+        if name in watched:
+            _try_patches(config)
+        return module
+
+    _import._grokbot_oauth_hook = True  # type: ignore[attr-defined]
+    builtins.__import__ = _import
+
+    try:
+        import importlib
+
+        orig_import_module = importlib.import_module
+        if not getattr(orig_import_module, "_grokbot_oauth_hook", False):
+
+            def _import_module(name, package=None):
+                module = orig_import_module(name, package)
+                if name in watched:
+                    _try_patches(config)
+                return module
+
+            _import_module._grokbot_oauth_hook = True  # type: ignore[attr-defined]
+            importlib.import_module = _import_module
+    except Exception:
+        pass
 
 
 def install_fastmcp_public_callback_patch(
@@ -154,32 +221,8 @@ def install_fastmcp_public_callback_patch(
         )
         return False
 
-    try:
-        _patch_fastmcp_oauth(config)
-    except Exception as exc:
-        print(
-            f"[grokbot-sitecustomize] FastMCP OAuth patch skipped: {exc}",
-            file=sys.stderr,
-            flush=True,
-        )
-
-    try:
-        patched_router = _patch_mcp_router(config)
-    except Exception as exc:
-        patched_router = False
-        print(
-            f"[grokbot-sitecustomize] MCP router OAuth patch deferred: {exc}",
-            file=sys.stderr,
-            flush=True,
-        )
-    if not patched_router:
-        threading.Thread(
-            target=_retry_mcp_router_patch,
-            args=(config,),
-            name="grokbot-mcp-oauth-patch",
-            daemon=True,
-        ).start()
-
+    _install_import_hook(config)
+    _try_patches(config)
     print(
         "[grokbot-sitecustomize] MCP OAuth public callback -> "
         f"{config['redirect_uri']} (port {config['callback_port']})",

@@ -106,6 +106,7 @@ export function rewriteGoogleOAuthStartResponse(payload, env = process.env) {
   if (!isRecord(payload) || typeof payload.authorization_url !== "string") {
     return payload;
   }
+  rememberCallbackPortFromAuthorizationUrl(payload.authorization_url);
   const redirectUri = getMcpOAuthRedirectUri(env);
   if (!redirectUri) return payload;
   return {
@@ -115,6 +116,20 @@ export function rewriteGoogleOAuthStartResponse(payload, env = process.env) {
       redirectUri,
     ),
   };
+}
+
+export function rememberCallbackPortFromAuthorizationUrl(authorizationUrl) {
+  if (typeof authorizationUrl !== "string" || !authorizationUrl) return null;
+  try {
+    const redirect = new URL(authorizationUrl).searchParams.get("redirect_uri");
+    const port = rememberMcpOAuthCallbackUrl(redirect);
+    if (port) {
+      console.log(`[oauth-callback] FastMCP listener on 127.0.0.1:${port}`);
+    }
+    return port;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeCallbackPath(pathname) {
@@ -326,10 +341,11 @@ export async function handleGoogleWorkspaceMcpProxy(req, res, backendUrl) {
     return true;
   }
 
+  const isGoogle = result.injected || isGoogleWorkspaceMcpUrl(result.body?.server?.url);
   let transformResponse;
   try {
     const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
-    if (pathname === "/api/mcp/oauth/start") {
+    if (pathname === "/api/mcp/oauth/start" && isGoogle) {
       transformResponse = (payload) => rewriteGoogleOAuthStartResponse(payload);
     }
   } catch {
@@ -463,7 +479,12 @@ export function handleMcpOAuthPublicCallback(req, res, env = process.env) {
       "OAuth callback timed out. Go back to /mcp and click Install again.",
     );
   });
-  proxyReq.on("error", () => {
+  proxyReq.on("error", (err) => {
+    console.error(
+      `[oauth-callback] FastMCP not listening on 127.0.0.1:${port}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
     writeCallbackUnavailable(
       res,
       503,
