@@ -11,14 +11,14 @@ loopback listener to a fixed port so static-server can proxy ``GET /callback``.
 
 from __future__ import annotations
 
-import builtins
 import os
 import sys
+import threading
+import time
 from typing import Any
 
 DEFAULT_CALLBACK_PORT = 18765
 DEFAULT_PUBLIC_REDIRECT_URI = "https://ship.beenex.org/callback"
-_PATCH_CONFIG: dict[str, Any] | None = None
 
 
 def resolve_public_oauth_callback(
@@ -147,9 +147,12 @@ def _patch_mcp_router(config: dict[str, Any]) -> bool:
     return True
 
 
-def _try_patches(config: dict[str, Any]) -> None:
+def _try_patches(config: dict[str, Any]) -> tuple[bool, bool]:
+    fastmcp_ok = False
+    router_ok = False
     try:
         _patch_fastmcp_oauth(config)
+        fastmcp_ok = True
     except Exception as exc:
         print(
             f"[grokbot-sitecustomize] FastMCP OAuth patch deferred: {exc}",
@@ -157,56 +160,22 @@ def _try_patches(config: dict[str, Any]) -> None:
             flush=True,
         )
     try:
-        _patch_mcp_router(config)
+        router_ok = _patch_mcp_router(config)
     except Exception as exc:
         print(
             f"[grokbot-sitecustomize] MCP router OAuth patch deferred: {exc}",
             file=sys.stderr,
             flush=True,
         )
+    return fastmcp_ok, router_ok
 
 
-def _install_import_hook(config: dict[str, Any]) -> None:
-    global _PATCH_CONFIG
-    _PATCH_CONFIG = config
-    orig_import = builtins.__import__
-    if getattr(orig_import, "_grokbot_oauth_hook", False):
-        return
-
-    watched = {
-        "fastmcp",
-        "fastmcp.client",
-        "fastmcp.client.auth",
-        "fastmcp.client.auth.oauth",
-        "openhands.agent_server",
-        "openhands.agent_server.mcp_router",
-    }
-
-    def _import(name, globals=None, locals=None, fromlist=(), level=0):
-        module = orig_import(name, globals, locals, fromlist, level)
-        if name in watched:
-            _try_patches(config)
-        return module
-
-    _import._grokbot_oauth_hook = True  # type: ignore[attr-defined]
-    builtins.__import__ = _import
-
-    try:
-        import importlib
-
-        orig_import_module = importlib.import_module
-        if not getattr(orig_import_module, "_grokbot_oauth_hook", False):
-
-            def _import_module(name, package=None):
-                module = orig_import_module(name, package)
-                if name in watched:
-                    _try_patches(config)
-                return module
-
-            _import_module._grokbot_oauth_hook = True  # type: ignore[attr-defined]
-            importlib.import_module = _import_module
-    except Exception:
-        pass
+def _retry_patches(config: dict[str, Any]) -> None:
+    for _ in range(40):
+        fastmcp_ok, router_ok = _try_patches(config)
+        if fastmcp_ok and router_ok:
+            return
+        time.sleep(0.25)
 
 
 def install_fastmcp_public_callback_patch(
@@ -221,8 +190,14 @@ def install_fastmcp_public_callback_patch(
         )
         return False
 
-    _install_import_hook(config)
-    _try_patches(config)
+    fastmcp_ok, router_ok = _try_patches(config)
+    if not (fastmcp_ok and router_ok):
+        threading.Thread(
+            target=_retry_patches,
+            args=(config,),
+            name="grokbot-mcp-oauth-patch",
+            daemon=True,
+        ).start()
     print(
         "[grokbot-sitecustomize] MCP OAuth public callback -> "
         f"{config['redirect_uri']} (port {config['callback_port']})",
