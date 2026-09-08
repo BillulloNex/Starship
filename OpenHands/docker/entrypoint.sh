@@ -418,6 +418,7 @@ if [ -n "$PREVIEW_HOST_PATTERN" ]; then
     --preview-block-port "$PORT"
     --preview-block-port "$AGENT_SERVER_PORT"
     --preview-block-port "$AUTOMATION_PORT"
+    --preview-block-port "${GROKBOT_MCP_OAUTH_CALLBACK_PORT:-18765}"
   )
   log "Live app preview enabled: ${PREVIEW_URL_SCHEME}://${PREVIEW_HOST_PATTERN} (any port)"
 else

@@ -41,7 +41,7 @@ import { getApp, listApps } from "./app-registry.mjs";
  * Kept in sync with config/defaults.json `ports` by way of the entrypoint,
  * which passes the live values via --preview-block-port.
  */
-export const DEFAULT_BLOCKED_PORTS = [8000, 18000, 18001];
+export const DEFAULT_BLOCKED_PORTS = [8000, 18000, 18001, 18765];
 
 /** Below 1024 is privileged/system territory; nothing the agent starts lives there. */
 const MIN_PREVIEW_PORT = 1024;

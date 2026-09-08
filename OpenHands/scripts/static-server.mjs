@@ -48,7 +48,10 @@ import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
 import { handleClaudeUsageProxy } from "./claude-usage-proxy.mjs";
 import { handleCursorApiProxy } from "./cursor-api-proxy.mjs";
 import { handleOpencodeApiProxy } from "./opencode-api-proxy.mjs";
-import { handleGoogleWorkspaceMcpProxy } from "./google-workspace-oauth.mjs";
+import {
+  handleGoogleWorkspaceMcpProxy,
+  handleMcpOAuthPublicCallback,
+} from "./google-workspace-oauth.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
   captureInfrastructurePorts,
@@ -989,6 +992,10 @@ export function startStaticServer(config) {
     }
 
     const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+
+    if (handleMcpOAuthPublicCallback(req, res)) {
+      return;
+    }
 
     if (parsedUrl.pathname === PREVIEW_PORTS_PATH) {
       handlePreviewPortsRequest(

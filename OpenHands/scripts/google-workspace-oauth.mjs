@@ -1,9 +1,13 @@
 /**
- * Server-side Google Workspace MCP OAuth client.
+ * Server-side Google Workspace MCP OAuth client + public OAuth callback proxy.
  *
  * The GCP web client ID/secret are operator infrastructure (Coolify env),
  * not something a /mcp user should paste. This module injects them into
  * agent-server MCP OAuth start/test requests for official Google hosts.
+ *
+ * FastMCP still listens on loopback. Google must redirect the user's browser
+ * to a public HTTPS URI registered on the web client. GET /callback is proxied
+ * to that loopback listener so authorize and token-exchange share one URI.
  */
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
@@ -11,6 +15,14 @@ import process from "node:process";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const PROXY_TIMEOUT_MS = 125_000;
+const CALLBACK_PROXY_TIMEOUT_MS = 15_000;
+
+export const DEFAULT_MCP_OAUTH_CALLBACK_PORT = 18765;
+
+export const MCP_OAUTH_PUBLIC_CALLBACK_PATHS = new Set([
+  "/callback",
+  "/mcp/gmail/callback",
+]);
 
 export const GOOGLE_WORKSPACE_MCP_HOSTS = new Set([
   "gmailmcp.googleapis.com",
@@ -47,6 +59,37 @@ export function getGoogleWorkspaceOAuthClient(env = process.env) {
   const clientSecret = String(env.GOOGLE_OAUTH_CLIENT_SECRET ?? "").trim();
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret };
+}
+
+export function getMcpOAuthCallbackPort(env = process.env) {
+  const raw = String(
+    env.GROKBOT_MCP_OAUTH_CALLBACK_PORT ?? DEFAULT_MCP_OAUTH_CALLBACK_PORT,
+  ).trim();
+  const port = Number.parseInt(raw, 10);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    return DEFAULT_MCP_OAUTH_CALLBACK_PORT;
+  }
+  return port;
+}
+
+function normalizeCallbackPath(pathname) {
+  if (typeof pathname !== "string" || !pathname) return "/";
+  return pathname.length > 1 && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
+}
+
+export function shouldProxyMcpOAuthPublicCallback(req) {
+  const method = req?.method;
+  if (method !== "GET" && method !== "HEAD") return false;
+  try {
+    const pathname = normalizeCallbackPath(
+      new URL(req.url ?? "/", "http://localhost").pathname,
+    );
+    return MCP_OAUTH_PUBLIC_CALLBACK_PATHS.has(pathname);
+  } catch {
+    return false;
+  }
 }
 
 function isRecord(value) {
@@ -187,5 +230,68 @@ export async function handleGoogleWorkspaceMcpProxy(req, res, backendUrl) {
   }
 
   forwardJson(req, res, backendUrl, JSON.stringify(result.body));
+  return true;
+}
+
+function writeCallbackUnavailable(res, status, message) {
+  if (res.headersSent) return;
+  const body = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OAuth callback</title>
+  </head>
+  <body>
+    <p>${message}</p>
+    <p><a href="/mcp">Return to MCP marketplace</a></p>
+  </body>
+</html>`;
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(body);
+}
+
+export function handleMcpOAuthPublicCallback(req, res, env = process.env) {
+  if (!shouldProxyMcpOAuthPublicCallback(req)) return false;
+
+  const port = getMcpOAuthCallbackPort(env);
+  const incoming = new URL(req.url ?? "/", "http://localhost");
+  const path = `/callback${incoming.search}`;
+  const proxyReq = httpRequest(
+    {
+      hostname: "127.0.0.1",
+      port,
+      path,
+      method: req.method,
+      headers: {
+        host: `127.0.0.1:${port}`,
+        accept: req.headers.accept ?? "*/*",
+        "user-agent": req.headers["user-agent"] ?? "starship-oauth-callback",
+      },
+      timeout: CALLBACK_PROXY_TIMEOUT_MS,
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    },
+  );
+  proxyReq.on("timeout", () => {
+    proxyReq.destroy();
+    writeCallbackUnavailable(
+      res,
+      504,
+      "OAuth callback timed out. Go back to /mcp and click Install again.",
+    );
+  });
+  proxyReq.on("error", () => {
+    writeCallbackUnavailable(
+      res,
+      503,
+      "OAuth is not waiting for a callback. Go back to /mcp and click Install again.",
+    );
+  });
+  proxyReq.end();
   return true;
 }

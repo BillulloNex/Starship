@@ -19,6 +19,7 @@ describe("preview-proxy.mjs", () => {
       expect(isPreviewablePort(8000)).toBe(false);
       expect(isPreviewablePort(18000)).toBe(false);
       expect(isPreviewablePort(18001)).toBe(false);
+      expect(isPreviewablePort(18765)).toBe(false);
       expect(isPreviewablePort(80)).toBe(false);
       expect(isPreviewablePort(443)).toBe(false);
     });

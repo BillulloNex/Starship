@@ -525,9 +525,23 @@ def _init_antigravity_acp():
         print(f"[grokbot-sitecustomize] Antigravity ACP patch skipped: {e}", file=sys.stderr, flush=True)
 
 
+def _init_mcp_oauth_public_callback():
+    try:
+        from mcp_oauth_public_callback import install_fastmcp_public_callback_patch
+
+        install_fastmcp_public_callback_patch()
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] MCP OAuth public callback patch skipped: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 _init_llmobs()
 _init_antigravity_acp()
 _init_acp_background_warmup()
+_init_mcp_oauth_public_callback()
 
 
 def _background_sync():

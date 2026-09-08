@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   getGoogleWorkspaceOAuthClient,
+  getMcpOAuthCallbackPort,
   injectGoogleWorkspaceOAuthClient,
   isGoogleWorkspaceMcpUrl,
   shouldInterceptGoogleWorkspaceMcp,
+  shouldProxyMcpOAuthPublicCallback,
 } from "../../scripts/google-workspace-oauth.mjs";
 
 describe("google-workspace-oauth.mjs", () => {
@@ -92,5 +94,48 @@ describe("google-workspace-oauth.mjs", () => {
     );
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("missing_env");
+  });
+
+  it("proxies Google's public OAuth callback paths to the FastMCP listener", () => {
+    expect(
+      shouldProxyMcpOAuthPublicCallback({
+        method: "GET",
+        url: "/callback?code=abc&state=xyz",
+      }),
+    ).toBe(true);
+    expect(
+      shouldProxyMcpOAuthPublicCallback({
+        method: "GET",
+        url: "/mcp/gmail/callback?code=abc&state=xyz",
+      }),
+    ).toBe(true);
+    expect(
+      shouldProxyMcpOAuthPublicCallback({
+        method: "GET",
+        url: "/callback/",
+      }),
+    ).toBe(true);
+    expect(
+      shouldProxyMcpOAuthPublicCallback({
+        method: "POST",
+        url: "/callback?code=abc",
+      }),
+    ).toBe(false);
+    expect(
+      shouldProxyMcpOAuthPublicCallback({
+        method: "GET",
+        url: "/mcp",
+      }),
+    ).toBe(false);
+  });
+
+  it("pins the FastMCP callback listener to a Coolify-configured port", () => {
+    expect(getMcpOAuthCallbackPort({})).toBe(18765);
+    expect(
+      getMcpOAuthCallbackPort({ GROKBOT_MCP_OAUTH_CALLBACK_PORT: "19001" }),
+    ).toBe(19001);
+    expect(
+      getMcpOAuthCallbackPort({ GROKBOT_MCP_OAUTH_CALLBACK_PORT: "nope" }),
+    ).toBe(18765);
   });
 });
