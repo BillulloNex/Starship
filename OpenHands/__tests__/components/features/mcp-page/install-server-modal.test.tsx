@@ -353,7 +353,7 @@ describe("InstallServerModal", () => {
     });
   });
 
-  it("requires Google OAuth client ID and secret before authorizing Gmail", async () => {
+  it("authorizes Gmail without asking for a Google Cloud client ID or secret", async () => {
     const gmail = getMcpMarketplaceCatalog(MCP_MARKETPLACE).find(
       (entry) => entry.id === "gmail",
     )!;
@@ -381,17 +381,13 @@ describe("InstallServerModal", () => {
     await screen.findByTestId("mcp-install-modal");
     await waitFor(() => expect(getSpy).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByTestId("mcp-install-submit"));
-    await waitFor(() => expect(authorizeSpy).not.toHaveBeenCalled());
-    expect(saveSpy).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("mcp-install-field-oauth_client_id"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mcp-install-field-oauth_client_secret"),
+    ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("mcp-install-field-oauth_client_id"), {
-      target: { value: "123.apps.googleusercontent.com" },
-    });
-    fireEvent.change(
-      screen.getByTestId("mcp-install-field-oauth_client_secret"),
-      { target: { value: "gsecret" } },
-    );
     fireEvent.click(screen.getByTestId("mcp-install-submit"));
 
     await waitFor(() => expect(authorizeSpy).toHaveBeenCalledTimes(1));
@@ -404,11 +400,15 @@ describe("InstallServerModal", () => {
         authentication: {
           type: "oauth",
           client_auth_method: "client_secret_post",
-          client_id: "123.apps.googleusercontent.com",
-          client_secret: "gsecret",
         },
       },
     });
+    expect(
+      authorizeSpy.mock.calls[0][0].auth?.authentication,
+    ).not.toHaveProperty("client_id");
+    expect(
+      authorizeSpy.mock.calls[0][0].auth?.authentication,
+    ).not.toHaveProperty("client_secret");
     await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
   });
 

@@ -48,6 +48,7 @@ import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
 import { handleClaudeUsageProxy } from "./claude-usage-proxy.mjs";
 import { handleCursorApiProxy } from "./cursor-api-proxy.mjs";
 import { handleOpencodeApiProxy } from "./opencode-api-proxy.mjs";
+import { handleGoogleWorkspaceMcpProxy } from "./google-workspace-oauth.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
   captureInfrastructurePorts,
@@ -199,7 +200,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
         break;
       case "--reject-prefix": {
         const prefix = argv[++i];
-        if (!prefix || !prefix.startsWith("/")) {
+        if (!prefix?.startsWith("/")) {
           throw new Error(
             `--reject-prefix value must start with '/': ${prefix ?? "(empty)"}`,
           );
@@ -698,7 +699,7 @@ async function handlePreviewPortsRequest(
 ) {
   const enabled = Boolean(
     config.previewHostPattern?.includes("{port}") ||
-      config.previewHostPattern?.includes("{app}"),
+    config.previewHostPattern?.includes("{app}"),
   );
   const listening = await listListeningPorts(
     blockedPorts,
@@ -733,10 +734,15 @@ async function handlePreviewAppsRequest(
 
   if (req.method === "GET") {
     // 1. Check if requesting logs for an app: /api/preview/apps?action=logs&name=... or ?name=...&logs=true
-    const logsAction = parsedUrl.searchParams.get("action") === "logs" || parsedUrl.searchParams.get("logs") === "true";
+    const logsAction =
+      parsedUrl.searchParams.get("action") === "logs" ||
+      parsedUrl.searchParams.get("logs") === "true";
     const logAppName = parsedUrl.searchParams.get("name");
     if (logsAction && logAppName) {
-      const tail = Number.parseInt(parsedUrl.searchParams.get("tail") || "100", 10);
+      const tail = Number.parseInt(
+        parsedUrl.searchParams.get("tail") || "100",
+        10,
+      );
       try {
         const logData = await getAppLogs(logAppName, tail, registryPath);
         res.writeHead(200, {
@@ -822,7 +828,13 @@ async function handlePreviewAppsRequest(
           res.writeHead(200, {
             "Content-Type": "application/json; charset=utf-8",
           });
-          res.end(JSON.stringify({ success: true, count: discovered.length, discovered }));
+          res.end(
+            JSON.stringify({
+              success: true,
+              count: discovered.length,
+              discovered,
+            }),
+          );
           return;
         }
 
@@ -848,7 +860,11 @@ async function handlePreviewAppsRequest(
 
         if (action === "logs") {
           if (!name) throw new Error("Missing app name for logs action");
-          const logData = await getAppLogs(name, payload.tail || 100, registryPath);
+          const logData = await getAppLogs(
+            name,
+            payload.tail || 100,
+            registryPath,
+          );
           res.writeHead(200, {
             "Content-Type": "application/json; charset=utf-8",
           });
@@ -857,7 +873,11 @@ async function handlePreviewAppsRequest(
         }
 
         let record;
-        if (payload.type === "static" || payload.provider === "cloudflare_pages" || payload.url) {
+        if (
+          payload.type === "static" ||
+          payload.provider === "cloudflare_pages" ||
+          payload.url
+        ) {
           record = await registerStaticApp(payload, registryPath);
         } else {
           record = await registerApp(payload, registryPath, blockedPorts);
@@ -997,7 +1017,10 @@ export function startStaticServer(config) {
       return;
     }
 
-    if (parsedUrl.pathname === JOBS_API_PREFIX || parsedUrl.pathname.startsWith(`${JOBS_API_PREFIX}/`)) {
+    if (
+      parsedUrl.pathname === JOBS_API_PREFIX ||
+      parsedUrl.pathname.startsWith(`${JOBS_API_PREFIX}/`)
+    ) {
       const agentServerUrl =
         config.routes["/api"] ||
         process.env.GROKBOT_AGENT_SERVER_URL ||
@@ -1023,13 +1046,12 @@ export function startStaticServer(config) {
         blockedPreviewPorts,
         infrastructurePorts,
       ).catch((err) => {
-          console.error("Preview apps error:", err);
-          if (!res.headersSent) {
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: err.message }));
-          }
-        },
-      );
+        console.error("Preview apps error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
       return;
     }
 
@@ -1099,13 +1121,15 @@ export function startStaticServer(config) {
 
     if (parsedUrl.pathname.startsWith("/api/observability/opencode")) {
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
-      handleOpencodeApiProxy(req, res, parsedUrl.pathname, query).catch((err) => {
-        console.error("OpenCode API proxy error:", err);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: err.message }));
-        }
-      });
+      handleOpencodeApiProxy(req, res, parsedUrl.pathname, query).catch(
+        (err) => {
+          console.error("OpenCode API proxy error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
       return;
     }
 
@@ -1117,6 +1141,22 @@ export function startStaticServer(config) {
         (req.method === "GET" || req.method === "HEAD")
       ) {
         proxyServerInfoRequest(req, res, backend, config.runtimeServicesInfo);
+        return;
+      }
+      try {
+        if (await handleGoogleWorkspaceMcpProxy(req, res, backend)) {
+          return;
+        }
+      } catch (err) {
+        console.error("Google Workspace MCP OAuth inject error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : "OAuth inject failed",
+            }),
+          );
+        }
         return;
       }
       proxy.proxyHttp(req, res, backend);
@@ -1203,9 +1243,7 @@ export function startStaticServer(config) {
       }
       console.log("  * (default) -> static files + SPA fallback");
       const agentServerUrl =
-        config.routes["/api"] ||
-        process.env.GROKBOT_AGENT_SERVER_URL ||
-        "";
+        config.routes["/api"] || process.env.GROKBOT_AGENT_SERVER_URL || "";
       const dispatchApiKey =
         process.env.GROKBOT_AGENT_SERVER_API_KEY ||
         process.env.LOCAL_BACKEND_API_KEY ||

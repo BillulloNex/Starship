@@ -150,6 +150,7 @@ describe("getInstallableMcpConnectionOption", () => {
     const option = getInstallableMcpConnectionOption(gmail);
     expect(option).toBeDefined();
     expect(oauthRequiresClientCredentials(option)).toBe(true);
+    expect(oauthRequiresClientCredentials(option, "gmail")).toBe(false);
     expect(
       buildMcpOAuthAuthentication(option!, {
         clientId: "id.apps.googleusercontent.com",

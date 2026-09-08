@@ -137,7 +137,7 @@ function makeInitialState(entry: MarketplaceEntry): FieldState {
           option.auth.saveCredentialAsSecretByDefault ?? false;
       }
     }
-    if (oauthRequiresClientCredentials(option)) {
+    if (oauthRequiresClientCredentials(option, entry.id)) {
       values.oauth_client_id = "";
       values.oauth_client_secret = "";
     }
@@ -378,7 +378,7 @@ export function InstallServerModal({
     }
     const clientId = state.values.oauth_client_id?.trim() ?? "";
     const clientSecret = state.values.oauth_client_secret?.trim() ?? "";
-    if (oauthRequiresClientCredentials(option)) {
+    if (oauthRequiresClientCredentials(option, entry.id)) {
       if (!clientId) {
         headerErrors.oauth_client_id = t(I18nKey.MCP$ERROR_FIELD_REQUIRED);
       }
@@ -562,7 +562,7 @@ export function InstallServerModal({
               </p>
             </div>
           ) : null}
-          {oauthRequiresClientCredentials(option) ? (
+          {oauthRequiresClientCredentials(option, entry.id) ? (
             <>
               <div className="flex flex-col gap-1">
                 <SettingsInput

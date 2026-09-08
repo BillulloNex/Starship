@@ -109,13 +109,26 @@ export function getMcpOAuthAuthenticationConfig(
 }
 
 /**
- * Google Workspace remote MCP (and similar confidential clients) need the
- * user to paste an OAuth client ID + secret. Public MCP OAuth (`none` /
- * omitted) still uses the click-to-authorize popup with no extra fields.
+ * Gmail / Drive / Docs use the operator Google Cloud OAuth client from
+ * Coolify (`GOOGLE_OAUTH_CLIENT_ID` / `_SECRET`). The /mcp install UI
+ * must not ask a user to paste those.
+ */
+export const SERVER_MANAGED_OAUTH_ENTRY_IDS = new Set([
+  "gmail",
+  "google-drive",
+  "google-docs",
+]);
+
+/**
+ * Confidential MCP OAuth clients need an OAuth client ID + secret.
+ * Public MCP OAuth (`none` / omitted) still uses the click-to-authorize
+ * popup with no extra fields. Server-managed entries skip the form.
  */
 export function oauthRequiresClientCredentials(
   option: McpMarketplaceConnectionOption | undefined,
+  entryId?: string,
 ): boolean {
+  if (entryId && SERVER_MANAGED_OAUTH_ENTRY_IDS.has(entryId)) return false;
   if (option?.auth.strategy !== "oauth2") return false;
   const method = option.auth.oauth?.clientAuthentication;
   return method === "body" || method === "basic";

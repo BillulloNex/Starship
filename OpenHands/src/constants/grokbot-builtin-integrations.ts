@@ -1,7 +1,7 @@
 import type { IntegrationCatalogEntry as MarketplaceEntry } from "@openhands/extensions/integrations";
 
 const GOOGLE_WORKSPACE_INSTALL_HINT =
-  "Create a Google Cloud OAuth 2.0 Web application client, enable this product's API and MCP API, then paste the client ID and secret. Add any redirect URI shown in the OAuth popup error to Authorized redirect URIs. Use Internal audience, or External with your account as a test user. One client can be reused for Gmail, Drive, and Docs.";
+  "Click Install and sign in with Google. Starship already has the Google Cloud OAuth client. Add any redirect URI shown in the OAuth popup error to Authorized redirect URIs if Google rejects the callback.";
 
 function googleWorkspaceRemoteMcp(options: {
   id: string;
