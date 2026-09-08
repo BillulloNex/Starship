@@ -300,6 +300,7 @@ COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 
 # Copy the static-server scripts and their production runtime deps.
 COPY OpenHands/scripts/static-server.mjs /opt/agent-canvas/static-server.mjs
+COPY OpenHands/scripts/google-workspace-oauth.mjs /opt/agent-canvas/google-workspace-oauth.mjs
 COPY OpenHands/scripts/proxy-utils.mjs /opt/agent-canvas/proxy-utils.mjs
 COPY OpenHands/scripts/datadog-proxy.mjs /opt/agent-canvas/datadog-proxy.mjs
 COPY OpenHands/scripts/posthog-proxy.mjs /opt/agent-canvas/posthog-proxy.mjs
