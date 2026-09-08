@@ -46,11 +46,13 @@ def resolve_public_oauth_callback(
 
 
 def apply_public_oauth_callback(oauth: Any, config: dict[str, Any]) -> None:
-    """Pin FastMCP's loopback listener and advertised redirect URI."""
+    """Pin FastMCP's loopback listener. Do not set redirect_uris here.
+
+    FastMCP passes ``redirect_uris`` as a named argument to
+    ``OAuthClientMetadata``, so putting the same key in
+    ``additional_client_metadata`` raises TypeError.
+    """
     oauth._callback_port = config["callback_port"]
-    extra = dict(getattr(oauth, "_additional_client_metadata", None) or {})
-    extra["redirect_uris"] = [config["redirect_uri"]]
-    oauth._additional_client_metadata = extra
 
 
 def rewrite_bound_redirect_uris(oauth: Any, redirect_uri: str) -> None:
@@ -83,9 +85,6 @@ def _patch_fastmcp_oauth(config: dict[str, Any]) -> None:
 
     def _init(self, *args: Any, **kwargs: Any) -> None:
         kwargs["callback_port"] = kwargs.get("callback_port") or config["callback_port"]
-        extra = dict(kwargs.get("additional_client_metadata") or {})
-        extra["redirect_uris"] = [config["redirect_uri"]]
-        kwargs["additional_client_metadata"] = extra
         orig_init(self, *args, **kwargs)
         apply_public_oauth_callback(self, config)
         rewrite_bound_redirect_uris(self, config["redirect_uri"])
@@ -99,6 +98,12 @@ def _patch_fastmcp_oauth(config: dict[str, Any]) -> None:
             apply_public_oauth_callback(self, config)
             orig_bind(self, mcp_url)
             rewrite_bound_redirect_uris(self, config["redirect_uri"])
+            print(
+                "[grokbot-sitecustomize] FastMCP OAuth bound "
+                f"redirect_uri={config['redirect_uri']} port={self.redirect_port}",
+                file=sys.stderr,
+                flush=True,
+            )
 
         OAuth._bind = _bind  # type: ignore[method-assign]
 

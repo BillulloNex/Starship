@@ -72,10 +72,10 @@ describe("google-workspace-oauth.mjs", () => {
     expect(result.body.server.auth.authentication).toMatchObject({
       client_id: "id.apps.googleusercontent.com",
       client_secret: "gsecret",
-      additional_client_metadata: {
-        redirect_uris: ["https://ship.beenex.org/callback"],
-      },
     });
+    expect(
+      result.body.server.auth.authentication.additional_client_metadata,
+    ).toBeUndefined();
   });
 
   it("does not inject into unrelated MCP servers", () => {

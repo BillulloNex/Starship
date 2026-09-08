@@ -165,14 +165,6 @@ export function injectGoogleWorkspaceOAuthClient(body, env = process.env) {
     authentication.client_auth_method || "client_secret_post";
   authentication.client_id = client.clientId;
   authentication.client_secret = client.clientSecret;
-  const redirectUri =
-    getMcpOAuthRedirectUri(env) || DEFAULT_MCP_OAUTH_REDIRECT_URI;
-  authentication.additional_client_metadata = {
-    ...(isRecord(authentication.additional_client_metadata)
-      ? authentication.additional_client_metadata
-      : {}),
-    redirect_uris: [redirectUri],
-  };
   auth.strategy = "oauth2";
   auth.authentication = authentication;
   server.auth = auth;
@@ -285,6 +277,7 @@ function forwardJson(req, res, backendUrl, jsonBody, transformResponse) {
         const outHeaders = { ...proxyRes.headers };
         delete outHeaders["content-length"];
         delete outHeaders["transfer-encoding"];
+        delete outHeaders["content-encoding"];
         outHeaders["content-length"] = String(Buffer.byteLength(body));
         res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
         res.end(body);
@@ -385,6 +378,7 @@ function forwardGet(req, res, backendUrl, transformResponse) {
         const outHeaders = { ...proxyRes.headers };
         delete outHeaders["content-length"];
         delete outHeaders["transfer-encoding"];
+        delete outHeaders["content-encoding"];
         outHeaders["content-length"] = String(Buffer.byteLength(body));
         res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
         res.end(body);
