@@ -274,6 +274,43 @@ export default defineConfig(({ mode }) => {
         },
       },
       {
+        name: "serve-github-oauth",
+        apply: "serve",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            const parsedUrl = new URL(req.url ?? "", "http://localhost");
+            if (
+              parsedUrl.pathname === "/api/github" ||
+              parsedUrl.pathname.startsWith("/api/github/")
+            ) {
+              const { handleGithubOAuthRequest } = await import(
+                "./scripts/github-oauth.mjs"
+              );
+              const agentServerUrl =
+                process.env.GROKBOT_AGENT_SERVER_URL ||
+                "http://127.0.0.1:18000";
+              handleGithubOAuthRequest(req, res, {
+                agentServerUrl,
+                sessionApiKey:
+                  process.env.OH_SESSION_API_KEYS_0 ||
+                  process.env.LOCAL_BACKEND_API_KEY ||
+                  "",
+              }).catch((err) => {
+                console.error("GitHub OAuth error:", err);
+                if (!res.headersSent) {
+                  res.writeHead(500, {
+                    "Content-Type": "application/json; charset=utf-8",
+                  });
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+              return;
+            }
+            next();
+          });
+        },
+      },
+      {
         name: "serve-job-board",
         apply: "serve",
         configureServer(server) {

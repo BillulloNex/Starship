@@ -18,10 +18,13 @@ const mockUseLlmConfigured = vi.fn();
 let mockImages: File[] = [];
 let mockFiles: File[] = [];
 
-const { prewarmCtl, createConversationMutate } = vi.hoisted(() => ({
-  prewarmCtl: { id: null as string | null },
-  createConversationMutate: vi.fn(),
-}));
+const { prewarmCtl, createConversationMutate, ensureWorkspace } = vi.hoisted(
+  () => ({
+    prewarmCtl: { id: null as string | null },
+    createConversationMutate: vi.fn(),
+    ensureWorkspace: vi.fn(),
+  }),
+);
 
 vi.mock("#/utils/send-message-with-attachments", () => ({
   sendMessageWithAttachments: (...args: unknown[]) =>
@@ -74,6 +77,20 @@ vi.mock("#/hooks/mutation/use-create-conversation", () => ({
     isPending: false,
   }),
   CREATE_CONVERSATION_MUTATION_KEY: ["create-conversation"],
+}));
+
+vi.mock("#/api/github-oauth-service", () => ({
+  default: {
+    ensureWorkspace,
+    getStatus: vi.fn(async () => ({
+      configured: false,
+      connected: false,
+      login: null,
+      name: null,
+      avatarUrl: null,
+      mode: "unset",
+    })),
+  },
 }));
 
 vi.mock("#/hooks/use-opencode-acp-prewarm", () => ({
@@ -309,6 +326,12 @@ describe("HomeChatLauncher", () => {
     prewarmCtl.id = null;
     createConversationMutate.mockReset();
     createConversationMutate.mockResolvedValue(makeCreateResult());
+    ensureWorkspace.mockReset();
+    ensureWorkspace.mockResolvedValue({
+      path: "/projects/repo",
+      cloned: true,
+      full_name: "org/repo",
+    });
     mockUseActiveBackend.mockReturnValue(localBackend);
     mockUseLlmConfigured.mockReturnValue({
       isConfigured: true,
@@ -413,6 +436,45 @@ describe("HomeChatLauncher", () => {
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith("/conversations/conv-ws"),
     );
+  });
+
+  it("shows Open Repository next to Open Workspace on a local backend", () => {
+    renderLauncher();
+    expect(screen.getByTestId("open-workspace-button")).toBeInTheDocument();
+    expect(screen.getByTestId("open-repository-button")).toBeInTheDocument();
+  });
+
+  it("clones the picked GitHub repo into a local working dir", async () => {
+    createConversationMutate.mockResolvedValue(
+      makeCreateResult({ conversation_id: "conv-gh", task_id: "conv-gh" }),
+    );
+
+    renderLauncher();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("open-repository-button"));
+    await user.click(await screen.findByTestId("stub-repo-dialog-confirm"));
+
+    await waitFor(() =>
+      expect(ensureWorkspace).toHaveBeenCalledWith("org/repo", "main"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("stub-git-control-bar-preview"),
+      ).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByTestId("stub-chat-submit"));
+
+    await waitFor(() =>
+      expect(createConversationMutate).toHaveBeenCalledTimes(1),
+    );
+    expect(createConversationMutate).toHaveBeenCalledWith({
+      query: "hello world",
+      entryPoint: "home_chat_launcher",
+      workingDir: "/projects/repo",
+      workspaceMode: "local_repo",
+    });
   });
 
   it("passes the picked workspace path with new-worktree mode when selected", async () => {

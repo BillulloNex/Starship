@@ -19,6 +19,21 @@ vi.mock("#/contexts/active-backend-context", () => ({
   }),
 }));
 
+vi.mock("#/api/github-oauth-service", () => ({
+  default: {
+    getStatus: vi.fn(async () => ({
+      configured: false,
+      connected: false,
+      login: null,
+      name: null,
+      avatarUrl: null,
+      mode: "unset",
+    })),
+    startUrl: () => "/api/github/oauth/start?next=%2Fsettings%2Fapp",
+    disconnect: vi.fn(),
+  },
+}));
+
 function buildSettings(overrides: Partial<Settings> = {}): Settings {
   return {
     ...MOCK_DEFAULT_USER_SETTINGS,
@@ -75,6 +90,8 @@ describe("AppSettingsScreen", () => {
     expect(screen.getByTestId("git-user-email-input")).toHaveValue(
       "octocat@example.com",
     );
+    expect(screen.getByTestId("github-connect-card")).toBeInTheDocument();
+    expect(screen.getByTestId("github-connect-button")).toBeInTheDocument();
     expect(
       screen.getByText("SETTINGS$CONVERSATION_TITLES"),
     ).toBeInTheDocument();

@@ -22,6 +22,7 @@ import { NavigationLink } from "#/components/shared/navigation-link";
 import { useLlmProfiles } from "#/hooks/query/use-llm-profiles";
 import { useActiveBackend } from "#/contexts/active-backend-context";
 import { formatModelNameForDisplay } from "#/utils/format-model-name";
+import { GithubConnectCard } from "#/components/features/settings/github-connect-card";
 
 const AUTOMATIC_TITLE_LLM_PROFILE_KEY = "__automatic__";
 
@@ -258,6 +259,9 @@ export function AppSettingsScreen() {
             <p className="mb-4 text-sm leading-5 text-tertiary-light">
               {t(I18nKey.SETTINGS$GIT_SETTINGS_DESCRIPTION)}
             </p>
+            <div className="mb-6">
+              <GithubConnectCard />
+            </div>
             <div className="flex flex-col gap-6">
               <SettingsInput
                 testId="git-user-name-input"

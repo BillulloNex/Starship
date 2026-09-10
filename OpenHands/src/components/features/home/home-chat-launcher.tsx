@@ -36,6 +36,7 @@ import { OpenWorkspaceDialog } from "./open-workspace-dialog";
 import { OpenRepositoryDialog } from "./open-repository-dialog";
 import { HomeGitControlBarPreview } from "./home-git-control-bar-preview";
 import { useOpencodeAcpPrewarm } from "#/hooks/use-opencode-acp-prewarm";
+import GitHubOAuthService from "#/api/github-oauth-service";
 
 export function HomeChatLauncher() {
   const { t } = useTranslation("openhands");
@@ -43,7 +44,8 @@ export function HomeChatLauncher() {
   const { navigate } = useNavigation();
   const isLocal = backend.kind === "local";
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
+  const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
   const [pendingWorkspace, setPendingWorkspace] =
     useState<LocalWorkspace | null>(null);
   const [pendingRepository, setPendingRepository] =
@@ -79,7 +81,7 @@ export function HomeChatLauncher() {
     : null;
 
   const hasSelection = isLocal
-    ? !!pendingWorkspace
+    ? !!pendingWorkspace || (!!pendingRepository && !!pendingBranch)
     : !!pendingRepository && !!pendingBranch;
 
   const handleSubmit = (message: string) => {
@@ -288,16 +290,28 @@ export function HomeChatLauncher() {
               provider={pendingProvider}
               workspaceMode={workspaceMode}
               backendKind={backend.kind}
-              onRepoClick={() => setIsDialogOpen(true)}
+              onRepoClick={() => {
+                if (pendingRepository) setIsRepoDialogOpen(true);
+                else setIsWorkspaceDialogOpen(true);
+              }}
               onWorkspaceModeChange={setWorkspaceMode}
             />
           ) : (
-            <OpenLauncherButton
-              kind={isLocal ? "local" : "cloud"}
-              onClick={() => setIsDialogOpen(true)}
-              disabled={isCreating || Boolean(workspacesUnsupportedMessage)}
-              disabledTooltip={workspacesUnsupportedMessage}
-            />
+            <>
+              {isLocal && (
+                <OpenLauncherButton
+                  kind="local"
+                  onClick={() => setIsWorkspaceDialogOpen(true)}
+                  disabled={isCreating || Boolean(workspacesUnsupportedMessage)}
+                  disabledTooltip={workspacesUnsupportedMessage}
+                />
+              )}
+              <OpenLauncherButton
+                kind="cloud"
+                onClick={() => setIsRepoDialogOpen(true)}
+                disabled={isCreating}
+              />
+            </>
           )}
           <PluginPickerTrigger
             count={selectedPlugins.length}
@@ -312,10 +326,10 @@ export function HomeChatLauncher() {
         </div>
       </div>
 
-      {isLocal ? (
+      {isLocal && (
         <OpenWorkspaceDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          isOpen={isWorkspaceDialogOpen}
+          onClose={() => setIsWorkspaceDialogOpen(false)}
           onConfirm={(workspace) => {
             setPendingWorkspace(workspace);
             setPendingRepository(null);
@@ -324,19 +338,48 @@ export function HomeChatLauncher() {
             setWorkspaceMode("local_repo");
           }}
         />
-      ) : (
-        <OpenRepositoryDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
-          onConfirm={({ repository, branch, provider }) => {
+      )}
+      <OpenRepositoryDialog
+        isOpen={isRepoDialogOpen}
+        onClose={() => setIsRepoDialogOpen(false)}
+        onConfirm={({ repository, branch, provider }) => {
+          void (async () => {
+            if (isLocal) {
+              const toastId = toast.loading(
+                t(I18nKey.SETTINGS$GITHUB_PREPARING_WORKSPACE),
+                TOAST_OPTIONS,
+              );
+              try {
+                const workspace = await GitHubOAuthService.ensureWorkspace(
+                  repository.full_name,
+                  branch.name,
+                );
+                toast.dismiss(toastId);
+                const name =
+                  workspace.path.replace(/\/+$/, "").split("/").pop() ||
+                  repository.full_name;
+                setPendingWorkspace({
+                  id: workspace.path,
+                  name,
+                  path: workspace.path,
+                });
+              } catch (error) {
+                toast.dismiss(toastId);
+                displayErrorToast(
+                  error instanceof Error ? error.message : null,
+                );
+                return;
+              }
+            } else {
+              setPendingWorkspace(null);
+            }
             setPendingRepository(repository);
             setPendingBranch(branch);
             setPendingProvider(provider ?? repository.git_provider);
-            setPendingWorkspace(null);
             setWorkspaceMode("local_repo");
-          }}
-        />
-      )}
+          })();
+        }}
+      />
 
       {isPluginPickerOpen && (
         <PluginPickerModal
