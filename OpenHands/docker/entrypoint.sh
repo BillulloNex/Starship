@@ -82,6 +82,21 @@ export CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
 export PUPPETEER_USER_DATA_DIR="${PUPPETEER_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
 log "Browser session persistence: $CHROME_PROFILE_DIR"
 
+# GitHub HTTPS clones in the web console have no TTY. Use the Starship
+# credential helper so `git clone https://github.com/...` can read the
+# Connect GitHub token (or GITHUB_TOKEN) instead of prompting.
+export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
+if command -v git >/dev/null 2>&1 && [ -x /opt/agent-canvas/github-git-credential.sh ]; then
+  git config --global credential.https://github.com.helper \
+    /opt/agent-canvas/github-git-credential.sh || true
+  git config --global credential.https://gist.github.com.helper \
+    /opt/agent-canvas/github-git-credential.sh || true
+  git config --global --unset-all url.https://github.com/.insteadOf >/dev/null 2>&1 || true
+  git config --global --add url.https://github.com/.insteadOf git@github.com: || true
+  git config --global --add url.https://github.com/.insteadOf ssh://git@github.com/ || true
+  log "GitHub credential helper installed"
+fi
+
 # OH_SECRET_KEY is required for settings/secrets encryption. Without it the
 # agent-server refuses to return encrypted secrets → conversation creation
 # fails with a 503.  Auto-generate and persist (just like the session API key)

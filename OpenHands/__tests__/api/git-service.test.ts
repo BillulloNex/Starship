@@ -2,11 +2,19 @@ import { describe, expect, vi, beforeEach, it, afterEach } from "vitest";
 import GitService from "#/api/git-service/git-service.api";
 import * as cloudGitService from "#/api/cloud/git-service.api";
 import * as activeStore from "#/api/backend-registry/active-store";
+import GitHubOAuthService from "#/api/github-oauth-service";
 
 vi.mock("#/api/cloud/git-service.api", () => ({
   searchCloudRepositories: vi.fn(),
   getCloudInstallations: vi.fn(),
   getCloudRepositoryBranches: vi.fn(),
+}));
+
+vi.mock("#/api/github-oauth-service", () => ({
+  default: {
+    listRepos: vi.fn(),
+    listBranches: vi.fn(),
+  },
 }));
 
 vi.mock("#/api/backend-registry/active-store", () => ({
@@ -22,6 +30,8 @@ const mockGetCloudInstallations = vi.mocked(
 const mockGetCloudRepositoryBranches = vi.mocked(
   cloudGitService.getCloudRepositoryBranches,
 );
+const mockListLocalGithubRepos = vi.mocked(GitHubOAuthService.listRepos);
+const mockListLocalGithubBranches = vi.mocked(GitHubOAuthService.listBranches);
 const mockGetActiveBackend = vi.mocked(activeStore.getActiveBackend);
 
 const cloudActive = () =>
@@ -194,13 +204,52 @@ describe("GitService", () => {
       expect(result.items).toHaveLength(1);
     });
 
-    it("should short-circuit to empty results when provider is valid but local backend is active", async () => {
+    it("should list local GitHub repos through the OAuth service", async () => {
       localActive();
+      mockListLocalGithubRepos.mockResolvedValue({
+        items: [
+          {
+            id: "1",
+            full_name: "BillulloNex/Starship",
+            git_provider: "github",
+            is_public: false,
+          },
+        ],
+        next_page_id: null,
+      });
 
-      const result = await GitService.searchGitRepositories("test", "github");
+      const result = await GitService.searchGitRepositories(
+        "Starship",
+        "github",
+      );
 
-      expect(result).toEqual({ items: [], next_page_id: null });
       expect(mockSearchCloudRepositories).not.toHaveBeenCalled();
+      expect(mockListLocalGithubRepos).toHaveBeenCalledWith({
+        query: "Starship",
+        limit: 100,
+        pageId: undefined,
+      });
+      expect(result.items).toHaveLength(1);
+    });
+
+    it("should list local GitHub branches through the OAuth service", async () => {
+      localActive();
+      mockListLocalGithubBranches.mockResolvedValue({
+        items: [{ name: "main", commit_sha: "abc", protected: false }],
+        next_page_id: null,
+      });
+
+      const result = await GitService.getRepositoryBranches(
+        "BillulloNex/Starship",
+        "github",
+      );
+
+      expect(mockGetCloudRepositoryBranches).not.toHaveBeenCalled();
+      expect(mockListLocalGithubBranches).toHaveBeenCalledWith(
+        "BillulloNex/Starship",
+        { query: undefined, limit: 30, pageId: undefined },
+      );
+      expect(result.items[0]?.name).toBe("main");
     });
   });
 });

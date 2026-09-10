@@ -11,10 +11,14 @@ import {
   getCloudRepositoryBranches,
   searchCloudRepositories,
 } from "../cloud/git-service.api";
+import GitHubOAuthService from "../github-oauth-service";
 
 const safeProvider = (value: string): Provider => value as Provider;
 
 const isCloudActive = () => getActiveBackend().backend.kind === "cloud";
+
+const isLocalGithub = (provider: string) =>
+  !isCloudActive() && provider === "github";
 
 /**
  * Guard against null/undefined provider values that would result in
@@ -39,7 +43,17 @@ class GitService {
     pageId?: string,
     installationId?: string,
   ): Promise<RepositoryPage> {
-    if (isInvalidProvider(provider) || !isCloudActive()) {
+    if (isInvalidProvider(provider)) {
+      return EMPTY_REPOSITORY_PAGE;
+    }
+    if (isLocalGithub(provider)) {
+      return GitHubOAuthService.listRepos({
+        query: query || undefined,
+        limit,
+        pageId,
+      });
+    }
+    if (!isCloudActive()) {
       return EMPTY_REPOSITORY_PAGE;
     }
     return searchCloudRepositories({
@@ -57,7 +71,13 @@ class GitService {
     limit = 30,
     installationId?: string,
   ): Promise<RepositoryPage> {
-    if (isInvalidProvider(provider) || !isCloudActive()) {
+    if (isInvalidProvider(provider)) {
+      return EMPTY_REPOSITORY_PAGE;
+    }
+    if (isLocalGithub(provider)) {
+      return GitHubOAuthService.listRepos({ limit, pageId });
+    }
+    if (!isCloudActive()) {
       return EMPTY_REPOSITORY_PAGE;
     }
     return searchCloudRepositories({
@@ -95,7 +115,17 @@ class GitService {
     pageId?: string,
     limit = 30,
   ): Promise<BranchPage> {
-    if (isInvalidProvider(provider) || !isCloudActive()) {
+    if (isInvalidProvider(provider)) {
+      return EMPTY_BRANCH_PAGE;
+    }
+    if (isLocalGithub(provider)) {
+      return GitHubOAuthService.listBranches(repository, {
+        query: query || undefined,
+        limit,
+        pageId,
+      });
+    }
+    if (!isCloudActive()) {
       return EMPTY_BRANCH_PAGE;
     }
     return getCloudRepositoryBranches({
@@ -114,7 +144,17 @@ class GitService {
     pageId?: string,
     limit = 30,
   ): Promise<BranchPage> {
-    if (isInvalidProvider(provider) || !isCloudActive()) {
+    if (isInvalidProvider(provider)) {
+      return EMPTY_BRANCH_PAGE;
+    }
+    if (isLocalGithub(provider)) {
+      return GitHubOAuthService.listBranches(repository, {
+        query,
+        limit,
+        pageId,
+      });
+    }
+    if (!isCloudActive()) {
       return EMPTY_BRANCH_PAGE;
     }
     return getCloudRepositoryBranches({
