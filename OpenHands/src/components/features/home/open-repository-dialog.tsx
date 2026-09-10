@@ -8,6 +8,8 @@ import { Branch, GitRepository } from "#/types/git";
 import { Provider } from "#/types/settings";
 import { useUserProviders } from "#/hooks/use-user-providers";
 import { RepositorySelectionForm } from "./repo-selection-form";
+import { GithubConnectCard } from "#/components/features/settings/github-connect-card";
+import { useGithubConnection } from "#/hooks/query/use-github-connection";
 
 interface OpenRepositoryDialogProps {
   isOpen: boolean;
@@ -25,7 +27,13 @@ export function OpenRepositoryDialog({
   onConfirm,
 }: OpenRepositoryDialogProps) {
   const { t } = useTranslation("openhands");
-  const { isLoadingSettings } = useUserProviders();
+  const { providers, isLoadingSettings } = useUserProviders();
+  const { data: github, isLoading: isLoadingGithub } = useGithubConnection();
+  const showConnectPrompt =
+    !isLoadingSettings &&
+    !isLoadingGithub &&
+    !github?.connected &&
+    providers.length === 0;
 
   if (!isOpen) return null;
 
@@ -44,13 +52,17 @@ export function OpenRepositoryDialog({
         </div>
 
         <div className="w-full" data-testid="open-repository-dialog-body">
-          <RepositorySelectionForm
-            isLoadingSettings={isLoadingSettings}
-            onConfirm={(selection) => {
-              onConfirm(selection);
-              onClose();
-            }}
-          />
+          {showConnectPrompt ? (
+            <GithubConnectCard compact />
+          ) : (
+            <RepositorySelectionForm
+              isLoadingSettings={isLoadingSettings}
+              onConfirm={(selection) => {
+                onConfirm(selection);
+                onClose();
+              }}
+            />
+          )}
         </div>
       </ModalBody>
     </ModalBackdrop>

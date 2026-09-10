@@ -54,6 +54,10 @@ import {
   handleMcpOAuthStatusSniff,
 } from "./google-workspace-oauth.mjs";
 import {
+  GITHUB_OAUTH_API_PREFIX,
+  handleGithubOAuthRequest,
+} from "./github-oauth.mjs";
+import {
   DEFAULT_BLOCKED_PORTS,
   captureInfrastructurePorts,
   createPreviewHostMatcher,
@@ -84,6 +88,8 @@ import { handleSkillInstallRequest } from "./skill-installer.mjs";
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
 /** Where apps are registered and listed. */
 const PREVIEW_APPS_PATH = "/api/preview/apps";
+/** Click-to-connect GitHub (OAuth App or GitHub App manifest). */
+const GITHUB_API_PREFIX = GITHUB_OAUTH_API_PREFIX;
 /** Persistent workforce kanban. */
 const JOBS_API_PREFIX = "/api/jobs";
 /** Skill installation endpoint. */
@@ -1017,6 +1023,27 @@ export function startStaticServer(config) {
     if (parsedUrl.pathname === SKILLS_INSTALL_PATH && req.method === "POST") {
       handleSkillInstallRequest(req, res).catch((err) => {
         console.error("Skill installer error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (
+      parsedUrl.pathname === GITHUB_API_PREFIX ||
+      parsedUrl.pathname.startsWith(`${GITHUB_API_PREFIX}/`)
+    ) {
+      const agentServerUrl =
+        config.routes["/api"] ||
+        process.env.GROKBOT_AGENT_SERVER_URL ||
+        "http://127.0.0.1:18000";
+      handleGithubOAuthRequest(req, res, {
+        sessionApiKey: config.sessionApiKey,
+        agentServerUrl,
+      }).catch((err) => {
+        console.error("GitHub OAuth error:", err);
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: err.message }));
