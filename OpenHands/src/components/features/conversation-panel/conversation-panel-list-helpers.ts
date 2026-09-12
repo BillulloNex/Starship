@@ -164,15 +164,47 @@ export function filterOutPinnedConversations(
 export const UNNAMED_AUTOMATION_FACET = "__unnamed__";
 
 /**
- * Whether a conversation was created by an automation run: the cloud backend
- * stamps `trigger: "automation"`, while local agent-server conversations are
- * recognized by the automation tags the SDK workspace attaches at creation.
+ * Whether a conversation was created by an automation run.
+ *
+ * Local agent-server conversations are recognized by the automation tags the
+ * SDK workspace attaches at creation, or by the isolated
+ * `.../automation-runs/<run-id>/` working dir used when tags never landed
+ * (older runs, list payloads that omit tags). Cloud stamps
+ * `trigger: "automation"`.
  */
 /** Enough of a conversation to recognize an automation-born thread. */
 export type AutomationConversationIdentity = Pick<
   AppConversation,
-  "trigger" | "tags"
+  "trigger" | "tags" | "workspace" | "selected_workspace"
 >;
+
+const AUTOMATION_TAG_KEY_SET = new Set(
+  AUTOMATION_TAG_KEYS.map((key) => key.toLowerCase()),
+);
+
+/** Path segment the automation runner uses for per-run disk isolation. */
+const AUTOMATION_RUNS_PATH_SEGMENT = /(?:^|\/)automation-runs(?:\/|$)/;
+
+export function isAutomationRunWorkspacePath(
+  path: string | null | undefined,
+): boolean {
+  if (!path) {
+    return false;
+  }
+  return AUTOMATION_RUNS_PATH_SEGMENT.test(path.replace(/\\/g, "/"));
+}
+
+function hasAutomationTag(
+  tags: Record<string, string> | null | undefined,
+): boolean {
+  if (!tags) {
+    return false;
+  }
+  return Object.entries(tags).some(
+    ([key, value]) =>
+      Boolean(value) && AUTOMATION_TAG_KEY_SET.has(key.trim().toLowerCase()),
+  );
+}
 
 export function isAutomationConversation(
   conversation: AutomationConversationIdentity,
@@ -180,11 +212,13 @@ export function isAutomationConversation(
   if (conversation.trigger === "automation") {
     return true;
   }
-  const tags = conversation.tags;
-  if (!tags) {
-    return false;
+  if (hasAutomationTag(conversation.tags)) {
+    return true;
   }
-  return AUTOMATION_TAG_KEYS.some((key) => Boolean(tags[key]));
+  return (
+    isAutomationRunWorkspacePath(conversation.workspace?.working_dir) ||
+    isAutomationRunWorkspacePath(conversation.selected_workspace)
+  );
 }
 
 export function getAutomationNameFacet(

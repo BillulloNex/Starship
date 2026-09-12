@@ -628,6 +628,36 @@ describe("conversation-panel-list-helpers", () => {
     ).toEqual([true, true, true, false]);
   });
 
+  it("recognizes untagged local runs by the automation-runs working dir", () => {
+    // Older local runs (and list payloads that omit tags) still isolate
+    // disk under automation-runs/<run-id>/. That path is how they show up
+    // as "No workspace" in grouped mode without an automation badge.
+    const isolatedRun: AppConversation = {
+      ...base,
+      id: "isolated-run",
+      title: "You Are the DemoBuild Qc Automation",
+      workspace: {
+        working_dir: "/root/workspaces/automation-runs/run-abc",
+      },
+    };
+    const similarlyNamedFolder: AppConversation = {
+      ...base,
+      id: "manual-similar",
+      title: "manual",
+      workspace: { working_dir: "/workspace/my-automation-runs-backup" },
+    };
+    expect(isAutomationConversation(isolatedRun)).toBe(true);
+    expect(isAutomationConversation(similarlyNamedFolder)).toBe(false);
+    expect(
+      applyAutomationConversationFilter(
+        [isolatedRun, similarlyNamedFolder],
+        "hide-automations",
+        [],
+        [],
+      ).map((conversation) => conversation.id),
+    ).toEqual(["manual-similar"]);
+  });
+
   it("returns a named badge, an unnamed fallback, or null for manual chats", () => {
     expect(
       getAutomationConversationBadgeLabel(
