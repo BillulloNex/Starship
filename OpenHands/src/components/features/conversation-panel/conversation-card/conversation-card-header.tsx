@@ -1,13 +1,16 @@
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { isArchivedSandboxStatus } from "#/utils/conversation-archive-status";
+import { ConversationAutomationBadge } from "../conversation-automation-badge";
 import { ConversationCardTitle } from "./conversation-card-title";
+
 interface ConversationCardHeaderProps {
   title: string;
   titleMode: "view" | "edit";
   onTitleSave: (title: string) => void;
   executionStatus?: ExecutionStatus | null;
   sandboxStatus?: SandboxStatus | null;
+  automationBadge?: string | null;
 }
 
 export function ConversationCardHeader({
@@ -15,6 +18,7 @@ export function ConversationCardHeader({
   titleMode,
   onTitleSave,
   sandboxStatus,
+  automationBadge,
 }: ConversationCardHeaderProps) {
   const isArchived = isArchivedSandboxStatus(sandboxStatus);
   return (
@@ -25,6 +29,9 @@ export function ConversationCardHeader({
         onSave={onTitleSave}
         isConversationArchived={isArchived}
       />
+      {automationBadge ? (
+        <ConversationAutomationBadge label={automationBadge} />
+      ) : null}
     </div>
   );
 }

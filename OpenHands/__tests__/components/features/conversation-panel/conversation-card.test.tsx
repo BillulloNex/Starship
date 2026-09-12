@@ -41,6 +41,8 @@ vi.mock("react-i18next", async () => {
           CONVERSATION$ACP_AGENT_GENERIC: "ACP",
           CONVERSATION_PANEL$PIN_CONVERSATION: "Pin conversation",
           CONVERSATION_PANEL$UNPIN_CONVERSATION: "Unpin conversation",
+          CONVERSATION_PANEL$AUTOMATION_UNNAMED: "Unnamed automation",
+          CONVERSATION_PANEL$AUTOMATION_BADGE_LABEL: "Automation: {{name}}",
         };
         return translations[key] || key;
       },
@@ -842,11 +844,10 @@ describe("ConversationCard", () => {
       expect(chips[0].getAttribute("title")).not.toContain("origin");
     });
 
-    it("keeps the automation name/trigger chips but hides the automation id chips", () => {
-      // The automation id/run-id tags are raw UUIDs consumed by the panel's
-      // automation filter — chip noise — while the human-meaningful name and
-      // trigger stay visible. Like every tag chip they render value-only,
-      // with the humanized ``key: value`` pair in the tooltip.
+    it("shows an always-on automation badge and keeps only the trigger as a tag chip", () => {
+      // The name is a first-class badge so mixed lists stay distinguishable
+      // even with Tags off. Raw UUID tags stay hidden; cron/event stays as
+      // optional tag metadata.
       renderWithProviders(
         <ConversationCard
           title="Conversation 1"
@@ -862,15 +863,31 @@ describe("ConversationCard", () => {
         />,
       );
 
-      const chips = screen.getAllByTestId("conversation-card-tag-chip");
-      expect(chips).toHaveLength(2);
-      expect(chips[0]).toHaveTextContent("Nightly Audit");
-      expect(chips[0]).toHaveAttribute(
-        "title",
-        "Automationname: Nightly Audit",
+      expect(screen.getByTestId("conversation-automation-badge")).toHaveTextContent(
+        "Nightly Audit",
       );
-      expect(chips[1]).toHaveTextContent("cron");
-      expect(chips[1]).toHaveAttribute("title", "Automationtrigger: cron");
+      const chips = screen.getAllByTestId("conversation-card-tag-chip");
+      expect(chips).toHaveLength(1);
+      expect(chips[0]).toHaveTextContent("cron");
+      expect(chips[0]).toHaveAttribute("title", "Automationtrigger: cron");
+    });
+
+    it("shows the automation badge without requiring the Tags toggle", () => {
+      renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          trigger="automation"
+        />,
+      );
+
+      expect(screen.getByTestId("conversation-automation-badge")).toHaveTextContent(
+        "Unnamed automation",
+      );
+      expect(
+        screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
     });
 
     it("hides the chips when showTags is omitted", () => {

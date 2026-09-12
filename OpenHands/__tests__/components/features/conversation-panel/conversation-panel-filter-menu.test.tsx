@@ -27,7 +27,7 @@ function renderFilterMenu(
     setConversationSort: vi.fn(),
     threadScope: "all",
     setThreadScope: vi.fn(),
-    automationFilterMode: "all",
+    automationFilterMode: "hide-automations",
     setAutomationFilterMode: vi.fn(),
     selectedAutomationNames: [],
     onToggleAutomationName: vi.fn(),
@@ -105,7 +105,7 @@ describe("ConversationPanelFilterMenu", () => {
   });
 
   it("selects an automation filter mode and closes the menu", async () => {
-    // Arrange: default mode is "all", so the trigger shows no active dot.
+    // Arrange: default mode is hide-automations, so the trigger shows no active dot.
     const user = userEvent.setup();
     const props = renderFilterMenu();
     expect(
@@ -113,12 +113,10 @@ describe("ConversationPanelFilterMenu", () => {
     ).not.toBeInTheDocument();
 
     // Act
-    await user.click(screen.getByTestId("automation-filter-hide"));
+    await user.click(screen.getByTestId("automation-filter-all"));
 
     // Assert
-    expect(props.setAutomationFilterMode).toHaveBeenCalledWith(
-      "hide-automations",
-    );
+    expect(props.setAutomationFilterMode).toHaveBeenCalledWith("all");
     expect(props.setFilterMenuOpen).toHaveBeenCalledWith(false);
   });
 

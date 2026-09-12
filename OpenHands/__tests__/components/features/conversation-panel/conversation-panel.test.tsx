@@ -125,6 +125,7 @@ describe("ConversationPanel", () => {
     useArchivedConversationsStore.setState({ archivesByBackendId: {} });
     useConversationPanelPreferencesStore.setState({
       showArchivedConversations: false,
+      organizeMode: "chronological",
       automationFilterMode: "all",
       selectedAutomationNames: [],
     });
@@ -294,6 +295,91 @@ describe("ConversationPanel", () => {
     });
     expect(await screen.findByText("Tagged Run")).toBeInTheDocument();
     expect(screen.getByText("Cloud Run")).toBeInTheDocument();
+    expect(screen.queryByText("Manual 1")).not.toBeInTheDocument();
+  });
+
+  it("keeps automation runs out of the workspace folder when showing every conversation grouped", async () => {
+    useConversationPanelPreferencesStore.setState({
+      organizeMode: "grouped",
+      automationFilterMode: "all",
+    });
+    vi.spyOn(
+      AgentServerConversationService,
+      "searchConversations",
+    ).mockResolvedValue({
+      items: [
+        createMockConversation({
+          id: "manual",
+          title: "Manual Starship",
+          selected_workspace: "/workspace/starship",
+        }),
+        createMockConversation({
+          id: "run",
+          title: "Nightly Audit Run",
+          selected_workspace: "/workspace/starship",
+          tags: { automationname: "Nightly Audit" },
+        }),
+      ],
+      next_page_id: null,
+    });
+
+    renderConversationPanel();
+
+    const workspaceFolder = await screen.findByTestId(
+      "thread-folder-ws--workspace-starship",
+    );
+    const automationFolder = screen.getByTestId(
+      "thread-folder-auto-Nightly-Audit",
+    );
+    expect(
+      within(workspaceFolder).getByText("Manual Starship"),
+    ).toBeInTheDocument();
+    expect(
+      within(workspaceFolder).queryByText("Nightly Audit Run"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(automationFolder).getByText("Nightly Audit Run"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("add-conversation-to-group-auto-Nightly-Audit"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows per-automation folders when filtering to automation runs, even if organize mode is chronological", async () => {
+    useConversationPanelPreferencesStore.setState({
+      organizeMode: "chronological",
+      automationFilterMode: "only-automations",
+    });
+    vi.spyOn(
+      AgentServerConversationService,
+      "searchConversations",
+    ).mockResolvedValue({
+      items: [
+        createMockConversation({ id: "manual", title: "Manual 1" }),
+        createMockConversation({
+          id: "audit",
+          title: "Audit Run",
+          tags: { automationname: "Nightly Audit" },
+        }),
+        createMockConversation({
+          id: "review",
+          title: "Review Run",
+          tags: { automationname: "PR Review Bot" },
+        }),
+      ],
+      next_page_id: null,
+    });
+
+    renderConversationPanel();
+
+    expect(
+      await screen.findByTestId("thread-folder-auto-Nightly-Audit"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("thread-folder-auto-PR-Review-Bot"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Audit Run")).toBeInTheDocument();
+    expect(screen.getByText("Review Run")).toBeInTheDocument();
     expect(screen.queryByText("Manual 1")).not.toBeInTheDocument();
   });
 

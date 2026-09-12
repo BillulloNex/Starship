@@ -6,6 +6,9 @@ const STORAGE_KEY = "conversation-panel-preferences";
 describe("conversation-panel-preferences store", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    useConversationPanelPreferencesStore.setState(
+      useConversationPanelPreferencesStore.getInitialState(),
+    );
   });
 
   it("defaults to showing older conversations, chronological list, and expected toggles", () => {
@@ -17,7 +20,7 @@ describe("conversation-panel-preferences store", () => {
     expect(state.organizeMode).toBe("chronological");
     expect(state.conversationSort).toBe("updated");
     expect(state.threadScope).toBe("all");
-    expect(state.automationFilterMode).toBe("all");
+    expect(state.automationFilterMode).toBe("hide-automations");
     expect(state.selectedAutomationNames).toEqual([]);
   });
 
@@ -137,7 +140,7 @@ describe("conversation-panel-preferences store", () => {
 
     // Restore defaults so later tests in this file see a pristine store.
     useConversationPanelPreferencesStore.setState({
-      automationFilterMode: "all",
+      automationFilterMode: "hide-automations",
       selectedAutomationNames: [],
     });
   });
@@ -167,6 +170,7 @@ describe("conversation-panel-preferences store", () => {
       organizeMode: state.organizeMode,
       conversationSort: state.conversationSort,
       threadScope: state.threadScope,
+      automationFilterMode: state.automationFilterMode,
     }).toEqual({
       // Preserved from the legacy payload.
       showOlderConversations: false,
@@ -176,6 +180,7 @@ describe("conversation-panel-preferences store", () => {
       organizeMode: "chronological",
       conversationSort: "updated",
       threadScope: "all",
+      automationFilterMode: "hide-automations",
     });
   });
 
@@ -197,5 +202,43 @@ describe("conversation-panel-preferences store", () => {
     expect(
       useConversationPanelPreferencesStore.getState().showLlmProfiles,
     ).toBe(true);
+  });
+
+  it("migrates a persisted 'all' automation filter to hide-automations", async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          automationFilterMode: "all",
+          organizeMode: "chronological",
+        },
+        version: 0,
+      }),
+    );
+
+    await useConversationPanelPreferencesStore.persist.rehydrate();
+
+    expect(
+      useConversationPanelPreferencesStore.getState().automationFilterMode,
+    ).toBe("hide-automations");
+  });
+
+  it("keeps an explicit only-automations preference across the hide-default migration", async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          automationFilterMode: "only-automations",
+          selectedAutomationNames: ["Nightly Audit"],
+        },
+        version: 0,
+      }),
+    );
+
+    await useConversationPanelPreferencesStore.persist.rehydrate();
+
+    const state = useConversationPanelPreferencesStore.getState();
+    expect(state.automationFilterMode).toBe("only-automations");
+    expect(state.selectedAutomationNames).toEqual(["Nightly Audit"]);
   });
 });

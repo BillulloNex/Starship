@@ -534,13 +534,15 @@ export const AUTOMATION_TAG_KEYS: readonly string[] = [
  *   footer / hovercard rows (``selected_repository``, ``selected_branch``,
  *   ``git_provider``, ``workspace.working_dir``)
  * - ``automationid`` / ``automationrunid`` → raw UUIDs consumed by the
- *   conversation panel's automation filter (chip noise), while
- *   ``automationname`` / ``automationtrigger`` stay visible
+ *   conversation panel's automation filter (chip noise)
+ * - ``automationname`` → first-class automation badge on the card
+ * - ``automationtrigger`` stays visible under the Tags toggle (cron / event)
  */
 export const RESERVED_CONVERSATION_TAG_KEYS: ReadonlySet<string> = new Set([
   ACP_SERVER_TAG_KEY,
   AUTOMATION_ID_TAG_KEY,
   AUTOMATION_RUN_ID_TAG_KEY,
+  AUTOMATION_NAME_TAG_KEY,
   "title",
   "git_provider",
   "repo_name",

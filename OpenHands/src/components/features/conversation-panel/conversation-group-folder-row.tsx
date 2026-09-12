@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, Workflow } from "lucide-react";
 import { useRef, type DragEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
@@ -8,17 +8,10 @@ import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { cn } from "#/utils/utils";
 import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
 import type {
-  ConversationGroupLaunch,
+  ConversationGroup,
   GroupFolderDropPosition,
 } from "./conversation-panel-list-helpers";
 import { getGroupConversationPreview } from "./conversation-panel-list-helpers";
-
-interface ConversationGroup {
-  id: string;
-  label: string;
-  conversations: AppConversation[];
-  launch: ConversationGroupLaunch;
-}
 
 interface ConversationGroupFolderRowProps {
   group: ConversationGroup;
@@ -166,44 +159,56 @@ export function ConversationGroupFolderRow({
               "focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
             )}
           >
-            <StickerFolderIcon
-              width={16}
-              height={16}
-              className="h-4 w-4 shrink-0 overflow-visible"
-              aria-hidden
-            />
+            {group.kind === "automation" ? (
+              <Workflow
+                width={16}
+                height={16}
+                className="h-4 w-4 shrink-0"
+                aria-hidden
+                strokeWidth={2}
+              />
+            ) : (
+              <StickerFolderIcon
+                width={16}
+                height={16}
+                className="h-4 w-4 shrink-0 overflow-visible"
+                aria-hidden
+              />
+            )}
             <span className="truncate">{group.label}</span>
           </button>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md",
-              "text-inherit transition-colors",
-              "hover:bg-white/10 hover:text-white",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-              hoverRevealActionClassName(),
-            )}
-            disabled={isCreatingConversationFlow}
-            aria-label={t(
-              I18nKey.CONVERSATION_PANEL$ADD_CONVERSATION_TO_GROUP,
-              {
-                label: group.label,
-              },
-            )}
-            data-testid={`add-conversation-to-group-${groupTestIdSuffix}`}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onLaunchFromGroup();
-            }}
-          >
-            <Plus
-              className="h-3.5 w-3.5 shrink-0"
-              aria-hidden
-              strokeWidth={2}
-            />
-          </button>
+          {group.kind !== "automation" ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md",
+                "text-inherit transition-colors",
+                "hover:bg-white/10 hover:text-white",
+                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--oh-border)]",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                hoverRevealActionClassName(),
+              )}
+              disabled={isCreatingConversationFlow}
+              aria-label={t(
+                I18nKey.CONVERSATION_PANEL$ADD_CONVERSATION_TO_GROUP,
+                {
+                  label: group.label,
+                },
+              )}
+              data-testid={`add-conversation-to-group-${groupTestIdSuffix}`}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onLaunchFromGroup();
+              }}
+            >
+              <Plus
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden
+                strokeWidth={2}
+              />
+            </button>
+          ) : null}
         </div>
         {expanded ? (
           <div

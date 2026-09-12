@@ -13,6 +13,10 @@ export type AutomationFilterMode =
   | "all"
   | "hide-automations"
   | "only-automations";
+export type ConversationGroupKind = "workspace" | "repository" | "automation";
+
+/** Folder-id prefix for conversations spawned by an automation run. */
+export const AUTOMATION_GROUP_ID_PREFIX = "auto:";
 
 /** Max conversations shown under a workspace/repo folder before "View more". */
 export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 5;
@@ -164,8 +168,14 @@ export const UNNAMED_AUTOMATION_FACET = "__unnamed__";
  * stamps `trigger: "automation"`, while local agent-server conversations are
  * recognized by the automation tags the SDK workspace attaches at creation.
  */
+/** Enough of a conversation to recognize an automation-born thread. */
+export type AutomationConversationIdentity = Pick<
+  AppConversation,
+  "trigger" | "tags"
+>;
+
 export function isAutomationConversation(
-  conversation: AppConversation,
+  conversation: AutomationConversationIdentity,
 ): boolean {
   if (conversation.trigger === "automation") {
     return true;
@@ -177,9 +187,27 @@ export function isAutomationConversation(
   return AUTOMATION_TAG_KEYS.some((key) => Boolean(tags[key]));
 }
 
-export function getAutomationNameFacet(conversation: AppConversation): string {
+export function getAutomationNameFacet(
+  conversation: AutomationConversationIdentity,
+): string {
   const name = conversation.tags?.[AUTOMATION_NAME_TAG_KEY]?.trim();
   return name || UNNAMED_AUTOMATION_FACET;
+}
+
+/**
+ * Sidebar badge copy for an automation-born conversation, or `null` when
+ * the conversation is a normal workspace chat. Named runs use the
+ * `automationname` tag; unnamed / cloud-trigger-only runs use `unnamedLabel`.
+ */
+export function getAutomationConversationBadgeLabel(
+  conversation: AutomationConversationIdentity,
+  unnamedLabel: string,
+): string | null {
+  if (!isAutomationConversation(conversation)) {
+    return null;
+  }
+  const facet = getAutomationNameFacet(conversation);
+  return facet === UNNAMED_AUTOMATION_FACET ? unnamedLabel : facet;
 }
 
 /**
@@ -250,11 +278,26 @@ export type ConversationGroupLaunch = {
   };
 };
 
+export type ConversationGroup = {
+  id: string;
+  label: string;
+  conversations: AppConversation[];
+  launch: ConversationGroupLaunch;
+  kind: ConversationGroupKind;
+};
+
+export function isAutomationGroupId(id: string): boolean {
+  return id.startsWith(AUTOMATION_GROUP_ID_PREFIX);
+}
+
 function buildGroupLaunch(
   id: string,
   backendKind: BackendKind,
   conversations: AppConversation[],
 ): ConversationGroupLaunch {
+  if (isAutomationGroupId(id)) {
+    return {};
+  }
   if (backendKind === "local") {
     if (id === "__none_workspace") {
       return {};
@@ -324,6 +367,17 @@ function workspaceGroup(conversation: AppConversation): {
   return { id: `ws:${normalized}`, label };
 }
 
+function automationGroup(conversation: AppConversation): {
+  id: string;
+  label: string;
+} {
+  const facet = getAutomationNameFacet(conversation);
+  return {
+    id: `${AUTOMATION_GROUP_ID_PREFIX}${facet}`,
+    label: facet === UNNAMED_AUTOMATION_FACET ? "" : facet,
+  };
+}
+
 function repositoryGroup(conversation: AppConversation): {
   id: string;
   label: string;
@@ -354,9 +408,25 @@ function getConversationGroupIdentity(
   conversation: AppConversation,
   backendKind: BackendKind,
 ): { id: string; label: string } {
+  // Automation runs get their own folder keyed by automation name, even when
+  // they inherited the same selected workspace/repo as a manual conversation.
+  // Mixing them into the workspace folder is what crowds the main chat list.
+  if (isAutomationConversation(conversation)) {
+    return automationGroup(conversation);
+  }
   return backendKind === "local"
     ? workspaceGroup(conversation)
     : repositoryGroup(conversation);
+}
+
+function resolveGroupKind(
+  id: string,
+  backendKind: BackendKind,
+): ConversationGroupKind {
+  if (isAutomationGroupId(id)) {
+    return "automation";
+  }
+  return backendKind === "local" ? "workspace" : "repository";
 }
 
 /**
@@ -424,13 +494,13 @@ export function groupConversations(
   items: readonly AppConversation[],
   backendKind: BackendKind,
   sortField: ConversationSortField,
-  labels: { emptyWorkspace: string; emptyRepository: string },
-): {
-  id: string;
-  label: string;
-  conversations: AppConversation[];
-  launch: ConversationGroupLaunch;
-}[] {
+  labels: {
+    emptyWorkspace: string;
+    emptyRepository: string;
+    unnamedAutomation: string;
+  },
+): ConversationGroup[] {
+  const unnamedAutomationGroupId = `${AUTOMATION_GROUP_ID_PREFIX}${UNNAMED_AUTOMATION_FACET}`;
   const byId = new Map<
     string,
     { label: string; conversations: AppConversation[] }
@@ -446,7 +516,9 @@ export function groupConversations(
         ? labels.emptyWorkspace
         : id === "__none_repo"
           ? labels.emptyRepository
-          : rawLabel;
+          : id === unnamedAutomationGroupId
+            ? labels.unnamedAutomation
+            : rawLabel;
     const bucket = byId.get(id);
     if (bucket) {
       bucket.conversations.push(c);
@@ -462,6 +534,7 @@ export function groupConversations(
       label: g.label,
       conversations,
       launch: buildGroupLaunch(id, backendKind, conversations),
+      kind: resolveGroupKind(id, backendKind),
     };
   });
 
@@ -480,7 +553,15 @@ export function groupConversations(
       0,
     );
 
-  groups.sort((a, b) => groupOrderKey(b) - groupOrderKey(a));
+  // Workspace/repo folders stay together at the top; automation folders
+  // follow as their own section so run history never interleaves with
+  // the main workspace.
+  groups.sort((a, b) => {
+    if ((a.kind === "automation") !== (b.kind === "automation")) {
+      return a.kind === "automation" ? 1 : -1;
+    }
+    return groupOrderKey(b) - groupOrderKey(a);
+  });
   return groups;
 }
 

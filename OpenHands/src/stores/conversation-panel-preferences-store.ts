@@ -69,7 +69,7 @@ const initialState: ConversationPanelPreferencesState = {
   organizeMode: "chronological",
   conversationSort: "updated",
   threadScope: "all",
-  automationFilterMode: "all",
+  automationFilterMode: "hide-automations",
   selectedAutomationNames: [],
   groupFolderOrder: [],
 };
@@ -158,6 +158,18 @@ export const useConversationPanelPreferencesStore =
           selectedAutomationNames: state.selectedAutomationNames,
           groupFolderOrder: state.groupFolderOrder,
         }),
+        // v1: hide automation runs from the main chat list by default so
+        // workspace threads stay readable. Persisted `"all"` was the previous
+        // implicit default, not an explicit choice — migrate it. `"only-
+        // automations"` (and an already-chosen hide) stay as the user left them.
+        version: 1,
+        migrate: (persistedState, version) => {
+          const state = persistedState as ConversationPanelPreferencesState;
+          if (version < 1 && state.automationFilterMode === "all") {
+            return { ...state, automationFilterMode: "hide-automations" };
+          }
+          return state;
+        },
       },
     ),
   );

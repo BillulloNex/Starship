@@ -48,6 +48,7 @@ import {
   resolvePinnedConversations,
   sortConversationsByField,
   type ConversationGroupLaunch,
+  type OrganizeMode,
 } from "./conversation-panel-list-helpers";
 import { useArchivedConversationsStore } from "#/stores/archived-conversations-store";
 import { usePinnedConversationsStore } from "#/stores/pinned-conversations-store";
@@ -188,6 +189,13 @@ export function ConversationPanel({
   const setGroupFolderOrder = useConversationPanelPreferencesStore(
     (state) => state.setGroupFolderOrder,
   );
+  // "Only automation runs" is a per-automation folder view even when the
+  // persisted organize preference is chronological, so each automation is
+  // "this automation has these chats" rather than a mixed timeline.
+  const listOrganizeMode: OrganizeMode =
+    !compact && automationFilterMode === "only-automations"
+      ? "grouped"
+      : organizeMode;
   const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   const [isListScrolled, setIsListScrolled] = React.useState(false);
   const filterMenuRef = useClickOutsideElement<HTMLDivElement>(() => {
@@ -257,15 +265,15 @@ export function ConversationPanel({
   }, []);
 
   React.useEffect(() => {
-    if (organizeMode !== "grouped") {
+    if (listOrganizeMode !== "grouped") {
       setCollapsedGroupIds(new Set());
       setExpandedGroupPreviewIds(new Set());
     }
-  }, [organizeMode]);
+  }, [listOrganizeMode]);
 
   React.useEffect(() => {
     setVisibleGroupLimit(GROUP_FOLDERS_PREVIEW_LIMIT);
-  }, [activeBackend.id, organizeMode]);
+  }, [activeBackend.id, listOrganizeMode]);
 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -432,12 +440,13 @@ export function ConversationPanel({
     () => ({
       emptyWorkspace: t(I18nKey.CONVERSATION_PANEL$NO_WORKSPACE),
       emptyRepository: t(I18nKey.CONVERSATION_PANEL$NO_REPOSITORY),
+      unnamedAutomation: t(I18nKey.CONVERSATION_PANEL$AUTOMATION_UNNAMED),
     }),
     [t],
   );
 
   const groupedSourceConversations = React.useMemo(() => {
-    if (compact || organizeMode !== "grouped") {
+    if (compact || listOrganizeMode !== "grouped") {
       return null;
     }
     // Use the unsorted partitions: groupConversations sorts each bucket
@@ -447,7 +456,7 @@ export function ConversationPanel({
   }, [
     compact,
     olderScoped,
-    organizeMode,
+    listOrganizeMode,
     recentScoped,
     showOlderConversations,
   ]);
@@ -525,7 +534,7 @@ export function ConversationPanel({
   const visibleGroupCount = visibleConversationGroups?.length ?? 0;
 
   const listIsEffectivelyEmpty =
-    organizeMode === "grouped" && !compact
+    listOrganizeMode === "grouped" && !compact
       ? visibleGroupCount === 0
       : visibleFlatCount === 0;
 
@@ -544,7 +553,7 @@ export function ConversationPanel({
   // driver walks past them (bounded by the per-click page cap) so a single
   // click can still reach a folder hiding behind deepen-only pages.
   const visibleCount =
-    organizeMode === "grouped" && !compact
+    listOrganizeMode === "grouped" && !compact
       ? visibleGroupCount
       : visibleFlatCount;
   const loadedPageCount = data?.pages.length ?? 0;
@@ -557,7 +566,7 @@ export function ConversationPanel({
   React.useEffect(() => {
     if (
       compact ||
-      organizeMode !== "grouped" ||
+      listOrganizeMode !== "grouped" ||
       visibleGroupCount >= GROUP_FOLDERS_PREVIEW_LIMIT ||
       loadedPageCount >= MAX_INITIAL_GROUP_DISCOVERY_PAGES ||
       !hasNextPage ||
@@ -574,7 +583,7 @@ export function ConversationPanel({
     isFetching,
     isFetchingNextPage,
     loadedPageCount,
-    organizeMode,
+    listOrganizeMode,
     visibleGroupCount,
   ]);
 
@@ -614,7 +623,7 @@ export function ConversationPanel({
   }, []);
 
   const requestLoadMore = React.useCallback(() => {
-    if (organizeMode === "grouped") {
+    if (listOrganizeMode === "grouped") {
       setVisibleGroupLimit((current) => current + GROUP_FOLDERS_PREVIEW_LIMIT);
       if (hasLoadedHiddenGroups) {
         return;
@@ -624,7 +633,7 @@ export function ConversationPanel({
       setLoadMoreFloor(visibleCountRef.current);
       setLoadMorePageFloor(loadedPageCountRef.current);
     }
-  }, [hasLoadedHiddenGroups, hasNextPage, organizeMode]);
+  }, [hasLoadedHiddenGroups, hasNextPage, listOrganizeMode]);
 
   React.useEffect(() => {
     if (loadMoreFloor === null) {
@@ -641,7 +650,7 @@ export function ConversationPanel({
     // Chronological mode keeps its pre-existing behavior: fetch until a
     // visible row appears or pages run out.
     if (
-      organizeMode === "grouped" &&
+      listOrganizeMode === "grouped" &&
       !compact &&
       loadMorePageFloor != null &&
       loadedPageCount >= loadMorePageFloor + MAX_PAGES_PER_LOAD_MORE_CLICK
@@ -668,7 +677,7 @@ export function ConversationPanel({
     loadMorePageFloor,
     visibleCount,
     loadedPageCount,
-    organizeMode,
+    listOrganizeMode,
     hasNextPage,
     isFetching,
     isFetchingNextPage,
@@ -871,6 +880,7 @@ export function ConversationPanel({
             acpServer={conversation.acp_server}
             tags={conversation.tags}
             showTags={showTagsMetadata}
+            trigger={conversation.trigger}
           />
         );
       }
@@ -904,6 +914,7 @@ export function ConversationPanel({
               acpServer={conversation.acp_server}
               createdAt={conversation.created_at}
               tags={conversation.tags}
+              trigger={conversation.trigger}
             />
           }
         >
@@ -970,6 +981,7 @@ export function ConversationPanel({
               acpServer={conversation.acp_server}
               tags={conversation.tags}
               showTags={showTagsMetadata}
+              trigger={conversation.trigger}
               isArchived={isArchived}
               isPinned={isPinned}
               onTogglePin={() => togglePin(activeBackend.id, conversation.id)}
@@ -1120,7 +1132,7 @@ export function ConversationPanel({
               setExpandedPinnedPreview((current) => !current)
             }
             activeConversationId={currentConversationId}
-            showDivider={!compact && organizeMode === "chronological"}
+            showDivider={!compact && listOrganizeMode === "chronological"}
             renderConversationCard={(conversation) =>
               renderConversationCard(conversation, { inPinnedSection: true })
             }
@@ -1149,7 +1161,7 @@ export function ConversationPanel({
 
         {!showInitialSkeleton &&
         !compact &&
-        organizeMode === "grouped" &&
+        listOrganizeMode === "grouped" &&
         visibleConversationGroups &&
         visibleConversationGroups.length > 0 ? (
           <ConversationGroupFolderList
@@ -1173,7 +1185,7 @@ export function ConversationPanel({
 
         {!showInitialSkeleton &&
         !compact &&
-        organizeMode === "chronological" ? (
+        listOrganizeMode === "chronological" ? (
           <div className="space-y-0.5">
             {sortedVisibleConversations.map((conversation) =>
               renderConversationCard(conversation),

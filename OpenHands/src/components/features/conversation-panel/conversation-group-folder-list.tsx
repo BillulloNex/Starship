@@ -12,16 +12,10 @@ import { I18nKey } from "#/i18n/declaration";
 import { ConversationGroupFolderRow } from "./conversation-group-folder-row";
 import {
   moveGroupFolderOrder,
+  type ConversationGroup,
   type ConversationGroupLaunch,
   type GroupFolderDropPosition,
 } from "./conversation-panel-list-helpers";
-
-interface ConversationGroup {
-  id: string;
-  label: string;
-  conversations: AppConversation[];
-  launch: ConversationGroupLaunch;
-}
 
 interface ConversationGroupFolderListProps {
   groups: ConversationGroup[];

@@ -99,6 +99,9 @@ describe("getDisplayConversationTags", () => {
         repo: "other/repo",
         workspace: "/tmp/ws",
         working_dir: "/tmp/wd",
+        automationname: "Nightly Audit",
+        automationid: "auto-1",
+        automationrunid: "run-1",
       }),
     ).toEqual([
       ["origin", "slack"],

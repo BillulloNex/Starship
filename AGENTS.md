@@ -4,9 +4,10 @@ This file is the index of durable rules for any agent (human or AI) working in t
 
 ## Agent Permissions & Direct Pushes (MANDATORY)
 
-- **AI agents are fully authorized and encouraged to make changes, commit, and push directly to GitHub (including the `main` branch).**
-- There are no restrictions prohibiting agents from committing or pushing directly to `main` or creating PRs.
-- **The only strict requirement is versioning:** Whenever committing and pushing changes to GitHub, agents MUST bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`).
+- **Close finished work by bumping, committing, and pushing.** When requested implementation is done (code + tests + lint/typecheck as required), bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`), commit the work, and push to GitHub — including `main`. That is the default end of the task. Do not stop at "say if you want this committed."
+- Agents are fully authorized to push directly to `main`. Creating a PR is optional, not a substitute for shipping when the work belongs on `main`.
+- This close-the-work rule is the repo default and supersedes generic "ask before commit/push" habits.
+- **Every push must include a version bump.** See Grokbot Versioning.
 
 ## Grokbot Versioning (MANDATORY)
 

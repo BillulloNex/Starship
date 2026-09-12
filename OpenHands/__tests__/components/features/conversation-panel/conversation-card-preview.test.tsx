@@ -126,6 +126,31 @@ describe("ConversationCardPreview", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows an always-on automation row and keeps the name out of generic tags", () => {
+    renderWithProviders(
+      <ConversationCardPreview
+        title={PREVIEW_TITLE}
+        selectedRepository={null}
+        trigger="automation"
+        tags={{
+          automationname: "Nightly Audit",
+          automationtrigger: "cron",
+          automationid: "auto-1",
+          owner: "alice",
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("conversation-card-preview-automation"),
+    ).toHaveTextContent("Nightly Audit");
+    const rows = screen.getAllByTestId("conversation-card-preview-tag-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveAttribute("data-tag-key", "automationtrigger");
+    expect(rows[0]).toHaveTextContent("cron");
+    expect(rows[1]).toHaveAttribute("data-tag-key", "owner");
+  });
+
   it("omits blank tag values from the hovercard", () => {
     renderWithProviders(
       <ConversationCardPreview

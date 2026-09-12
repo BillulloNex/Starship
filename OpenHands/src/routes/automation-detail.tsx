@@ -25,6 +25,7 @@ import { ConfigurationSection } from "#/components/features/automations/detail/c
 import { PluginsSection } from "#/components/features/automations/detail/plugins-section";
 import { ActivitySection } from "#/components/features/automations/detail/activity-section";
 import { ActivityLogSection } from "#/components/features/automations/detail/activity-log-section";
+import { AutomationChatsSection } from "#/components/features/automations/detail/automation-chats-section";
 import { DetailSkeleton } from "#/components/features/automations/detail/detail-skeleton";
 import { NotFoundState } from "#/components/features/automations/detail/not-found-state";
 import { ErrorState } from "#/components/features/automations/error-state";
@@ -208,6 +209,7 @@ export default function AutomationDetail() {
             createdAt={automation.created_at}
             lastRunAt={automation.last_triggered_at}
           />
+          <AutomationChatsSection automation={automation} />
           <ActivityLogSection
             automation={automation}
             highlightedRunId={highlightedRunId}

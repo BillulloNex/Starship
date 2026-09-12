@@ -185,7 +185,7 @@ export function ConversationPanelFilterMenu({
           strokeWidth={2}
           aria-hidden
         />
-        {automationFilterMode !== "all" ? (
+        {automationFilterMode !== "hide-automations" ? (
           <span
             aria-hidden
             data-testid="automation-filter-active-indicator"

@@ -9,7 +9,10 @@ import ConversationService from "#/api/conversation-service/conversation-service
 import { getDisplayConversationTags } from "#/api/agent-server-adapter";
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
-import { RepositorySelection } from "#/api/open-hands.types";
+import {
+  RepositorySelection,
+  type ConversationTrigger,
+} from "#/api/open-hands.types";
 import { formatTimeDelta } from "#/utils/format-time-delta";
 import {
   hoverRevealActionClassName,
@@ -17,15 +20,16 @@ import {
   hoverRevealReserveClassName,
   hoverRevealYieldClassName,
 } from "#/utils/hover-reveal-classes";
+import { useDownloadConversation } from "#/hooks/use-download-conversation";
 import { ConversationCardHeader } from "./conversation-card-header";
 import { ConversationCardActions } from "./conversation-card-actions";
 import { ConversationCardFooter } from "./conversation-card-footer";
 import { ConversationStatusBadges } from "./conversation-status-badges";
-import { useDownloadConversation } from "#/hooks/use-download-conversation";
 import {
   ConversationStatusDot,
   getConversationStatusVisual,
 } from "../conversation-status-dot";
+import { getAutomationConversationBadgeLabel } from "../conversation-panel-list-helpers";
 
 interface ConversationCardProps {
   onClick?: () => void;
@@ -59,6 +63,8 @@ interface ConversationCardProps {
   tags?: Record<string, string> | null;
   /** Gates the tag-chip row; wired to the panel's "Tags" metadata toggle. */
   showTags?: boolean;
+  /** Cloud conversations stamp `trigger: "automation"` without local tags. */
+  trigger?: ConversationTrigger | null;
   isArchived?: boolean;
   isPinned?: boolean;
   onTogglePin?: () => void;
@@ -92,6 +98,7 @@ export function ConversationCard({
   acpServer = null,
   tags = null,
   showTags = false,
+  trigger = null,
   isArchived = false,
   isPinned = false,
   onTogglePin,
@@ -101,6 +108,10 @@ export function ConversationCard({
   const { trackDownloadVsCodeButtonClicked } = useTracking();
   const [titleMode, setTitleMode] = React.useState<"view" | "edit">("view");
   const { mutateAsync: downloadConversation } = useDownloadConversation();
+  const automationBadge = getAutomationConversationBadgeLabel(
+    { trigger, tags },
+    t(I18nKey.CONVERSATION_PANEL$AUTOMATION_UNNAMED),
+  );
 
   const onTitleSave = (newTitle: string) => {
     if (newTitle !== "" && newTitle !== title) {
@@ -256,6 +267,7 @@ export function ConversationCard({
             onTitleSave={onTitleSave}
             executionStatus={executionStatus}
             sandboxStatus={sandboxStatus}
+            automationBadge={automationBadge}
           />
           {sandboxStatus === "ERROR" && <ConversationStatusBadges />}
         </div>

@@ -7,7 +7,9 @@ import {
   getGroupDiscoveryConversationIds,
   groupConversations,
   GROUP_CONVERSATIONS_PREVIEW_LIMIT,
+  getAutomationConversationBadgeLabel,
   isAutomationConversation,
+  isAutomationGroupId,
   parseConversationTimeMs,
   moveGroupFolderOrder,
   resolvePinnedConversations,
@@ -33,6 +35,12 @@ const base: Omit<AppConversation, "id" | "title" | "workspace"> = {
   session_api_key: null,
   sandbox_id: null,
   sub_conversation_ids: [],
+};
+
+const GROUP_LABELS = {
+  emptyWorkspace: "No workspace",
+  emptyRepository: "No repository",
+  unnamedAutomation: "Unnamed automation",
 };
 
 describe("conversation-panel-list-helpers", () => {
@@ -126,7 +134,7 @@ describe("conversation-panel-list-helpers", () => {
       [trailingSlash, whitespaceOnly, rootOnly],
       "local",
       "updated",
-      { emptyWorkspace: "No workspace", emptyRepository: "No repository" },
+      GROUP_LABELS,
     );
     expect(
       localGroups.map((g) => ({
@@ -192,7 +200,7 @@ describe("conversation-panel-list-helpers", () => {
       [dotGit, repoTrailingSlash, repoNoSlash, blankRepo, rootRepo],
       "cloud",
       "updated",
-      { emptyWorkspace: "No workspace", emptyRepository: "No repository" },
+      GROUP_LABELS,
     );
     expect(
       cloudGroups.map((g) => ({
@@ -305,10 +313,7 @@ describe("conversation-panel-list-helpers", () => {
       }),
     ]).toEqual(["none-1", "alpha-1", "none-2"]);
 
-    const grouped = groupConversations(items, "local", "updated", {
-      emptyWorkspace: "No workspace",
-      emptyRepository: "No repository",
-    });
+    const grouped = groupConversations(items, "local", "updated", GROUP_LABELS);
     const noneGroup = grouped.find((group) => group.id === "__none_workspace");
     expect(noneGroup?.conversations.map((c) => c.id)).toEqual([
       "none-1",
@@ -395,7 +400,7 @@ describe("conversation-panel-list-helpers", () => {
       [sameWsA, sameWsB, otherWs, none],
       "local",
       "updated",
-      { emptyWorkspace: "No workspace", emptyRepository: "No repository" },
+      GROUP_LABELS,
     );
 
     expect(
@@ -427,6 +432,99 @@ describe("conversation-panel-list-helpers", () => {
     ]);
   });
 
+  it("groups automation runs under the automation name, not the shared workspace", () => {
+    // The crowding bug: an automation run that inherited the user's workspace
+    // used to land in the same folder as the manual chats. It must sit in its
+    // own automation folder, and unnamed runs must not invent a workspace.
+    const manual: AppConversation = {
+      ...base,
+      id: "manual",
+      title: "manual",
+      selected_workspace: "/workspace/starship",
+      updated_at: "2024-01-05T00:00:00.000Z",
+    };
+    const namedRun: AppConversation = {
+      ...base,
+      id: "named-run",
+      title: "named-run",
+      selected_workspace: "/workspace/starship",
+      tags: { automationname: "Nightly Audit" },
+      updated_at: "2024-01-06T00:00:00.000Z",
+    };
+    const secondNamedRun: AppConversation = {
+      ...base,
+      id: "named-run-2",
+      title: "named-run-2",
+      selected_workspace: "/workspace/starship",
+      tags: { automationname: "Nightly Audit" },
+      updated_at: "2024-01-04T00:00:00.000Z",
+    };
+    const otherAutomation: AppConversation = {
+      ...base,
+      id: "other-run",
+      title: "other-run",
+      selected_workspace: "/workspace/starship",
+      tags: { automationname: "PR Review Bot" },
+      updated_at: "2024-01-03T00:00:00.000Z",
+    };
+    const unnamedRun: AppConversation = {
+      ...base,
+      id: "unnamed-run",
+      title: "unnamed-run",
+      trigger: "automation",
+      selected_workspace: "/workspace/starship",
+      updated_at: "2024-01-02T00:00:00.000Z",
+    };
+
+    const groups = groupConversations(
+      [manual, namedRun, secondNamedRun, otherAutomation, unnamedRun],
+      "local",
+      "updated",
+      GROUP_LABELS,
+    );
+
+    expect(
+      groups.map((g) => ({
+        id: g.id,
+        label: g.label,
+        kind: g.kind,
+        ids: g.conversations.map((c) => c.id),
+        launch: g.launch,
+      })),
+    ).toEqual([
+      {
+        id: "ws:/workspace/starship",
+        label: "starship",
+        kind: "workspace",
+        ids: ["manual"],
+        launch: { workingDir: "/workspace/starship" },
+      },
+      {
+        id: "auto:Nightly Audit",
+        label: "Nightly Audit",
+        kind: "automation",
+        ids: ["named-run", "named-run-2"],
+        launch: {},
+      },
+      {
+        id: "auto:PR Review Bot",
+        label: "PR Review Bot",
+        kind: "automation",
+        ids: ["other-run"],
+        launch: {},
+      },
+      {
+        id: `auto:${UNNAMED_AUTOMATION_FACET}`,
+        label: "Unnamed automation",
+        kind: "automation",
+        ids: ["unnamed-run"],
+        launch: {},
+      },
+    ]);
+    expect(isAutomationGroupId("auto:Nightly Audit")).toBe(true);
+    expect(isAutomationGroupId("ws:/workspace/starship")).toBe(false);
+  });
+
   it("groups cloud conversations by repository string", () => {
     const r1: AppConversation = {
       ...base,
@@ -443,10 +541,7 @@ describe("conversation-panel-list-helpers", () => {
       updated_at: "2024-01-03T00:00:00.000Z",
     };
 
-    const groups = groupConversations([r1, r2], "cloud", "updated", {
-      emptyWorkspace: "No workspace",
-      emptyRepository: "No repository",
-    });
+    const groups = groupConversations([r1, r2], "cloud", "updated", GROUP_LABELS);
 
     expect(groups.map((g) => g.label)).toEqual(["sdk", "agent-canvas"]);
     expect(groups[0].launch).toEqual({
@@ -531,6 +626,27 @@ describe("conversation-panel-list-helpers", () => {
         isAutomationConversation,
       ),
     ).toEqual([true, true, true, false]);
+  });
+
+  it("returns a named badge, an unnamed fallback, or null for manual chats", () => {
+    expect(
+      getAutomationConversationBadgeLabel(
+        { tags: { automationname: "Nightly Audit" }, trigger: null },
+        "Unnamed automation",
+      ),
+    ).toBe("Nightly Audit");
+    expect(
+      getAutomationConversationBadgeLabel(
+        { tags: null, trigger: "automation" },
+        "Unnamed automation",
+      ),
+    ).toBe("Unnamed automation");
+    expect(
+      getAutomationConversationBadgeLabel(
+        { tags: { origin: "slack" }, trigger: null },
+        "Unnamed automation",
+      ),
+    ).toBeNull();
   });
 
   it("collects unique sorted automation-name facets with the unnamed bucket last", () => {

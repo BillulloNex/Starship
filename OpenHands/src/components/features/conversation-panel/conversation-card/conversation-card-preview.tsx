@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
+import { Workflow } from "lucide-react";
 import { FaBitbucket, FaGithub, FaGitlab } from "react-icons/fa6";
 import { FaCodeBranch } from "react-icons/fa";
 import type { IconType } from "react-icons/lib";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
-import type { RepositorySelection } from "#/api/open-hands.types";
+import type {
+  RepositorySelection,
+  ConversationTrigger,
+} from "#/api/open-hands.types";
 import type { Provider } from "#/types/settings";
 import type { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import type { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
@@ -16,6 +20,7 @@ import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { ConversationStatusDot } from "../conversation-status-dot";
 import { getConversationTagLabel } from "./conversation-tag-display";
 import { getConversationTagIcon } from "./conversation-tag-icons";
+import { getAutomationConversationBadgeLabel } from "../conversation-panel-list-helpers";
 
 interface ConversationCardPreviewProps {
   title: string;
@@ -40,6 +45,7 @@ interface ConversationCardPreviewProps {
    * Sidebar card chips stay gated by the panel's Tags preference.
    */
   tags?: Record<string, string> | null;
+  trigger?: ConversationTrigger | null;
 }
 
 const providerIcon: Partial<Record<Provider, IconType>> = {
@@ -114,6 +120,7 @@ export function ConversationCardPreview({
   acpServer = null,
   createdAt,
   tags = null,
+  trigger = null,
 }: ConversationCardPreviewProps) {
   const { t } = useTranslation("openhands");
 
@@ -130,6 +137,10 @@ export function ConversationCardPreview({
     : null;
 
   const previewTags = getDisplayConversationTags(tags);
+  const automationBadge = getAutomationConversationBadgeLabel(
+    { trigger, tags },
+    t(I18nKey.CONVERSATION_PANEL$AUTOMATION_UNNAMED),
+  );
 
   return (
     <div
@@ -201,6 +212,19 @@ export function ConversationCardPreview({
               }
             >
               {llmModel}
+            </PreviewValueWithIcon>
+          </PreviewRow>
+        ) : null}
+
+        {automationBadge ? (
+          <PreviewRow label={t(I18nKey.CONVERSATION_PANEL$PREVIEW_AUTOMATION)}>
+            <PreviewValueWithIcon
+              testId="conversation-card-preview-automation"
+              icon={
+                <Workflow aria-hidden className="h-3 w-3" strokeWidth={2} />
+              }
+            >
+              {automationBadge}
             </PreviewValueWithIcon>
           </PreviewRow>
         ) : null}

@@ -219,6 +219,12 @@ describe("AutomationDetail — backend-change guard", () => {
     expect(AutomationService.dispatchAutomation).toHaveBeenCalledTimes(1);
   });
 
+  it("renders the chats section for this automation", async () => {
+    renderDetail();
+
+    expect(await screen.findByTestId("automation-chats")).toBeInTheDocument();
+  });
+
   it("does not dispatch when Run now is clicked on a disabled automation", async () => {
     // Arrange — the detail page loads a turned-off automation.
     vi.mocked(AutomationService.getAutomation).mockResolvedValue({

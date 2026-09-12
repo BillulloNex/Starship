@@ -3,14 +3,19 @@ import { Tooltip } from "@heroui/react";
 import { useTranslation } from "react-i18next";
 import { MessageSquare } from "lucide-react";
 import { NavigationLink } from "#/components/shared/navigation-link";
+import { useBackendScopedPath } from "#/hooks/use-backend-scoped-path";
+import { I18nKey } from "#/i18n/declaration";
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
 import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
-import { RepositorySelection } from "#/api/open-hands.types";
+import {
+  RepositorySelection,
+  type ConversationTrigger,
+} from "#/api/open-hands.types";
 import { cn } from "#/utils/utils";
 import { ConversationStatusDot } from "./conversation-status-dot";
 import { ConversationCardFooter } from "./conversation-card/conversation-card-footer";
-import { I18nKey } from "#/i18n/declaration";
-import { useBackendScopedPath } from "#/hooks/use-backend-scoped-path";
+import { ConversationAutomationBadge } from "./conversation-automation-badge";
+import { getAutomationConversationBadgeLabel } from "./conversation-panel-list-helpers";
 
 interface CompactConversationRowProps {
   conversationId: string;
@@ -30,6 +35,7 @@ interface CompactConversationRowProps {
   acpServer?: string | null;
   tags?: Record<string, string> | null;
   showTags?: boolean;
+  trigger?: ConversationTrigger | null;
 }
 
 /**
@@ -55,10 +61,15 @@ export function CompactConversationRow({
   acpServer = null,
   tags = null,
   showTags = false,
+  trigger = null,
 }: CompactConversationRowProps) {
   const { t } = useTranslation("openhands");
   const backendScopedPath = useBackendScopedPath();
   const disableAnimation = import.meta.env.MODE === "test";
+  const automationBadge = getAutomationConversationBadgeLabel(
+    { trigger, tags },
+    t(I18nKey.CONVERSATION_PANEL$AUTOMATION_UNNAMED),
+  );
 
   const statusDot = (
     <ConversationStatusDot
@@ -74,6 +85,9 @@ export function CompactConversationRow({
         <span className="text-sm font-medium text-white truncate" title={title}>
           {title || t(I18nKey.CONVERSATION$UNTITLED)}
         </span>
+        {automationBadge ? (
+          <ConversationAutomationBadge label={automationBadge} />
+        ) : null}
         {statusDot}
       </div>
       <ConversationCardFooter
