@@ -538,10 +538,40 @@ def _init_mcp_oauth_public_callback():
         )
 
 
+def _init_automation_shared_venv():
+    """Stop per-run SDK venvs (~540 MB) from filling local automation workspaces."""
+    argv0 = os.path.basename(sys.argv[0]) if sys.argv else ""
+    if argv0 in {"automation_workspace_gc.py", "automation_workspace_gc_test.py"}:
+        return
+    try:
+        from automation_setup_rewrite import install_execution_patches
+
+        if install_execution_patches():
+            print(
+                "[grokbot-sitecustomize] Automation shared-venv patch installed",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            print(
+                "[grokbot-sitecustomize] Automation shared-venv patch skipped "
+                "(openhands.automation.execution not loaded)",
+                file=sys.stderr,
+                flush=True,
+            )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] Automation shared-venv patch skipped: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 _init_llmobs()
 _init_antigravity_acp()
 _init_acp_background_warmup()
 _init_mcp_oauth_public_callback()
+_init_automation_shared_venv()
 
 
 def _background_sync():

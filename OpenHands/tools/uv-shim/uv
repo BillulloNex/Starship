@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# uv shim used while running a per-run setup.sh.
+# No-ops `uv venv .venv` and OpenHands SDK pip installs so existing tarballs
+# reuse the shared SDK venv instead of downloading ~540 MB every run.
+set -euo pipefail
+
+SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$0")"
+SHIM_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+REAL_UV="${GROKBOT_REAL_UV:-}"
+
+if [ -z "$REAL_UV" ]; then
+  OLD_IFS="$IFS"
+  IFS=":"
+  for d in $PATH; do
+    [ -z "$d" ] && continue
+    cand="${d}/uv"
+    if [ -x "$cand" ]; then
+      cand_real="$(readlink -f "$cand" 2>/dev/null || echo "$cand")"
+      if [ "$cand_real" != "$SCRIPT_PATH" ] && [ "$d" != "$SHIM_DIR" ]; then
+        REAL_UV="$cand"
+        break
+      fi
+    fi
+  done
+  IFS="$OLD_IFS"
+fi
+
+if [ -z "${REAL_UV:-}" ]; then
+  echo "[setup] ERROR: real uv binary not found on PATH" >&2
+  exit 127
+fi
+
+is_openhands_pkg() {
+  case "$1" in
+    openhands-sdk|openhands-tools|openhands-workspace|openhands-sdk==*|openhands-tools==*|openhands-workspace==*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if [ "${1:-}" = "venv" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = ".venv" ] || [ "$arg" = "./.venv" ]; then
+      echo "[setup] Skipping uv venv .venv (using shared SDK venv)"
+      exit 0
+    fi
+  done
+fi
+
+if [ "${1:-}" = "pip" ] && [ "${2:-}" = "install" ]; then
+  only_oh=1
+  has_pkg=0
+  skip_next=0
+  for arg in "${@:3}"; do
+    if [ "$skip_next" -eq 1 ]; then
+      skip_next=0
+      continue
+    fi
+    case "$arg" in
+      -p|--python|--python-version)
+        skip_next=1
+        continue
+        ;;
+      -*)
+        continue
+        ;;
+    esac
+    if is_openhands_pkg "$arg"; then
+      has_pkg=1
+    else
+      only_oh=0
+    fi
+  done
+  if [ "$has_pkg" -eq 1 ] && [ "$only_oh" -eq 1 ]; then
+    echo "[setup] Skipping uv pip install of OpenHands SDK (using shared SDK venv)"
+    exit 0
+  fi
+fi
+
+exec "$REAL_UV" "$@"

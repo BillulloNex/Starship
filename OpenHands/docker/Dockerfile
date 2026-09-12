@@ -110,6 +110,18 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
 RUN uv pip install --system "openhands-automation==${AUTOMATION_VERSION}" "fastmcp>=3.0.0,<4.0.0" 2>/dev/null \
     || pip install --no-cache-dir "openhands-automation==${AUTOMATION_VERSION}" "fastmcp>=3.0.0,<4.0.0"
 
+# One shared SDK venv for every local-mode automation run. See root Dockerfile.
+RUN SDK_VER="$(python3 -c "from importlib.metadata import version; print(version('openhands-sdk'))")" && \
+    uv venv /opt/openhands-shared-sdk-venv --python '>=3.12' && \
+    uv pip install --python /opt/openhands-shared-sdk-venv \
+      "openhands-sdk==${SDK_VER}" \
+      "openhands-tools==${SDK_VER}" \
+      "openhands-workspace==${SDK_VER}" \
+      "fastmcp>=3.0.0,<4.0.0" && \
+    printf '%s\n' "$SDK_VER" > /opt/openhands-shared-sdk-venv/.grokbot-sdk-version && \
+    chmod -R a+rX /opt/openhands-shared-sdk-venv
+ENV AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
+
 # ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
 RUN uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
     || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"; \
@@ -153,6 +165,10 @@ COPY scripts/runtime-services-info.mjs /opt/agent-canvas/runtime-services-info.m
 # import canvas_ui_tool by qualname. Keep the compatibility module available;
 # new conversations define canvas_ui_control through a JSON client tool.
 COPY tools/ /opt/agent-canvas/tools/
+RUN chmod +x /opt/agent-canvas/tools/ensure-shared-sdk-venv.sh \
+             /opt/agent-canvas/tools/run-automation-setup.sh \
+             /opt/agent-canvas/tools/uv-shim/uv \
+             /opt/agent-canvas/tools/automation_workspace_gc.py
 
 # Copy generated defaults.env (from config/defaults.json via config-gen stage)
 COPY --from=config-gen /tmp/defaults.env /opt/agent-canvas/defaults.env

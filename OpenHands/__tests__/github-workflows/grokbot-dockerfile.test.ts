@@ -13,17 +13,12 @@ const dockerfile = readFileSync(path.join(projectRoot, "Dockerfile"), "utf-8");
 
 describe("Grokbot production image", () => {
   it("includes the Node.js executables required by stdio MCP servers", () => {
-    expect(dockerfile).toContain(
-      "COPY --from=frontend-build /usr/local/bin/node /usr/local/bin/node",
-    );
-    expect(dockerfile).toContain(
-      "COPY --from=frontend-build /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm",
-    );
-    expect(dockerfile).toContain(
-      "ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm",
-    );
-    expect(dockerfile).toContain(
-      "ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx",
-    );
+    expect(dockerfile).toContain("COPY --from=frontend-build /usr/local /usr/local");
+    expect(dockerfile).toContain("RUN node --version && npm --version && npx --version");
+  });
+
+  it("installs a shared automation SDK venv instead of per-run copies", () => {
+    expect(dockerfile).toContain("/opt/openhands-shared-sdk-venv");
+    expect(dockerfile).toContain("fix-automation-workspace-disk.py");
   });
 });

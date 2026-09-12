@@ -209,6 +209,26 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY patches/guard-watchdog-telemetry.py /tmp/guard-watchdog-telemetry.py
 RUN python3 /tmp/guard-watchdog-telemetry.py && rm /tmp/guard-watchdog-telemetry.py
 
+# Stop preset automations from baking a 540 MB per-run SDK venv into tarballs.
+# Runtime wrapping in sitecustomize still covers already-stored tarballs.
+COPY patches/fix-automation-workspace-disk.py /tmp/fix-automation-workspace-disk.py
+RUN python3 /tmp/fix-automation-workspace-disk.py && rm /tmp/fix-automation-workspace-disk.py
+
+# One shared SDK venv for every local-mode automation run. Without this, each
+# run's setup.sh pip-installs openhands-sdk/tools/workspace into
+# $AUTOMATION_WORKSPACE_BASE/automation-runs/<id>/.venv (~540 MB, ~13 GB/day).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    SDK_VER="$(python3 -c "from importlib.metadata import version; print(version('openhands-sdk'))")" && \
+    uv venv /opt/openhands-shared-sdk-venv --python '>=3.12' && \
+    uv pip install --python /opt/openhands-shared-sdk-venv \
+      "openhands-sdk==${SDK_VER}" \
+      "openhands-tools==${SDK_VER}" \
+      "openhands-workspace==${SDK_VER}" \
+      "fastmcp>=3.0.0,<4.0.0" && \
+    printf '%s\n' "$SDK_VER" > /opt/openhands-shared-sdk-venv/.grokbot-sdk-version && \
+    chmod -R a+rX /opt/openhands-shared-sdk-venv
+ENV AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
+
 # ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
@@ -351,6 +371,10 @@ COPY OpenHands/scripts/runtime-services-info.mjs /opt/agent-canvas/runtime-servi
 # Persisted conversations created before the client_tools migration still
 # import canvas_ui_tool by qualname. Keep the compatibility module available.
 COPY OpenHands/tools/ /opt/agent-canvas/tools/
+RUN chmod +x /opt/agent-canvas/tools/ensure-shared-sdk-venv.sh \
+             /opt/agent-canvas/tools/run-automation-setup.sh \
+             /opt/agent-canvas/tools/uv-shim/uv \
+             /opt/agent-canvas/tools/automation_workspace_gc.py
 
 # Copy generated defaults.env (from config/defaults.json via config-gen stage)
 COPY --from=config-gen /tmp/defaults.env /opt/agent-canvas/defaults.env

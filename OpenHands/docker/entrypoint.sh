@@ -39,6 +39,14 @@
 #                          Override in production when the external URL differs.
 #   AUTOMATION_WORKSPACE_BASE – Directory for automation run workspaces
 #                          (default: ~/.openhands/workspaces)
+#   AUTOMATION_SHARED_VENV – Shared SDK virtualenv reused by every local-mode
+#                          automation run (default: /opt/openhands-shared-sdk-venv)
+#   AUTOMATION_VENV_TTL_MINUTES – Age after which leftover per-run .venv dirs
+#                          are deleted (default: 15)
+#   AUTOMATION_WORKSPACE_TTL_HOURS – Age after which idle run workspaces are
+#                          deleted (default: 12)
+#   AUTOMATION_WORKSPACE_GC_INTERVAL_SECONDS – Workspace GC loop interval
+#                          (default: 300)
 #   TELEGRAM_BOT_TOKEN     – Enables the private-chat Telegram bridge.
 #   TELEGRAM_ALLOWED_USER_IDS – Comma-separated Telegram user ID allowlist.
 #   Any agent-server or automation env vars are passed through.
@@ -316,6 +324,28 @@ export AUTOMATION_BASE_URL="${AUTOMATION_BASE_URL:-http://127.0.0.1:${PORT}}"
 export AUTOMATION_WORKSPACE_BASE="${AUTOMATION_WORKSPACE_BASE:-${OPENHANDS_DIR}/workspaces}"
 mkdir -p "$AUTOMATION_WORKSPACE_BASE"
 
+# Shared SDK venv reused by every local-mode run instead of a 540 MB
+# per-run .venv under automation-runs/. Image builds seed
+# /opt/openhands-shared-sdk-venv; fall back to persistent storage.
+if [ -z "${AUTOMATION_SHARED_VENV:-}" ]; then
+  if [ -x /opt/openhands-shared-sdk-venv/bin/python ]; then
+    export AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
+  else
+    export AUTOMATION_SHARED_VENV="${OPENHANDS_DIR}/shared-sdk-venv"
+  fi
+fi
+export GROKBOT_AUTOMATION_SETUP_WRAPPER="${GROKBOT_AUTOMATION_SETUP_WRAPPER:-/opt/agent-canvas/tools/run-automation-setup.sh}"
+
+# Reclaim leftover per-run workspaces from before shared-venv existed.
+# A 12h TTL on the whole run dir plus a 15m TTL on real .venv directories
+# recovers the ~540 MB copies without touching in-flight runs.
+if [ -x /opt/agent-canvas/tools/automation_workspace_gc.py ]; then
+  log "Reclaiming leftover automation run workspaces..."
+  python3 /opt/agent-canvas/tools/automation_workspace_gc.py --once \
+    --workspace-base "$AUTOMATION_WORKSPACE_BASE" || \
+    log "WARNING: automation workspace GC failed (non-fatal)"
+fi
+
 # Default to SQLite so the automation server works out of the box without
 # an external PostgreSQL instance. Users can override AUTOMATION_DB_URL to
 # point at a real Postgres for production deployments.
@@ -343,6 +373,13 @@ elif python -c "import openhands.automation" 2>/dev/null; then
   PIDS+=($!)
 else
   log "WARNING: Automation server not found, skipping."
+fi
+
+if [ -x /opt/agent-canvas/tools/automation_workspace_gc.py ]; then
+  log "Starting automation workspace GC loop..."
+  python3 /opt/agent-canvas/tools/automation_workspace_gc.py --loop \
+    --workspace-base "$AUTOMATION_WORKSPACE_BASE" &
+  PIDS+=($!)
 fi
 
 # ── 3. Wait for backends to be ready ─────────────────────────────────────────
