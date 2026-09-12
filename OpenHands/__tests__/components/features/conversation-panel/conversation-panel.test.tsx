@@ -2245,6 +2245,58 @@ describe("ConversationPanel", () => {
       expect(searchSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("loads all pages and reveals all workspaces with their top 5 chats when load more is clicked", async () => {
+      useConversationPanelPreferencesStore.setState({
+        organizeMode: "grouped",
+      });
+      const searchSpy = vi
+        .spyOn(AgentServerConversationService, "searchConversations")
+        .mockResolvedValueOnce({
+          items: Array.from({ length: 6 }, (_, index) =>
+            createMockConversation({
+              id: `ws-a-${index + 1}`,
+              title: `Workspace A Chat ${index + 1}`,
+              selected_workspace: "/workspace/a",
+            }),
+          ),
+          next_page_id: "page-2",
+        })
+        .mockResolvedValueOnce({
+          items: [
+            createMockConversation({
+              id: "ws-b-1",
+              title: "Workspace B Chat 1",
+              selected_workspace: "/workspace/b",
+            }),
+          ],
+          next_page_id: "page-3",
+        })
+        .mockResolvedValueOnce({
+          items: [
+            createMockConversation({
+              id: "ws-c-1",
+              title: "Workspace C Chat 1",
+              selected_workspace: "/workspace/c",
+            }),
+          ],
+          next_page_id: null,
+        });
+
+      const user = userEvent.setup();
+      renderConversationPanel();
+
+      const folderA = await screen.findByTestId("thread-folder-ws--workspace-a");
+      expect(within(folderA).getAllByTestId("conversation-card")).toHaveLength(5);
+      expect(screen.getByTestId("load-more-conversations")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("load-more-conversations"));
+
+      await screen.findByTestId("thread-folder-ws--workspace-b");
+      await screen.findByTestId("thread-folder-ws--workspace-c");
+      expect(searchSpy).toHaveBeenCalledTimes(3);
+      expect(screen.queryByTestId("load-more-conversations")).not.toBeInTheDocument();
+    });
+
     it("caps initial workspace discovery when no new folder appears", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",

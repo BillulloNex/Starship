@@ -404,10 +404,10 @@ describe("InstallServerModal", () => {
       },
     });
     expect(
-      authorizeSpy.mock.calls[0][0].auth?.authentication,
+      (authorizeSpy.mock.calls[0][0].auth as any)?.authentication,
     ).not.toHaveProperty("client_id");
     expect(
-      authorizeSpy.mock.calls[0][0].auth?.authentication,
+      (authorizeSpy.mock.calls[0][0].auth as any)?.authentication,
     ).not.toHaveProperty("client_secret");
     await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
   });

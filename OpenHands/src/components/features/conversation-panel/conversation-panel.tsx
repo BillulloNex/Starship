@@ -44,7 +44,7 @@ import {
   groupConversations,
   GROUP_FOLDERS_PREVIEW_LIMIT,
   MAX_INITIAL_GROUP_DISCOVERY_PAGES,
-  MAX_PAGES_PER_LOAD_MORE_CLICK,
+  MAX_LOAD_ALL_PAGES,
   resolvePinnedConversations,
   sortConversationsByField,
   type ConversationGroupLaunch,
@@ -273,6 +273,7 @@ export function ConversationPanel({
 
   React.useEffect(() => {
     setVisibleGroupLimit(GROUP_FOLDERS_PREVIEW_LIMIT);
+    setIsLoadingAll(false);
   }, [activeBackend.id, listOrganizeMode]);
 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -482,7 +483,10 @@ export function ConversationPanel({
   ]);
 
   const groupDiscoveryConversationIds = React.useMemo(() => {
-    if (!groupedSourceConversations) {
+    if (
+      !groupedSourceConversations ||
+      visibleGroupLimit === Number.POSITIVE_INFINITY
+    ) {
       return null;
     }
     return getGroupDiscoveryConversationIds(
@@ -496,6 +500,7 @@ export function ConversationPanel({
     conversationPageById,
     currentConversationId,
     groupedSourceConversations,
+    visibleGroupLimit,
   ]);
 
   const orderedConversationGroups = React.useMemo(() => {
@@ -547,15 +552,6 @@ export function ConversationPanel({
     conversations.length > 0 &&
     automationFilteredConversations.length === 0;
 
-  // Grouped pagination prefers discovering another folder; chronological
-  // pagination succeeds when another row appears. Pages that only deepen
-  // already-visible folders are not success for the grouped control — the
-  // driver walks past them (bounded by the per-click page cap) so a single
-  // click can still reach a folder hiding behind deepen-only pages.
-  const visibleCount =
-    listOrganizeMode === "grouped" && !compact
-      ? visibleGroupCount
-      : visibleFlatCount;
   const loadedPageCount = data?.pages.length ?? 0;
 
   // A conversation page can be dominated by one busy agent workspace. Fill
@@ -603,88 +599,41 @@ export function ConversationPanel({
   // two reasons: (1) `fetchNextPage()` is silently dropped while the 10s
   // background refetch is in flight, and (2) a fetched page can yield zero
   // *visible* rows (filtered out by the active scope, or deduped as overlap),
-  // so the list does not appear to grow. We capture floors at click time and
-  // keep fetching — once idle — until the visible count grows, the grouped
-  // per-click page cap is hit, or pages run out. `loadedPageCount` keeps the
-  // driver advancing when a fetched page contains only folders that were
-  // already discovered.
-  const [loadMoreFloor, setLoadMoreFloor] = React.useState<number | null>(null);
-  const [loadMorePageFloor, setLoadMorePageFloor] = React.useState<
-    number | null
-  >(null);
-  const visibleCountRef = React.useRef(visibleCount);
-  visibleCountRef.current = visibleCount;
-  const loadedPageCountRef = React.useRef(loadedPageCount);
-  loadedPageCountRef.current = loadedPageCount;
-
-  const clearLoadMoreRequest = React.useCallback(() => {
-    setLoadMoreFloor(null);
-    setLoadMorePageFloor(null);
-  }, []);
+  // "Load more" loads all remaining pages and reveals all workspaces with their top 5 chats.
+  const [isLoadingAll, setIsLoadingAll] = React.useState(false);
 
   const requestLoadMore = React.useCallback(() => {
     if (listOrganizeMode === "grouped") {
-      setVisibleGroupLimit((current) => current + GROUP_FOLDERS_PREVIEW_LIMIT);
-      if (hasLoadedHiddenGroups) {
-        return;
-      }
+      setVisibleGroupLimit(Number.POSITIVE_INFINITY);
     }
     if (hasNextPage) {
-      setLoadMoreFloor(visibleCountRef.current);
-      setLoadMorePageFloor(loadedPageCountRef.current);
+      setIsLoadingAll(true);
+      fetchNextPage();
     }
-  }, [hasLoadedHiddenGroups, hasNextPage, listOrganizeMode]);
+  }, [fetchNextPage, hasNextPage, listOrganizeMode]);
 
   React.useEffect(() => {
-    if (loadMoreFloor === null) {
+    if (!isLoadingAll) {
       return;
     }
-    // Goal met: the visible list grew past where it was when the user clicked.
-    if (visibleCount > loadMoreFloor) {
-      clearLoadMoreRequest();
+    if (!hasNextPage || loadedPageCount >= MAX_LOAD_ALL_PAGES) {
+      setIsLoadingAll(false);
       return;
     }
-    // Hard cap (grouped only): pages that merely deepen already-visible
-    // folders are walked past — a new folder may sit right behind them — but
-    // never unbounded many, so one click cannot drain the whole cursor.
-    // Chronological mode keeps its pre-existing behavior: fetch until a
-    // visible row appears or pages run out.
-    if (
-      listOrganizeMode === "grouped" &&
-      !compact &&
-      loadMorePageFloor != null &&
-      loadedPageCount >= loadMorePageFloor + MAX_PAGES_PER_LOAD_MORE_CLICK
-    ) {
-      clearLoadMoreRequest();
-      return;
-    }
-    // Wait for any in-flight fetch (including the background refetch) to settle
-    // before evaluating `hasNextPage`; React Query may transiently clear that
-    // flag while replacing the last page.
     if (isFetching || isFetchingNextPage) {
-      return;
-    }
-    // Nothing more to fetch — stop waiting even if the list did not grow.
-    if (!hasNextPage) {
-      clearLoadMoreRequest();
       return;
     }
     fetchNextPage();
   }, [
-    clearLoadMoreRequest,
-    compact,
-    loadMoreFloor,
-    loadMorePageFloor,
-    visibleCount,
-    loadedPageCount,
-    listOrganizeMode,
+    fetchNextPage,
     hasNextPage,
     isFetching,
     isFetchingNextPage,
-    fetchNextPage,
+    isLoadingAll,
+    loadedPageCount,
   ]);
 
-  const isLoadingMore = loadMoreFloor !== null || isFetchingNextPage;
+  const isLoadingMore = isLoadingAll || isFetchingNextPage;
 
   const { mutate: deleteConversation, mutateAsync: deleteConversationAsync } =
     useDeleteConversation();

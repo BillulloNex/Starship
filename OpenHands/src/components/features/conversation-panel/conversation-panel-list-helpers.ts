@@ -27,6 +27,9 @@ export const GROUP_FOLDERS_PREVIEW_LIMIT = 5;
 /** Guardrail for automatically finding the first five workspace folders. */
 export const MAX_INITIAL_GROUP_DISCOVERY_PAGES = 5;
 
+/** Safeguard cap on backend pages fetched when user requests loading all pages. */
+export const MAX_LOAD_ALL_PAGES = 50;
+
 interface GroupConversationPreviewOptions {
   limit?: number;
   expanded: boolean;
