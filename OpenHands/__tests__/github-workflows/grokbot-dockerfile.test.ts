@@ -20,5 +20,6 @@ describe("Grokbot production image", () => {
   it("installs a shared automation SDK venv instead of per-run copies", () => {
     expect(dockerfile).toContain("/opt/openhands-shared-sdk-venv");
     expect(dockerfile).toContain("fix-automation-workspace-disk.py");
+    expect(dockerfile).toContain("fix-automation-sqlite-pool.py");
   });
 });

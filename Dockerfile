@@ -214,6 +214,11 @@ RUN python3 /tmp/guard-watchdog-telemetry.py && rm /tmp/guard-watchdog-telemetry
 COPY patches/fix-automation-workspace-disk.py /tmp/fix-automation-workspace-disk.py
 RUN python3 /tmp/fix-automation-workspace-disk.py && rm /tmp/fix-automation-workspace-disk.py
 
+# SQLite QueuePool (size 5 + overflow 10) times out when the dashboard fans
+# out one /runs query per automation. Force NullPool + WAL.
+COPY patches/fix-automation-sqlite-pool.py /tmp/fix-automation-sqlite-pool.py
+RUN python3 /tmp/fix-automation-sqlite-pool.py && rm /tmp/fix-automation-sqlite-pool.py
+
 # One shared SDK venv for every local-mode automation run. Without this, each
 # run's setup.sh pip-installs openhands-sdk/tools/workspace into
 # $AUTOMATION_WORKSPACE_BASE/automation-runs/<id>/.venv (~540 MB, ~13 GB/day).

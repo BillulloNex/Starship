@@ -7,6 +7,7 @@ import {
   type RunSummaryState,
 } from "#/manifests/automation-insights";
 import type { Automation } from "#/types/automation";
+import { withAutomationRunFetchLimit } from "./automation-run-fetch-limit";
 
 /**
  * The newest runs sampled per automation. Matches the detail page's default
@@ -19,9 +20,9 @@ interface UseAutomationRunSummariesOptions {
 }
 
 /**
- * One runs query per listed automation — a deliberate fan-out, bounded by the
- * list's page size. Summaries drive the dashboard's tiles, health badges,
- * filters, and sorts.
+ * One runs query per listed automation, bounded by the list's page size and
+ * `AUTOMATION_RUN_FETCH_CONCURRENCY` so SQLite is not hit with 50 checkouts
+ * at once. Summaries drive tiles, health badges, filters, and sorts.
  */
 export function useAutomationRunSummaries(
   automations: readonly Automation[],
@@ -40,12 +41,17 @@ export function useAutomationRunSummaries(
         active.orgId,
       ],
       queryFn: () =>
-        AutomationService.getAutomationRuns(
-          automation.id,
-          RECENT_RUN_SAMPLE_SIZE,
-          0,
+        withAutomationRunFetchLimit(() =>
+          AutomationService.getAutomationRuns(
+            automation.id,
+            RECENT_RUN_SAMPLE_SIZE,
+            0,
+          ),
         ),
       staleTime: 60 * 1000,
+      retry: false,
+      refetchOnWindowFocus: false,
+      meta: { disableToast: true },
       enabled: enabled && !!automation.id,
     })),
     combine: (results) => {

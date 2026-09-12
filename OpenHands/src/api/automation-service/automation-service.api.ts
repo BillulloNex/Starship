@@ -278,7 +278,7 @@ class AutomationService {
 
     const { data } = await localAutomationAxios.get<AutomationsResponse>(
       `${AUTOMATION_BASE_PATH}${getAutomationEndpoint("list")}`,
-      { params: { limit, offset } },
+      { params: { limit, offset }, timeout: 15_000 },
     );
     return data;
   }
@@ -472,7 +472,7 @@ class AutomationService {
 
     const { data } = await localAutomationAxios.get<AutomationRunsResponse>(
       basePath,
-      { params: { limit, offset } },
+      { params: { limit, offset }, timeout: 15_000 },
     );
     return data;
   }

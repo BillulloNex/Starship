@@ -174,6 +174,7 @@ describe("AutomationService", () => {
 
       expect(mockGet).toHaveBeenCalledWith("/api/automation/v1", {
         params: { limit: 10, offset: 5 },
+        timeout: 15_000,
       });
       expect(result).toEqual(response);
     });
@@ -189,6 +190,7 @@ describe("AutomationService", () => {
 
       expect(mockGet).toHaveBeenCalledWith("/api/automation/v1", {
         params: { limit: 50, offset: 0 },
+        timeout: 15_000,
       });
     });
   });
@@ -289,6 +291,7 @@ describe("AutomationService", () => {
 
       expect(mockGet).toHaveBeenCalledWith("/api/automation/v1/1/runs", {
         params: { limit: 20, offset: 10 },
+        timeout: 15_000,
       });
       expect(result).toEqual(response);
     });
@@ -301,6 +304,7 @@ describe("AutomationService", () => {
 
       expect(mockGet).toHaveBeenCalledWith("/api/automation/v1/1/runs", {
         params: { limit: 50, offset: 0 },
+        timeout: 15_000,
       });
     });
   });

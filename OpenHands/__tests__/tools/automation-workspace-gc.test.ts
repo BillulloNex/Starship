@@ -63,6 +63,7 @@ describe("Grokbot production image automation disk guards", () => {
   it("builds a shared SDK venv and patches preset setup.sh", () => {
     expect(dockerfile).toContain("/opt/openhands-shared-sdk-venv");
     expect(dockerfile).toContain("fix-automation-workspace-disk.py");
+    expect(dockerfile).toContain("fix-automation-sqlite-pool.py");
     expect(dockerfile).toContain("automation_workspace_gc.py");
   });
 
