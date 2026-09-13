@@ -13,6 +13,10 @@ import {
   SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH,
 } from "#/hooks/use-breakpoint";
 import { SidebarMobileMenuToggle } from "#/components/features/sidebar/sidebar-mobile-menu-toggle";
+import { useIdeViewStore } from "#/stores/ide-view-store";
+import { useIdeViewShortcut } from "#/hooks/use-ide-view-shortcut";
+import { ViewModeToggle } from "#/components/features/ide-layout/view-mode-toggle";
+import { IdeLayout } from "#/components/features/ide-layout/ide-layout";
 
 function getDesktopTabPanelClass(isRightPanelShown: boolean) {
   return isRightPanelShown
@@ -25,6 +29,10 @@ export function ConversationMain() {
   const isSidebarRailHidden = useBreakpoint(SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH);
   const { isRightPanelShown } = useConversationStore();
   const agentPhaseClass = useAgentPhaseStore((s) => s.phaseClass);
+  const viewMode = useIdeViewStore((s) => s.viewMode);
+
+  // Register Cmd+Shift+I keyboard shortcut for toggling IDE mode
+  useIdeViewShortcut();
 
   const { leftWidth, rightWidth, isDragging, containerRef, handleMouseDown } =
     useResizablePanels({
@@ -34,6 +42,33 @@ export function ConversationMain() {
       storageKey: "desktop-layout-panel-width",
     });
 
+  // IDE mode: render the dockview layout (desktop only, falls back to agent on mobile)
+  if (viewMode === "ide" && !isMobile) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Thin header bar with conversation name and mode toggle */}
+        <div
+          data-testid="ide-header"
+          className={cn(
+            "flex h-10 min-h-10 shrink-0 items-center px-2 border-b border-[var(--oh-border)] bg-[#0d0d0d]",
+            isSidebarRailHidden && "gap-2 pl-2.5",
+          )}
+        >
+          {isSidebarRailHidden ? <SidebarMobileMenuToggle /> : null}
+          <div className="min-w-0 flex-1">
+            <ConversationNameWithStatus />
+          </div>
+          <ViewModeToggle />
+        </div>
+        {/* Dockview IDE layout fills the rest */}
+        <div className="flex-1 min-h-0">
+          <IdeLayout />
+        </div>
+      </div>
+    );
+  }
+
+  // Agent mode: original chat-first layout
   return (
     <div
       className={cn(
@@ -85,6 +120,12 @@ export function ConversationMain() {
             <div className="min-w-0 flex-1">
               <ConversationNameWithStatus />
             </div>
+            {/* View mode toggle in the agent header (desktop only) */}
+            {!isMobile && (
+              <div className="mr-2">
+                <ViewModeToggle />
+              </div>
+            )}
           </div>
           <div className="flex-1 min-h-0 flex flex-col">
             <ChatInterfaceWrapper
