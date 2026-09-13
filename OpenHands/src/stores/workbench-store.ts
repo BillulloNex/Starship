@@ -11,6 +11,13 @@ export interface ActiveModelInfo {
   eol: "LF" | "CRLF";
 }
 
+export interface RevealTarget {
+  path: string;
+  line: number;
+  column: number;
+  length: number;
+}
+
 interface WorkbenchState {
   /** Live dockview API while the IDE layout is mounted. */
   api: DockviewApi | null;
@@ -24,6 +31,10 @@ interface WorkbenchState {
   /** Paths with a save in flight. */
   savingPaths: Record<string, true>;
   quickOpen: { isOpen: boolean; query: string };
+  /** A location to select once its file is showing in the editor. */
+  pendingReveal: RevealTarget | null;
+  /** Bumped to ask the search panel to focus its input. */
+  searchFocusRequest: number;
 }
 
 interface WorkbenchActions {
@@ -36,6 +47,8 @@ interface WorkbenchActions {
   openQuickOpen: (mode?: QuickOpenMode) => void;
   setQuickOpenQuery: (query: string) => void;
   closeQuickOpen: () => void;
+  setPendingReveal: (target: RevealTarget | null) => void;
+  requestSearchFocus: () => void;
 }
 
 const QUICK_OPEN_PREFIX: Record<QuickOpenMode, string> = {
@@ -65,6 +78,8 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     conflicts: {},
     savingPaths: {},
     quickOpen: { isOpen: false, query: "" },
+    pendingReveal: null,
+    searchFocusRequest: 0,
 
     setApi: (api) => set({ api }),
     setOpenPanels: (openPanels) => set({ openPanels }),
@@ -83,5 +98,8 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     setQuickOpenQuery: (query) =>
       set((state) => ({ quickOpen: { ...state.quickOpen, query } })),
     closeQuickOpen: () => set({ quickOpen: { isOpen: false, query: "" } }),
+    setPendingReveal: (pendingReveal) => set({ pendingReveal }),
+    requestSearchFocus: () =>
+      set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
   }),
 );

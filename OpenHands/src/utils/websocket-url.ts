@@ -114,6 +114,19 @@ export function buildBashWebSocketUrl(
 }
 
 /**
+ * Builds the WebSocket URL for the IDE's interactive terminals, served by the
+ * Grokbot static-server / dev ingress next to the agent-server routes.
+ */
+export function buildWorkbenchTerminalWebSocketUrl(
+  conversationUrl: string | null | undefined,
+): string {
+  return buildBashWebSocketUrl(conversationUrl).replace(
+    /\/sockets\/bash-events$/,
+    "/workbench/terminal",
+  );
+}
+
+/**
  * Builds the WebSocket URL for V1 conversations (without query params)
  * @param conversationId The conversation ID
  * @param conversationUrl The conversation URL containing host/port (e.g., "http://localhost:3000/api/conversations/123")

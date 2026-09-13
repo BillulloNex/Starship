@@ -214,6 +214,29 @@ export function WorkbenchEditor({ path, diskText }: WorkbenchEditorProps) {
     publishModelInfo(monaco, model);
   }, [isMounted, workspaceKey, path, diskText, setCursorPosition]);
 
+  // Select a location requested elsewhere (search results, go to line) once
+  // its file is the editor's model.
+  const pendingReveal = useWorkbenchStore((s) => s.pendingReveal);
+  React.useEffect(() => {
+    const instance = editorRef.current;
+    if (!isMounted || !instance || !workspaceKey || !pendingReveal) return;
+    if (pendingReveal.path !== path) return;
+    const model = workbenchDocuments.getModel(workspaceKey, path);
+    if (!model || instance.getModel() !== model) return;
+
+    const line = Math.min(pendingReveal.line, model.getLineCount());
+    const range = {
+      startLineNumber: line,
+      startColumn: pendingReveal.column,
+      endLineNumber: line,
+      endColumn: pendingReveal.column + pendingReveal.length,
+    };
+    instance.setSelection(range);
+    instance.revealRangeInCenterIfOutsideViewport(range);
+    instance.focus();
+    useWorkbenchStore.getState().setPendingReveal(null);
+  }, [isMounted, workspaceKey, path, diskText, pendingReveal]);
+
   return (
     <div className="h-full w-full" data-testid="workbench-editor">
       <Editor

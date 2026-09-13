@@ -1,12 +1,16 @@
 import { lazy } from "react";
 import { LazyPanel } from "./lazy-panel";
 
-const Terminal = lazy(() => import("#/components/features/terminal/terminal"));
+const WorkbenchTerminalPanel = lazy(() =>
+  import("../terminal/workbench-terminal-panel").then((module) => ({
+    default: module.WorkbenchTerminalPanel,
+  })),
+);
 
 export function TerminalPanel() {
   return (
     <LazyPanel>
-      <Terminal />
+      <WorkbenchTerminalPanel />
     </LazyPanel>
   );
 }

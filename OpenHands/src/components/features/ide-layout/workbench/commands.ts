@@ -6,6 +6,7 @@ import { addWorkbenchPanel, toggleWorkbenchPanel } from "./panels";
 export interface WorkbenchCommandContext {
   getApi: () => DockviewApi | null;
   openQuickOpen: (mode: QuickOpenMode) => void;
+  focusSearch: () => void;
   saveActiveFile: () => void;
   closeActiveTab: () => void;
   toggleViewMode: () => void;
@@ -21,6 +22,11 @@ export interface WorkbenchCommand {
    * is only shown in the palette, not dispatched by the workbench.
    */
   displayOnlyKeybinding?: boolean;
+  /**
+   * Keeps the keybinding working while a terminal has focus even when it
+   * uses Control (which would otherwise go to the shell, e.g. Ctrl+B, Ctrl+W).
+   */
+  runsInTerminal?: boolean;
   run: () => void;
 }
 
@@ -41,6 +47,7 @@ export const KEYBINDINGS = {
   save: { code: "KeyS", mod: true },
   closeTab: { code: "KeyW", mod: true },
   toggleExplorer: { code: "KeyB", mod: true },
+  findInFiles: { code: "KeyF", mod: true, shift: true },
   toggleTerminal: { code: "Backquote", ctrl: true },
   toggleTerminalAlt: { code: "KeyJ", mod: true },
   toggleChat: { code: "KeyB", mod: true, alt: true },
@@ -59,12 +66,14 @@ export function createWorkbenchCommands(
       id: "workbench.quickOpen",
       title: "Go to File…",
       keybindings: [KEYBINDINGS.quickOpen],
+      runsInTerminal: true,
       run: () => ctx.openQuickOpen("files"),
     },
     {
       id: "workbench.commandPalette",
       title: "Show All Commands",
       keybindings: [KEYBINDINGS.commandPalette],
+      runsInTerminal: true,
       run: () => ctx.openQuickOpen("commands"),
     },
     {
@@ -92,9 +101,19 @@ export function createWorkbenchCommands(
       run: withApi((api) => toggleWorkbenchPanel(api, "explorer")),
     },
     {
+      id: "workbench.findInFiles",
+      title: "Find in Files",
+      keybindings: [KEYBINDINGS.findInFiles],
+      run: withApi((api) => {
+        addWorkbenchPanel(api, "search");
+        ctx.focusSearch();
+      }),
+    },
+    {
       id: "view.toggleTerminal",
       title: "Toggle Terminal",
       keybindings: [KEYBINDINGS.toggleTerminal, KEYBINDINGS.toggleTerminalAlt],
+      runsInTerminal: true,
       run: withApi((api) => toggleWorkbenchPanel(api, "terminal")),
     },
     {

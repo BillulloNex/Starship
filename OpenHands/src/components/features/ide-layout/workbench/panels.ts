@@ -2,6 +2,7 @@ import type { AddPanelPositionOptions, DockviewApi } from "dockview-react";
 
 export type WorkbenchPanelId =
   | "explorer"
+  | "search"
   | "editor"
   | "terminal"
   | "chat"
@@ -11,6 +12,7 @@ export type WorkbenchPanelId =
 
 export const PANEL_TITLES: Record<WorkbenchPanelId, string> = {
   explorer: "Explorer",
+  search: "Search",
   editor: "Editor",
   terminal: "Terminal",
   chat: "Chat",
@@ -27,6 +29,9 @@ export const DEFAULT_PANELS: WorkbenchPanelId[] = [
   "chat",
 ];
 
+/** Panels that share the left dock. */
+const LEFT_PANELS: WorkbenchPanelId[] = ["explorer", "search"];
+
 /** Panels that share the bottom dock with the terminal. */
 const BOTTOM_PANELS: WorkbenchPanelId[] = [
   "terminal",
@@ -42,14 +47,24 @@ interface DockSize {
 
 const SIDE_SIZES: Partial<Record<WorkbenchPanelId, DockSize>> = {
   explorer: { width: 240 },
+  search: { width: 240 },
   chat: { width: 400 },
 };
 const BOTTOM_SIZE: DockSize = { height: 220 };
 
-function findBottomDockPanel(api: DockviewApi, except?: WorkbenchPanelId) {
-  return BOTTOM_PANELS.filter((id) => id !== except)
+function findDockPanel(
+  api: DockviewApi,
+  dock: WorkbenchPanelId[],
+  except?: WorkbenchPanelId,
+) {
+  return dock
+    .filter((id) => id !== except)
     .map((id) => api.getPanel(id))
     .find((panel) => panel !== undefined);
+}
+
+function findBottomDockPanel(api: DockviewApi, except?: WorkbenchPanelId) {
+  return findDockPanel(api, BOTTOM_PANELS, except);
 }
 
 function panelPosition(
@@ -57,8 +72,13 @@ function panelPosition(
   id: WorkbenchPanelId,
 ): AddPanelPositionOptions | undefined {
   if (id === "editor") return undefined;
-  if (id === "explorer") return { direction: "left" };
   if (id === "chat") return { direction: "right" };
+  if (LEFT_PANELS.includes(id)) {
+    const docked = findDockPanel(api, LEFT_PANELS, id);
+    return docked
+      ? { referencePanel: docked, direction: "within" }
+      : { direction: "left" };
+  }
 
   const docked = findBottomDockPanel(api, id);
   if (docked) return { referencePanel: docked, direction: "within" };
@@ -92,8 +112,11 @@ function restoreDockSizes(api: DockviewApi, sizes: Map<string, DockSize>) {
 }
 
 function defaultDockSize(api: DockviewApi, id: WorkbenchPanelId) {
+  // A panel that joined an existing dock as a tab keeps that dock's size.
+  if (LEFT_PANELS.includes(id) && findDockPanel(api, LEFT_PANELS, id)) {
+    return undefined;
+  }
   if (SIDE_SIZES[id]) return SIDE_SIZES[id];
-  // A panel that joined an existing bottom dock as a tab keeps that size.
   if (BOTTOM_PANELS.includes(id) && !findBottomDockPanel(api, id)) {
     return BOTTOM_SIZE;
   }

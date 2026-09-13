@@ -83,6 +83,7 @@ import {
   startJobBoardDispatcher,
 } from "./job-board.mjs";
 import { handleSkillInstallRequest } from "./skill-installer.mjs";
+import { createWorkbenchTerminalHandler } from "./workbench-terminal.mjs";
 
 /** Where the frontend reads the live-preview state from. */
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
@@ -958,6 +959,10 @@ export function startStaticServer(config) {
   let infrastructurePorts = new Set();
 
   const uninstallDiagnostics = proxy.installDiagnostics();
+  const workbenchTerminal = createWorkbenchTerminalHandler({
+    sessionApiKey: config.sessionApiKey,
+    defaultCwd: process.env.HOME || process.cwd(),
+  });
 
   const server = createServer(async (req, res) => {
     // Live app preview is matched on Host before anything else: a preview
@@ -995,6 +1000,10 @@ export function startStaticServer(config) {
     if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    if (workbenchTerminal.handleRequest(req, res)) {
       return;
     }
 
@@ -1238,6 +1247,10 @@ export function startStaticServer(config) {
       }
     }
 
+    if (workbenchTerminal.handleUpgrade(req, socket, head)) {
+      return;
+    }
+
     const backend = route(req.url ?? "/");
     if (backend) {
       proxy.proxyWebSocket(req, socket, head, backend);
@@ -1245,7 +1258,10 @@ export function startStaticServer(config) {
     }
     socket.destroy();
   });
-  server.on("close", uninstallDiagnostics);
+  server.on("close", () => {
+    uninstallDiagnostics();
+    workbenchTerminal.close();
+  });
 
   return new Promise((resolveListen) => {
     server.listen(config.port, config.host, async () => {

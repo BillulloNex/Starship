@@ -151,6 +151,22 @@ describe("workbench panels", () => {
     });
   });
 
+  it("tabs search with the explorer in the left dock", () => {
+    const { api, panels } = createFakeApi();
+    applyDefaultLayout(api);
+    addWorkbenchPanel(api, "search");
+    expect(panels.get("search")?.position).toEqual({
+      referencePanel: panels.get("explorer"),
+      direction: "within",
+    });
+
+    toggleWorkbenchPanel(api, "explorer");
+    toggleWorkbenchPanel(api, "search");
+    addWorkbenchPanel(api, "search");
+    expect(panels.get("search")?.position).toEqual({ direction: "left" });
+    expect(panels.get("search")?.group.width).toBe(240);
+  });
+
   it("falls back below the editor when the bottom dock is empty", () => {
     const { api, panels } = createFakeApi();
     applyDefaultLayout(api);

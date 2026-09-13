@@ -24,6 +24,7 @@
 import { createServer } from "node:http";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { createWorkbenchTerminalHandler } from "./workbench-terminal.mjs";
 
 import {
   applyCorsHeaders,
@@ -155,12 +156,22 @@ export function startIngress(config) {
   const route = createRouter(config.routes, config.defaultBackend);
   const proxy = createProxyHandlers({ label: `ingress:${config.port}` });
   const uninstallDiagnostics = proxy.installDiagnostics();
+  // Interactive IDE terminals are only served when a session key guards
+  // them (the dev launcher passes the agent-server's key).
+  const terminalKey = process.env.WORKBENCH_TERMINAL_SESSION_API_KEY;
+  const workbenchTerminal = terminalKey
+    ? createWorkbenchTerminalHandler({ sessionApiKey: terminalKey })
+    : null;
 
   const server = createServer((req, res) => {
     applyCorsHeaders(req, res);
     if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    if (workbenchTerminal?.handleRequest(req, res)) {
       return;
     }
 
@@ -247,6 +258,10 @@ export function startIngress(config) {
 
   // Handle WebSocket upgrades
   server.on("upgrade", (req, socket, head) => {
+    if (workbenchTerminal?.handleUpgrade(req, socket, head)) {
+      return;
+    }
+
     const backend = route(req.url ?? "/");
 
     if (!backend) {
@@ -269,7 +284,10 @@ export function startIngress(config) {
       socket.destroy();
     }
   });
-  server.on("close", uninstallDiagnostics);
+  server.on("close", () => {
+    uninstallDiagnostics();
+    workbenchTerminal?.close();
+  });
 
   server.listen(config.port, () => {
     console.log("");

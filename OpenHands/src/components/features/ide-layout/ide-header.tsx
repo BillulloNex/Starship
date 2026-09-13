@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { MessageSquare, PanelBottom, PanelLeft } from "lucide-react";
+import { MessageSquare, PanelBottom, PanelLeft, Search } from "lucide-react";
 import { cn } from "#/utils/utils";
 import {
   useBreakpoint,
@@ -31,6 +31,12 @@ const PANEL_TOGGLES: {
     label: "Explorer",
     icon: PanelLeft,
     keybinding: KEYBINDINGS.toggleExplorer,
+  },
+  {
+    id: "search",
+    label: "Search",
+    icon: Search,
+    keybinding: KEYBINDINGS.findInFiles,
   },
   {
     id: "terminal",

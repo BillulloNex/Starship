@@ -325,6 +325,9 @@ COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 
 # Copy the static-server scripts and their production runtime deps.
 COPY OpenHands/scripts/static-server.mjs /opt/agent-canvas/static-server.mjs
+# IDE terminals: WebSocket handler (served by static-server) + stdlib PTY bridge.
+COPY OpenHands/scripts/workbench-terminal.mjs /opt/agent-canvas/workbench-terminal.mjs
+COPY OpenHands/scripts/workbench-pty-bridge.py /opt/agent-canvas/workbench-pty-bridge.py
 COPY OpenHands/scripts/google-workspace-oauth.mjs /opt/agent-canvas/google-workspace-oauth.mjs
 COPY OpenHands/scripts/github-oauth.mjs /opt/agent-canvas/github-oauth.mjs
 COPY OpenHands/scripts/github-git-credential.sh /opt/agent-canvas/github-git-credential.sh
@@ -368,6 +371,10 @@ COPY --from=frontend-build /build/node_modules/sirv /opt/agent-canvas/node_modul
 COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_modules/@polka
 COPY --from=frontend-build /build/node_modules/mrmime /opt/agent-canvas/node_modules/mrmime
 COPY --from=frontend-build /build/node_modules/totalist /opt/agent-canvas/node_modules/totalist
+COPY --from=frontend-build /build/node_modules/ws /opt/agent-canvas/node_modules/ws
+RUN cd /opt/agent-canvas && \
+    node -e "import('./workbench-terminal.mjs').then(() => console.log('workbench-terminal ok'))" && \
+    python3 -m py_compile workbench-pty-bridge.py
 
 # Copy the runtime-services-info builder (entrypoint.sh runs it as a CLI to
 # emit the agent's <RUNTIME_SERVICES> block).

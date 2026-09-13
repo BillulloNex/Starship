@@ -986,6 +986,11 @@ function startIngress(config) {
     {
       cwd: projectRoot,
       color: c.yellow,
+      // Enables the IDE's interactive terminals behind the same session key
+      // the agent-server uses.
+      env: config.sessionApiKey
+        ? { WORKBENCH_TERMINAL_SESSION_API_KEY: config.sessionApiKey }
+        : {},
     },
   );
 }

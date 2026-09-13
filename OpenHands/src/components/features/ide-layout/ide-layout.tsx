@@ -10,6 +10,7 @@ import "#/styles/dockview-theme.css";
 import { useAutoRefreshFilesOnEdit } from "#/hooks/use-auto-refresh-files-on-edit";
 import { useWorkbenchStore } from "#/stores/workbench-store";
 import { ExplorerPanel } from "./panels/explorer-panel";
+import { SearchPanel } from "./panels/search-panel";
 import { EditorPanel } from "./panels/editor-panel";
 import { TerminalPanel } from "./panels/terminal-panel";
 import { ChatPanel } from "./panels/chat-panel";
@@ -35,6 +36,7 @@ const panelComponents: Record<
   React.FC<IDockviewPanelProps>
 > = {
   explorer: () => <ExplorerPanel />,
+  search: () => <SearchPanel />,
   editor: () => <EditorPanel />,
   terminal: () => <TerminalPanel />,
   chat: () => <ChatPanel />,

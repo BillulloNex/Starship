@@ -24,6 +24,7 @@ export function useWorkbenchCommands(): WorkbenchCommand[] {
       isMac: isMacPlatform(),
       getApi: () => useWorkbenchStore.getState().api,
       openQuickOpen: (mode) => useWorkbenchStore.getState().openQuickOpen(mode),
+      focusSearch: () => useWorkbenchStore.getState().requestSearchFocus(),
       saveActiveFile: () => {
         const path = activePath();
         if (path) save(path);
@@ -50,9 +51,18 @@ export function useWorkbenchKeybindings(commands: WorkbenchCommand[]) {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing) return;
+      const inTerminal =
+        event.target instanceof Element && !!event.target.closest(".xterm");
       const command = bound.find((candidate) =>
-        candidate.keybindings!.some((binding) =>
-          matchesKeybinding(event, binding, isMac),
+        candidate.keybindings!.some(
+          (binding) =>
+            matchesKeybinding(event, binding, isMac) &&
+            // Control chords belong to the shell while a terminal has focus.
+            !(
+              inTerminal &&
+              (binding.ctrl || (binding.mod && !isMac)) &&
+              !candidate.runsInTerminal
+            ),
         ),
       );
       if (!command) return;

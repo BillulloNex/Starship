@@ -114,6 +114,41 @@ describe("IDE layout", () => {
     });
   });
 
+  it("leaves Control chords to the shell while a terminal has focus", () => {
+    renderIde();
+    const xterm = document.createElement("div");
+    xterm.className = "xterm";
+    const textarea = document.createElement("textarea");
+    xterm.appendChild(textarea);
+    document.body.appendChild(xterm);
+
+    // Ctrl+B (non-Mac "toggle explorer") is tmux/readline input in a shell.
+    const ctrlB = new KeyboardEvent("keydown", {
+      code: "KeyB",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      textarea.dispatchEvent(ctrlB);
+    });
+    expect(ctrlB.defaultPrevented).toBe(false);
+    expect(useWorkbenchStore.getState().openPanels).toContain("explorer");
+
+    // The terminal toggle still works from inside the terminal.
+    act(() => {
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Backquote",
+          ctrlKey: true,
+          bubbles: true,
+        }),
+      );
+    });
+    expect(useWorkbenchStore.getState().openPanels).not.toContain("terminal");
+    xterm.remove();
+  });
+
   it("releases the dockview API on unmount", () => {
     const { unmount } = renderIde();
     expect(useWorkbenchStore.getState().api).not.toBeNull();
