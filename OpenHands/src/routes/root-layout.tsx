@@ -35,6 +35,13 @@ const AlertBanner = React.lazy(() =>
   })),
 );
 
+import { useIdeViewStore } from "#/stores/ide-view-store";
+import {
+  useBreakpoint,
+  SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH,
+} from "#/hooks/use-breakpoint";
+import { cn } from "#/utils/utils";
+
 import {
   isChunkLoadError,
   reloadOnChunkError,
@@ -109,23 +116,38 @@ export default function MainApp() {
 
   // Conversation + full-screen panel routes put the mobile menu control in the
   // chat / panel header; omit the extra top row so we don't duplicate chrome.
-  const hideMobileSidebarMenuBar = /^\/conversations\/[^/]+/.test(
-    location.pathname,
-  );
+  const isConversationRoute = /^\/conversations\/[^/]+/.test(location.pathname);
+  const hideMobileSidebarMenuBar = isConversationRoute;
   const showOnboardingPreview = isOnboardingPreviewActive(location.search);
+
+  const isMobile = useBreakpoint(SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH);
+  const viewMode = useIdeViewStore((s) => s.viewMode);
+  // Hide the outer agent sidebar in IDE mode during a conversation on desktop,
+  // making IDE mode a completely separate full-screen workspace.
+  const isIdeMode = viewMode === "ide" && isConversationRoute && !isMobile;
 
   return (
     <ReactRouterNavigationProvider>
       <SidebarMobileNavProvider>
         <div
           data-testid="root-layout"
-          className="h-screen lg:min-w-5xl flex flex-col md:flex-row bg-base overflow-hidden p-0"
+          className={cn(
+            "h-screen flex flex-col md:flex-row bg-base overflow-hidden p-0",
+            !isIdeMode && "lg:min-w-5xl",
+          )}
         >
           <title>{appTitle}</title>
-          <Sidebar />
+          {!isIdeMode ? <Sidebar /> : null}
 
-          <div className="flex min-h-0 flex-col w-full min-w-0 h-full gap-3">
-            {!hideMobileSidebarMenuBar ? <SidebarMobileMenuBar /> : null}
+          <div
+            className={cn(
+              "flex min-h-0 flex-col w-full min-w-0 h-full",
+              !isIdeMode && "gap-3",
+            )}
+          >
+            {!hideMobileSidebarMenuBar && !isIdeMode ? (
+              <SidebarMobileMenuBar />
+            ) : null}
             {config.data &&
               (config.data.maintenance_start_time ||
                 (config.data.faulty_models &&
@@ -142,7 +164,12 @@ export default function MainApp() {
               )}
             <div
               id="root-outlet"
-              className="relative flex-1 overflow-auto px-0 custom-scrollbar"
+              className={cn(
+                "relative flex-1 px-0",
+                isIdeMode
+                  ? "overflow-hidden"
+                  : "overflow-auto custom-scrollbar",
+              )}
             >
               <Outlet />
             </div>
