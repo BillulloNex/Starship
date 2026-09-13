@@ -37,6 +37,8 @@ interface WorkbenchState {
   searchFocusRequest: number;
   /** The file whose unreviewed changes are shown as a diff. */
   reviewPath: string | null;
+  /** Per-path counters; bumping one asks for that file to be linted. */
+  lintRequests: Record<string, number>;
 }
 
 interface WorkbenchActions {
@@ -52,6 +54,7 @@ interface WorkbenchActions {
   setPendingReveal: (target: RevealTarget | null) => void;
   requestSearchFocus: () => void;
   setReviewPath: (path: string | null) => void;
+  requestLint: (path: string) => void;
 }
 
 const QUICK_OPEN_PREFIX: Record<QuickOpenMode, string> = {
@@ -84,6 +87,7 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     pendingReveal: null,
     searchFocusRequest: 0,
     reviewPath: null,
+    lintRequests: {},
 
     setApi: (api) => set({ api }),
     setOpenPanels: (openPanels) => set({ openPanels }),
@@ -106,5 +110,12 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     requestSearchFocus: () =>
       set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
     setReviewPath: (reviewPath) => set({ reviewPath }),
+    requestLint: (path) =>
+      set((state) => ({
+        lintRequests: {
+          ...state.lintRequests,
+          [path]: (state.lintRequests[path] ?? 0) + 1,
+        },
+      })),
   }),
 );

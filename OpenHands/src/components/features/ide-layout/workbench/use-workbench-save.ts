@@ -59,6 +59,7 @@ export function useWorkbenchSave() {
           return "failed";
         }
         workbenchDocuments.markSaved(workspaceKey, path, snapshot);
+        useWorkbenchStore.getState().requestLint(path);
         return "saved";
       };
 

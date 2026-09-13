@@ -7,6 +7,7 @@ import { useFilesTabStore } from "#/stores/files-tab-store";
 import { useWorkbenchStore } from "#/stores/workbench-store";
 import { workbenchDocuments } from "../workbench/document-registry";
 import { useWorkbenchSave } from "../workbench/use-workbench-save";
+import { registerLanguageFeatures } from "../workbench/language-features";
 
 const EDITOR_THEME = "grokbot-workbench";
 
@@ -37,6 +38,7 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
 let languageDefaultsConfigured = false;
 
 function configureMonaco(monaco: Monaco) {
+  registerLanguageFeatures(monaco);
   monaco.editor.defineTheme(EDITOR_THEME, {
     base: "vs-dark",
     inherit: true,
@@ -60,6 +62,12 @@ function configureMonaco(monaco: Monaco) {
   };
   [ts.typescriptDefaults, ts.javascriptDefaults].forEach((defaults) => {
     defaults.setDiagnosticsOptions(diagnostics);
+    // The in-browser checker can't see other files, so its go-to-definition
+    // stops at import lines. The workspace search provider handles it.
+    defaults.setModeConfiguration({
+      ...defaults.modeConfiguration,
+      definitions: false,
+    });
     defaults.setCompilerOptions({
       ...defaults.getCompilerOptions(),
       allowJs: true,
@@ -189,7 +197,15 @@ export function WorkbenchEditor({ path, diskText }: WorkbenchEditorProps) {
     if (!isMounted || !instance || !monaco || !workspaceKey || !path) return;
 
     if (diskText !== null) {
-      workbenchDocuments.sync(monaco, workspaceKey, path, diskText);
+      const result = workbenchDocuments.sync(
+        monaco,
+        workspaceKey,
+        path,
+        diskText,
+      );
+      if (result === "created" || result === "reloaded") {
+        useWorkbenchStore.getState().requestLint(path);
+      }
     }
 
     const model = workbenchDocuments.getModel(workspaceKey, path);

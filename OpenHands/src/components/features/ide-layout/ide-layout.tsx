@@ -30,6 +30,7 @@ import {
   useWorkbenchKeybindings,
 } from "./workbench/use-workbench-commands";
 import { useDocumentLifecycle } from "./workbench/use-document-lifecycle";
+import { useLintDiagnostics } from "./workbench/use-lint-diagnostics";
 import { QuickOpen } from "./workbench/quick-open";
 
 const panelComponents: Record<
@@ -58,6 +59,7 @@ export function IdeLayout() {
   const commands = useWorkbenchCommands();
   useWorkbenchKeybindings(commands);
   useDocumentLifecycle();
+  useLintDiagnostics();
   useAutoRefreshFilesOnEdit();
 
   const subscriptions = React.useRef<{ dispose: () => void }[]>([]);
