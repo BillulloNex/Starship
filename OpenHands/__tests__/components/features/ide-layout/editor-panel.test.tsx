@@ -15,7 +15,9 @@ type ContentState = {
 };
 
 let contentState: ContentState = {};
+let reviewChanges: { path: string; kind: string }[] = [];
 const save = vi.fn();
+const acceptFile = vi.fn();
 
 vi.mock("#/context/workspace-runtime-context", () => ({
   useWorkspaceRuntime: () => ({ workspaceKey: "ws" }),
@@ -49,6 +51,19 @@ vi.mock("#/components/features/ide-layout/editor/workbench-editor", () => ({
   ),
 }));
 
+vi.mock("#/components/features/ide-layout/review/use-review", () => ({
+  useReviewChanges: () => ({
+    data: { isRepository: true, changes: reviewChanges },
+  }),
+  useReviewActions: () => ({ acceptFile, isBusy: false }),
+}));
+
+vi.mock("#/components/features/ide-layout/review/review-diff-view", () => ({
+  ReviewDiffView: ({ path }: { path: string }) => (
+    <div data-testid="review-diff-view" data-path={path} />
+  ),
+}));
+
 vi.mock("#/components/features/files-tab/file-content-viewer", () => ({
   FileContentViewer: ({ path }: { path: string }) => (
     <div data-testid="rich-viewer" data-path={path} />
@@ -72,9 +87,15 @@ function selectFile(path: string | null) {
 describe("EditorPanel", () => {
   beforeEach(() => {
     contentState = {};
+    reviewChanges = [];
     save.mockReset();
+    acceptFile.mockReset();
     workbenchDocuments.close("ws", "src/app.ts", { force: true });
-    useWorkbenchStore.setState({ conflicts: {}, savingPaths: {} });
+    useWorkbenchStore.setState({
+      conflicts: {},
+      savingPaths: {},
+      reviewPath: null,
+    });
     useFilesTabStore.setState({ previewModes: {}, dirtyFiles: {} });
   });
 
@@ -166,6 +187,43 @@ describe("EditorPanel", () => {
     expect(save).toHaveBeenCalledWith("src/app.ts");
     expect(
       screen.queryByTestId("editor-conflict-banner"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("flags a file with unreviewed changes and opens it for review", async () => {
+    const user = userEvent.setup();
+    selectFile("src/app.tsx");
+    reviewChanges = [{ path: "src/app.tsx", kind: "modified" }];
+    contentState = {
+      data: { path: "src/app.tsx", kind: "text", text: "code", staticUrl: "" },
+    };
+    render(<EditorPanel />);
+
+    await user.click(screen.getByTestId("unreviewed-accept"));
+    expect(acceptFile).toHaveBeenCalledWith("src/app.tsx");
+
+    await user.click(screen.getByTestId("unreviewed-review"));
+    expect(useWorkbenchStore.getState().reviewPath).toBe("src/app.tsx");
+  });
+
+  it("shows the review diff instead of the editor while reviewing", () => {
+    selectFile("src/app.tsx");
+    reviewChanges = [{ path: "src/app.tsx", kind: "modified" }];
+    useWorkbenchStore.setState({ reviewPath: "src/app.tsx" });
+    contentState = {
+      data: { path: "src/app.tsx", kind: "text", text: "code", staticUrl: "" },
+    };
+    render(<EditorPanel />);
+
+    expect(screen.getByTestId("review-diff-view")).toHaveAttribute(
+      "data-path",
+      "src/app.tsx",
+    );
+    expect(screen.getByTestId("workbench-editor").parentElement).toHaveClass(
+      "hidden",
+    );
+    expect(
+      screen.queryByTestId("unreviewed-changes-banner"),
     ).not.toBeInTheDocument();
   });
 });

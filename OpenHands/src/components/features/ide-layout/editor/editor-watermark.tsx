@@ -16,6 +16,7 @@ export function EditorWatermark() {
     { label: "Go to File", keybinding: KEYBINDINGS.quickOpen },
     { label: "Show All Commands", keybinding: KEYBINDINGS.commandPalette },
     { label: "Find in Files", keybinding: KEYBINDINGS.findInFiles },
+    { label: "Add Selection to Chat", keybinding: KEYBINDINGS.addToChat },
     { label: "Toggle Explorer", keybinding: KEYBINDINGS.toggleExplorer },
     { label: "Toggle Terminal", keybinding: KEYBINDINGS.toggleTerminal },
     { label: "Toggle Chat", keybinding: KEYBINDINGS.toggleChat },

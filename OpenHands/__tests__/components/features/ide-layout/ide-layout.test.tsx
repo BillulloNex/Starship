@@ -38,6 +38,17 @@ vi.mock(
     ConversationNameWithStatus: () => <div />,
   }),
 );
+vi.mock("#/components/features/ide-layout/review/use-review", () => ({
+  useReviewChanges: () => ({
+    data: {
+      isRepository: true,
+      changes: [
+        { path: "a.ts", kind: "modified" },
+        { path: "b.ts", kind: "added" },
+      ],
+    },
+  }),
+}));
 vi.mock("#/hooks/use-breakpoint", () => ({
   useBreakpoint: () => false,
   SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH: 767,
@@ -70,6 +81,7 @@ describe("IDE layout", () => {
       "aria-pressed",
       "true",
     );
+    expect(screen.getByTestId("ide-review-count")).toHaveTextContent("2");
   });
 
   it("closes and reopens a panel from the header", async () => {

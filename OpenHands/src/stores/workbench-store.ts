@@ -35,6 +35,8 @@ interface WorkbenchState {
   pendingReveal: RevealTarget | null;
   /** Bumped to ask the search panel to focus its input. */
   searchFocusRequest: number;
+  /** The file whose unreviewed changes are shown as a diff. */
+  reviewPath: string | null;
 }
 
 interface WorkbenchActions {
@@ -49,6 +51,7 @@ interface WorkbenchActions {
   closeQuickOpen: () => void;
   setPendingReveal: (target: RevealTarget | null) => void;
   requestSearchFocus: () => void;
+  setReviewPath: (path: string | null) => void;
 }
 
 const QUICK_OPEN_PREFIX: Record<QuickOpenMode, string> = {
@@ -80,6 +83,7 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     quickOpen: { isOpen: false, query: "" },
     pendingReveal: null,
     searchFocusRequest: 0,
+    reviewPath: null,
 
     setApi: (api) => set({ api }),
     setOpenPanels: (openPanels) => set({ openPanels }),
@@ -101,5 +105,6 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     setPendingReveal: (pendingReveal) => set({ pendingReveal }),
     requestSearchFocus: () =>
       set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
+    setReviewPath: (reviewPath) => set({ reviewPath }),
   }),
 );

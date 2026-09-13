@@ -7,6 +7,7 @@ export interface WorkbenchCommandContext {
   getApi: () => DockviewApi | null;
   openQuickOpen: (mode: QuickOpenMode) => void;
   focusSearch: () => void;
+  addSelectionToChat: () => void;
   saveActiveFile: () => void;
   closeActiveTab: () => void;
   toggleViewMode: () => void;
@@ -48,6 +49,8 @@ export const KEYBINDINGS = {
   closeTab: { code: "KeyW", mod: true },
   toggleExplorer: { code: "KeyB", mod: true },
   findInFiles: { code: "KeyF", mod: true, shift: true },
+  addToChat: { code: "KeyL", mod: true },
+  review: { code: "KeyG", mod: true, shift: true },
   toggleTerminal: { code: "Backquote", ctrl: true },
   toggleTerminalAlt: { code: "KeyJ", mod: true },
   toggleChat: { code: "KeyB", mod: true, alt: true },
@@ -81,6 +84,12 @@ export function createWorkbenchCommands(
       title: "Go to Line…",
       keybindings: [KEYBINDINGS.goToLine],
       run: () => ctx.openQuickOpen("line"),
+    },
+    {
+      id: "chat.addSelection",
+      title: "Add Selection to Chat",
+      keybindings: [KEYBINDINGS.addToChat],
+      run: ctx.addSelectionToChat,
     },
     {
       id: "file.save",
@@ -123,8 +132,14 @@ export function createWorkbenchCommands(
       run: withApi((api) => toggleWorkbenchPanel(api, "chat")),
     },
     {
+      id: "view.review",
+      title: "Review Changes",
+      keybindings: [KEYBINDINGS.review],
+      run: withApi((api) => addWorkbenchPanel(api, "review")),
+    },
+    {
       id: "view.showChanges",
-      title: "Show Changes",
+      title: "Show Git Diff",
       run: withApi((api) => addWorkbenchPanel(api, "changes")),
     },
     {

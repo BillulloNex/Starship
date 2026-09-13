@@ -1,5 +1,11 @@
 /* eslint-disable i18next/no-literal-string */
-import { MessageSquare, PanelBottom, PanelLeft, Search } from "lucide-react";
+import {
+  GitCompareArrows,
+  MessageSquare,
+  PanelBottom,
+  PanelLeft,
+  Search,
+} from "lucide-react";
 import { cn } from "#/utils/utils";
 import {
   useBreakpoint,
@@ -19,6 +25,7 @@ import {
   type Keybinding,
 } from "./workbench/keybindings";
 import { KEYBINDINGS } from "./workbench/commands";
+import { useReviewChanges } from "./review/use-review";
 
 const PANEL_TOGGLES: {
   id: WorkbenchPanelId;
@@ -39,6 +46,12 @@ const PANEL_TOGGLES: {
     keybinding: KEYBINDINGS.findInFiles,
   },
   {
+    id: "review",
+    label: "Review",
+    icon: GitCompareArrows,
+    keybinding: KEYBINDINGS.review,
+  },
+  {
     id: "terminal",
     label: "Terminal",
     icon: PanelBottom,
@@ -55,6 +68,10 @@ const PANEL_TOGGLES: {
 export function IdeHeader() {
   const isSidebarRailHidden = useBreakpoint(SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH);
   const openPanels = useWorkbenchStore((s) => s.openPanels);
+  const reviewChanges = useReviewChanges();
+  const unreviewedCount = reviewChanges.data?.isRepository
+    ? reviewChanges.data.changes.length
+    : 0;
   const isMac = isMacPlatform();
 
   return (
@@ -85,7 +102,7 @@ export function IdeHeader() {
                 if (api) toggleWorkbenchPanel(api, id);
               }}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
                 isOpen
                   ? "text-white"
                   : "text-[var(--oh-muted)] hover:text-white",
@@ -93,6 +110,14 @@ export function IdeHeader() {
               )}
             >
               <Icon size={15} />
+              {id === "review" && unreviewedCount > 0 && (
+                <span
+                  data-testid="ide-review-count"
+                  className="absolute -right-0.5 -top-0.5 min-w-3.5 rounded-full bg-[#528bff] px-1 text-center text-[9px] font-semibold leading-3.5 text-white"
+                >
+                  {unreviewedCount > 99 ? "99+" : unreviewedCount}
+                </span>
+              )}
             </button>
           );
         })}

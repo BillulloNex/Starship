@@ -93,9 +93,9 @@ describe("useAutoRefreshFilesOnEdit", () => {
           .addEvent(makeObservationEvent("1", kind, "git commit -m 'done'"));
       });
 
-      // Assert — the diff and commit-list queries refresh, and nothing
-      // else does (workspace file queries on every shell command would
-      // churn the Files tab; per-commit queries are immutable).
+      // Assert — the diff, commit-list, and IDE review queries refresh, and
+      // nothing else does (workspace file queries on every shell command
+      // would churn the Files tab; per-commit queries are immutable).
       const invalidatedKeys = spy.mock.calls.map(
         (call) => (call[0] as { queryKey: unknown[] }).queryKey[0],
       );
@@ -103,6 +103,7 @@ describe("useAutoRefreshFilesOnEdit", () => {
         "file_changes",
         "file_diff",
         "git_commits",
+        "workspace-review",
       ]);
     },
   );

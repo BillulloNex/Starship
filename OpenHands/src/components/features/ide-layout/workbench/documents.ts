@@ -269,6 +269,16 @@ export class WorkbenchDocuments {
     this.setConflict(doc, null);
   }
 
+  /**
+   * Replaces the buffer's content as an undoable edit (e.g. rejecting a
+   * change during review). The document becomes dirty until saved.
+   */
+  replaceContent(workspaceKey: string, path: string, text: string) {
+    const doc = this.find(workspaceKey, path);
+    if (!doc || !this.monaco) return;
+    replaceModelText(this.monaco, doc.model, text);
+  }
+
   saveViewState(
     workspaceKey: string,
     path: string,

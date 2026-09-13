@@ -135,6 +135,7 @@ export function useAutoRefreshFilesOnEdit(): void {
     queryClient.invalidateQueries({ queryKey: ["file_changes"] });
     queryClient.invalidateQueries({ queryKey: ["file_diff"] });
     queryClient.invalidateQueries({ queryKey: ["git_commits"] });
+    queryClient.invalidateQueries({ queryKey: ["workspace-review"] });
 
     if (hasNewFileEdits) {
       queryClient.invalidateQueries({ queryKey: ["workspace-files"] });

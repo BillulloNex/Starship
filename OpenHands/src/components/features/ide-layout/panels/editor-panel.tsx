@@ -14,6 +14,9 @@ import { ConflictBanner } from "../editor/conflict-banner";
 import { FilePreview } from "../editor/file-preview";
 import { EditorWatermark } from "../editor/editor-watermark";
 import { workbenchDocuments } from "../workbench/document-registry";
+import { ReviewDiffView } from "../review/review-diff-view";
+import { useReviewChanges } from "../review/use-review";
+import { UnreviewedChangesBanner } from "../review/unreviewed-changes-banner";
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
@@ -38,6 +41,8 @@ export function EditorPanel() {
     (s) => !!(selectedPath && s.conflicts[selectedPath]),
   );
   const openQuickOpen = useWorkbenchStore((s) => s.openQuickOpen);
+  const reviewPath = useWorkbenchStore((s) => s.reviewPath);
+  const reviewChanges = useReviewChanges();
 
   const content = useWorkspaceFileContent(selectedPath);
   const data =
@@ -52,8 +57,16 @@ export function EditorPanel() {
   const isText = hasDocument || (data?.kind === "text" && data.text !== null);
   const isNonText = !hasDocument && !!data && !isText;
 
-  const showEditor = !!selectedPath && isText && previewMode !== "preview";
-  const showPreview = !!selectedPath && isText && previewMode !== "code";
+  const isReviewing = !!selectedPath && isText && reviewPath === selectedPath;
+  const hasUnreviewedChanges =
+    !!selectedPath &&
+    !!reviewChanges.data?.isRepository &&
+    reviewChanges.data.changes.some((change) => change.path === selectedPath);
+
+  const showEditor =
+    !!selectedPath && isText && previewMode !== "preview" && !isReviewing;
+  const showPreview =
+    !!selectedPath && isText && previewMode !== "code" && !isReviewing;
 
   let overlay: React.ReactNode = null;
   if (!selectedPath) {
@@ -79,6 +92,9 @@ export function EditorPanel() {
       />
       {selectedPath && <EditorBreadcrumbs path={selectedPath} />}
       {selectedPath && hasConflict && <ConflictBanner path={selectedPath} />}
+      {selectedPath && isText && hasUnreviewedChanges && !isReviewing && (
+        <UnreviewedChangesBanner path={selectedPath} />
+      )}
 
       <div className="relative flex min-h-0 flex-1">
         <div
@@ -93,6 +109,11 @@ export function EditorPanel() {
             diskText={data?.kind === "text" ? data.text : null}
           />
         </div>
+        {isReviewing && selectedPath && (
+          <div className="h-full min-w-0 flex-1">
+            <ReviewDiffView key={selectedPath} path={selectedPath} />
+          </div>
+        )}
         {showPreview && selectedPath && (
           <div className="h-full min-w-0 flex-1">
             <FilePreview path={selectedPath} />

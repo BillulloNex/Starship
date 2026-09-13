@@ -11,6 +11,7 @@ import { useAutoRefreshFilesOnEdit } from "#/hooks/use-auto-refresh-files-on-edi
 import { useWorkbenchStore } from "#/stores/workbench-store";
 import { ExplorerPanel } from "./panels/explorer-panel";
 import { SearchPanel } from "./panels/search-panel";
+import { ReviewPanel } from "./panels/review-panel";
 import { EditorPanel } from "./panels/editor-panel";
 import { TerminalPanel } from "./panels/terminal-panel";
 import { ChatPanel } from "./panels/chat-panel";
@@ -37,6 +38,7 @@ const panelComponents: Record<
 > = {
   explorer: () => <ExplorerPanel />,
   search: () => <SearchPanel />,
+  review: () => <ReviewPanel />,
   editor: () => <EditorPanel />,
   terminal: () => <TerminalPanel />,
   chat: () => <ChatPanel />,

@@ -6,6 +6,8 @@ import { useWorkbenchStore } from "#/stores/workbench-store";
 import { createWorkbenchCommands, type WorkbenchCommand } from "./commands";
 import { isMacPlatform, matchesKeybinding } from "./keybindings";
 import { useWorkbenchSave } from "./use-workbench-save";
+import { addReferenceToChat, getEditorReference } from "./add-to-chat";
+import { workbenchDocuments } from "./document-registry";
 
 /** The IDE command list, bound to the live workbench state. */
 export function useWorkbenchCommands(): WorkbenchCommand[] {
@@ -25,6 +27,14 @@ export function useWorkbenchCommands(): WorkbenchCommand[] {
       getApi: () => useWorkbenchStore.getState().api,
       openQuickOpen: (mode) => useWorkbenchStore.getState().openQuickOpen(mode),
       focusSearch: () => useWorkbenchStore.getState().requestSearchFocus(),
+      addSelectionToChat: () => {
+        const { editor } = useWorkbenchStore.getState();
+        const path = workbenchDocuments.getPathForModel(
+          editor?.getModel() ?? null,
+        );
+        const reference = getEditorReference(editor, path);
+        if (reference) addReferenceToChat(reference);
+      },
       saveActiveFile: () => {
         const path = activePath();
         if (path) save(path);

@@ -3,6 +3,7 @@ import type { AddPanelPositionOptions, DockviewApi } from "dockview-react";
 export type WorkbenchPanelId =
   | "explorer"
   | "search"
+  | "review"
   | "editor"
   | "terminal"
   | "chat"
@@ -13,6 +14,7 @@ export type WorkbenchPanelId =
 export const PANEL_TITLES: Record<WorkbenchPanelId, string> = {
   explorer: "Explorer",
   search: "Search",
+  review: "Review",
   editor: "Editor",
   terminal: "Terminal",
   chat: "Chat",
@@ -30,7 +32,7 @@ export const DEFAULT_PANELS: WorkbenchPanelId[] = [
 ];
 
 /** Panels that share the left dock. */
-const LEFT_PANELS: WorkbenchPanelId[] = ["explorer", "search"];
+const LEFT_PANELS: WorkbenchPanelId[] = ["explorer", "search", "review"];
 
 /** Panels that share the bottom dock with the terminal. */
 const BOTTOM_PANELS: WorkbenchPanelId[] = [
@@ -48,6 +50,7 @@ interface DockSize {
 const SIDE_SIZES: Partial<Record<WorkbenchPanelId, DockSize>> = {
   explorer: { width: 240 },
   search: { width: 240 },
+  review: { width: 240 },
   chat: { width: 400 },
 };
 const BOTTOM_SIZE: DockSize = { height: 220 };
