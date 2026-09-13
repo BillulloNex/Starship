@@ -37,6 +37,7 @@ vi.mock("#/hooks/query/use-workspace-files", () => ({
 vi.mock("#/hooks/query/use-workspace-file-content", () => ({
   useWorkspaceFileContent: (path: string | null) =>
     useWorkspaceFileContentMock(path),
+  useWorkspaceFileReader: () => async () => null,
 }));
 
 vi.mock("#/hooks/query/use-unified-get-git-changes", () => ({

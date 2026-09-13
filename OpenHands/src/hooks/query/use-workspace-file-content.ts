@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { readCloudConversationFile } from "#/api/cloud/conversation-service.api";
@@ -127,6 +128,242 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+interface WorkspaceFileReadContext {
+  isStandalone: boolean;
+  isCloud: boolean;
+  conversationId: string | null;
+  conversationUrl: string | null;
+  sessionApiKey: string | null;
+  workingDir: string | undefined;
+  workspaceRoot: string;
+  baseUrl: string | undefined;
+}
+
+function resolveAbsoluteFilePath(
+  ctx: WorkspaceFileReadContext,
+  relativePath: string,
+): string {
+  return ctx.isStandalone
+    ? `${ctx.workingDir?.replace(/\/+$/, "")}/${relativePath}`
+    : `${ctx.workspaceRoot}/${relativePath}`;
+}
+
+async function readWorkspaceFile(
+  ctx: WorkspaceFileReadContext,
+  relativePath: string,
+): Promise<WorkspaceFileContent> {
+  const {
+    isStandalone,
+    isCloud,
+    conversationId,
+    conversationUrl,
+    sessionApiKey,
+    baseUrl,
+  } = ctx;
+  const absoluteFilePath = resolveAbsoluteFilePath(ctx, relativePath);
+  const kind = classifyKind(relativePath);
+  const mimeType = guessMimeType(relativePath);
+
+  if (isStandalone) {
+    const buffer = await AgentServerRuntimeService.downloadFile(
+      conversationUrl,
+      sessionApiKey,
+      absoluteFilePath,
+    );
+    const base64 = arrayBufferToBase64(buffer);
+
+    if (kind === "text" && isLikelyBinary(buffer)) {
+      return {
+        path: relativePath,
+        kind: "binary",
+        text: null,
+        staticUrl: `data:application/octet-stream;base64,${base64}`,
+        mimeType: "application/octet-stream",
+      };
+    }
+
+    return {
+      path: relativePath,
+      kind,
+      text:
+        kind === "text"
+          ? new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+          : null,
+      staticUrl: `data:${mimeType};base64,${base64}`,
+      mimeType,
+    };
+  }
+
+  if (isCloud) {
+    // Cloud: fetch through the cloud API's first-class runtime proxy
+    // (GET /api/v1/app-conversations/{id}/file), which avoids the
+    // removed /api/cloud-proxy hop. The endpoint returns file content as
+    // a string; binary files are detected via NUL-byte sniff on the
+    // decoded result and served as base64 data URIs.
+    const content = await readCloudConversationFile(
+      conversationId!,
+      absoluteFilePath,
+    );
+
+    if (kind === "text") {
+      // NUL-byte sniff on the decoded text to catch binary files that
+      // the cloud endpoint decoded as UTF-8 (fallible but sufficient).
+      const buf = new TextEncoder().encode(content);
+      if (isLikelyBinary(buf.buffer)) {
+        return {
+          path: relativePath,
+          kind: "binary",
+          text: null,
+          staticUrl: `data:application/octet-stream;base64,${arrayBufferToBase64(buf.buffer)}`,
+          mimeType: "application/octet-stream",
+        };
+      }
+      return {
+        path: relativePath,
+        kind: "text",
+        text: content,
+        staticUrl: `data:${mimeType};charset=utf-8;base64,${arrayBufferToBase64(buf.buffer)}`,
+        mimeType,
+      };
+    }
+    // Image / PDF via cloud API: the endpoint returns text, so binary
+    // bytes are decoded as UTF-8 server-side and can't round-trip
+    // faithfully. Best-effort base64 of the returned string — a proper
+    // binary path needs a cloud download endpoint (the old byte-accurate
+    // downloadFile route went through the removed /api/cloud-proxy).
+    const buf = new TextEncoder().encode(content);
+    return {
+      path: relativePath,
+      kind,
+      text: null,
+      staticUrl: `data:${mimeType};base64,${arrayBufferToBase64(buf.buffer)}`,
+      mimeType,
+    };
+  }
+
+  // Local: rely on the workspace-session cookie minted by
+  // useWorkspaceSession to authenticate the same-origin static
+  // fileserver fetch.
+  if (!baseUrl) throw new Error("No workspace session");
+
+  const staticUrl = joinWorkspaceUrl(baseUrl, relativePath);
+
+  // Image / PDF: don't fetch the bytes — the consumer renders them
+  // directly via `staticUrl` in an iframe or <img>. The browser
+  // will attach the `oh_workspace_session_key` cookie minted by
+  // `useWorkspaceSession` so the request authenticates without us
+  // having to set any headers (which a top-level <iframe src> can't
+  // do anyway).
+  if (kind !== "text") {
+    return {
+      path: relativePath,
+      kind,
+      text: null,
+      staticUrl,
+      mimeType,
+    };
+  }
+
+  // For our own fetch we also rely on the workspace-session cookie
+  // (it travels because we opt in to credentialed requests). This
+  // matches the auth path the iframe / <img> uses, and avoids a CORS
+  // preflight for a custom header.
+  // The fileserver sends Last-Modified without Cache-Control, which lets the
+  // browser serve a heuristically "fresh" stale copy. Always re-read: the
+  // editor treats this content as the truth on disk.
+  const response = await fetch(staticUrl, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to read ${relativePath}: ${response.status}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  if (isLikelyBinary(buffer)) {
+    return {
+      path: relativePath,
+      kind: "binary",
+      text: null,
+      staticUrl,
+      mimeType: "application/octet-stream",
+    };
+  }
+
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  return {
+    path: relativePath,
+    kind: "text",
+    text,
+    staticUrl,
+    mimeType,
+  };
+}
+
+function useWorkspaceFileReadContext() {
+  const {
+    isStandalone,
+    conversationId,
+    conversationUrl,
+    sessionApiKey,
+    workingDir,
+    isReady,
+  } = useWorkspaceRuntime();
+  const { data: conversation } = useActiveConversation();
+  const { data: workspaceSession } = useWorkspaceSession();
+
+  const selectedRepository = conversation?.selected_repository;
+  const baseUrl = workspaceSession?.baseUrl;
+  const isCloud = getActiveBackend().backend.kind === "cloud";
+
+  const gitPath = getGitPath(selectedRepository, workingDir);
+  const workspaceRoot = gitPath.startsWith("/") ? gitPath : `/${gitPath}`;
+
+  const context = useMemo<WorkspaceFileReadContext>(
+    () => ({
+      isStandalone,
+      isCloud,
+      conversationId,
+      conversationUrl,
+      sessionApiKey,
+      workingDir,
+      workspaceRoot,
+      baseUrl,
+    }),
+    [
+      isStandalone,
+      isCloud,
+      conversationId,
+      conversationUrl,
+      sessionApiKey,
+      workingDir,
+      workspaceRoot,
+      baseUrl,
+    ],
+  );
+
+  const canRead =
+    isReady && (isStandalone || (isCloud ? !!conversationId : !!baseUrl));
+
+  return { context, canRead };
+}
+
+/**
+ * Returns a function that reads a workspace file straight from the runtime,
+ * bypassing the query cache. The IDE uses it to check what is on disk right
+ * before saving. Resolves to `null` while the workspace isn't readable yet.
+ */
+export function useWorkspaceFileReader() {
+  const { context, canRead } = useWorkspaceFileReadContext();
+  return useCallback(
+    async (relativePath: string): Promise<WorkspaceFileContent | null> => {
+      if (!canRead) return null;
+      return readWorkspaceFile(context, relativePath);
+    },
+    [context, canRead],
+  );
+}
+
 /**
  * Reads a single file out of the active conversation's workspace via the
  * agent server's static workspace fileserver and classifies it as
@@ -141,16 +378,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * selected yet).
  */
 export function useWorkspaceFileContent(relativePath: string | null) {
-  const {
-    isStandalone,
-    conversationId,
-    conversationUrl,
-    sessionApiKey,
-    workingDir,
-    isReady,
-  } = useWorkspaceRuntime();
-  const { data: conversation } = useActiveConversation();
-  const { data: workspaceSession } = useWorkspaceSession();
+  const { context, canRead } = useWorkspaceFileReadContext();
   // Bump on every agent-side file mutation so the query refetches the
   // currently-selected file's body even when the *path* hasn't changed.
   // The iframe / <img> cache-busting for the rich preview is handled at
@@ -161,171 +389,23 @@ export function useWorkspaceFileContent(relativePath: string | null) {
     (state) => state.count,
   );
 
-  const selectedRepository = conversation?.selected_repository;
-  const baseUrl = workspaceSession?.baseUrl;
-  const isCloud = getActiveBackend().backend.kind === "cloud";
-
-  const gitPath = getGitPath(selectedRepository, workingDir);
-  const workspaceRoot = gitPath.startsWith("/") ? gitPath : `/${gitPath}`;
-  const absoluteFilePath = relativePath
-    ? isStandalone
-      ? `${workingDir?.replace(/\/+$/, "")}/${relativePath}`
-      : `${workspaceRoot}/${relativePath}`
-    : null;
-
   return useQuery<WorkspaceFileContent>({
     queryKey: [
       "workspace-file-content",
-      conversationId,
-      conversationUrl,
-      sessionApiKey,
-      isStandalone,
-      isCloud ? "cloud" : baseUrl,
+      context.conversationId,
+      context.conversationUrl,
+      context.sessionApiKey,
+      context.isStandalone,
+      context.isCloud ? "cloud" : context.baseUrl,
       relativePath,
-      absoluteFilePath,
+      relativePath ? resolveAbsoluteFilePath(context, relativePath) : null,
       workspaceMutationCount,
     ],
     queryFn: async () => {
       if (!relativePath) throw new Error("No path");
-
-      const kind = classifyKind(relativePath);
-      const mimeType = guessMimeType(relativePath);
-
-      if (isStandalone) {
-        const buffer = await AgentServerRuntimeService.downloadFile(
-          conversationUrl,
-          sessionApiKey,
-          absoluteFilePath!,
-        );
-        const base64 = arrayBufferToBase64(buffer);
-
-        if (kind === "text" && isLikelyBinary(buffer)) {
-          return {
-            path: relativePath,
-            kind: "binary",
-            text: null,
-            staticUrl: `data:application/octet-stream;base64,${base64}`,
-            mimeType: "application/octet-stream",
-          };
-        }
-
-        return {
-          path: relativePath,
-          kind,
-          text:
-            kind === "text"
-              ? new TextDecoder("utf-8", { fatal: false }).decode(buffer)
-              : null,
-          staticUrl: `data:${mimeType};base64,${base64}`,
-          mimeType,
-        };
-      }
-
-      if (isCloud) {
-        // Cloud: fetch through the cloud API's first-class runtime proxy
-        // (GET /api/v1/app-conversations/{id}/file), which avoids the
-        // removed /api/cloud-proxy hop. The endpoint returns file content as
-        // a string; binary files are detected via NUL-byte sniff on the
-        // decoded result and served as base64 data URIs.
-        const content = await readCloudConversationFile(
-          conversationId!,
-          absoluteFilePath!,
-        );
-
-        if (kind === "text") {
-          // NUL-byte sniff on the decoded text to catch binary files that
-          // the cloud endpoint decoded as UTF-8 (fallible but sufficient).
-          const buf = new TextEncoder().encode(content);
-          if (isLikelyBinary(buf.buffer)) {
-            return {
-              path: relativePath,
-              kind: "binary",
-              text: null,
-              staticUrl: `data:application/octet-stream;base64,${arrayBufferToBase64(buf.buffer)}`,
-              mimeType: "application/octet-stream",
-            };
-          }
-          return {
-            path: relativePath,
-            kind: "text",
-            text: content,
-            staticUrl: `data:${mimeType};charset=utf-8;base64,${arrayBufferToBase64(buf.buffer)}`,
-            mimeType,
-          };
-        }
-        // Image / PDF via cloud API: the endpoint returns text, so binary
-        // bytes are decoded as UTF-8 server-side and can't round-trip
-        // faithfully. Best-effort base64 of the returned string — a proper
-        // binary path needs a cloud download endpoint (the old byte-accurate
-        // downloadFile route went through the removed /api/cloud-proxy).
-        const buf = new TextEncoder().encode(content);
-        return {
-          path: relativePath,
-          kind,
-          text: null,
-          staticUrl: `data:${mimeType};base64,${arrayBufferToBase64(buf.buffer)}`,
-          mimeType,
-        };
-      }
-
-      // Local: rely on the workspace-session cookie minted by
-      // useWorkspaceSession to authenticate the same-origin static
-      // fileserver fetch.
-      if (!baseUrl) throw new Error("No workspace session");
-
-      const staticUrl = joinWorkspaceUrl(baseUrl, relativePath);
-
-      // Image / PDF: don't fetch the bytes — the consumer renders them
-      // directly via `staticUrl` in an iframe or <img>. The browser
-      // will attach the `oh_workspace_session_key` cookie minted by
-      // `useWorkspaceSession` so the request authenticates without us
-      // having to set any headers (which a top-level <iframe src> can't
-      // do anyway).
-      if (kind !== "text") {
-        return {
-          path: relativePath,
-          kind,
-          text: null,
-          staticUrl,
-          mimeType,
-        };
-      }
-
-      // For our own fetch we also rely on the workspace-session cookie
-      // (it travels because we opt in to credentialed requests). This
-      // matches the auth path the iframe / <img> uses, and avoids a CORS
-      // preflight for a custom header.
-      const response = await fetch(staticUrl, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to read ${relativePath}: ${response.status}`);
-      }
-
-      const buffer = await response.arrayBuffer();
-      if (isLikelyBinary(buffer)) {
-        return {
-          path: relativePath,
-          kind: "binary",
-          text: null,
-          staticUrl,
-          mimeType: "application/octet-stream",
-        };
-      }
-
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-      return {
-        path: relativePath,
-        kind: "text",
-        text,
-        staticUrl,
-        mimeType,
-      };
+      return readWorkspaceFile(context, relativePath);
     },
-    enabled:
-      isReady &&
-      !!relativePath &&
-      (isStandalone || (isCloud ? !!conversationId : !!baseUrl)),
+    enabled: canRead && !!relativePath,
     retry: false,
     staleTime: 1000 * 5,
     gcTime: 1000 * 60,

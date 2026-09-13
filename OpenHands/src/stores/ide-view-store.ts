@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export type ConversationViewMode = "agent" | "ide";
 
@@ -14,16 +15,27 @@ interface IdeViewActions {
 
 type IdeViewStore = IdeViewState & IdeViewActions;
 
-export const useIdeViewStore = create<IdeViewStore>()((set) => ({
-  viewMode: "agent",
+const STORAGE_KEY = "grokbot-ide-view";
 
-  setViewMode: (viewMode) => set({ viewMode }, false),
+// The chosen mode is remembered across reloads so people who live in the
+// IDE don't land back in the chat view every time. The dock layout itself
+// is intentionally not persisted.
+export const useIdeViewStore = create<IdeViewStore>()(
+  persist(
+    (set) => ({
+      viewMode: "agent",
 
-  toggleViewMode: () =>
-    set(
-      (state) => ({
-        viewMode: state.viewMode === "agent" ? "ide" : "agent",
-      }),
-      false,
-    ),
-}));
+      setViewMode: (viewMode) => set({ viewMode }),
+
+      toggleViewMode: () =>
+        set((state) => ({
+          viewMode: state.viewMode === "agent" ? "ide" : "agent",
+        })),
+    }),
+    {
+      name: STORAGE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state): IdeViewState => ({ viewMode: state.viewMode }),
+    },
+  ),
+);

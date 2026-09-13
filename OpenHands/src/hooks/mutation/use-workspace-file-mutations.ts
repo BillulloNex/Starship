@@ -92,6 +92,17 @@ export function useCreateWorkspaceFolder() {
   });
 }
 
+interface SaveWorkspaceFileVariables {
+  path: string;
+  content: string;
+  /**
+   * `"editor"` saves come from the IDE (including autosave): they skip the
+   * success toast and don't re-list the workspace, since saving an open file
+   * can't change the file tree.
+   */
+  source?: "editor";
+}
+
 export function useSaveWorkspaceFile() {
   const queryClient = useQueryClient();
   const { conversationUrl, sessionApiKey, workingDir } = useWorkspaceContext();
@@ -100,13 +111,7 @@ export function useSaveWorkspaceFile() {
   );
 
   return useMutation({
-    mutationFn: async ({
-      path,
-      content,
-    }: {
-      path: string;
-      content: string;
-    }) => {
+    mutationFn: async ({ path, content }: SaveWorkspaceFileVariables) => {
       const cleanPath = path.trim().replace(/^\/+/, "");
       if (!cleanPath) throw new Error("File path cannot be empty");
 
@@ -124,13 +129,15 @@ export function useSaveWorkspaceFile() {
 
       return cleanPath;
     },
-    onSuccess: (savedPath) => {
-      queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
+    onSuccess: (savedPath, { source }) => {
+      if (source !== "editor") {
+        queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
+      }
       queryClient.invalidateQueries({ queryKey: ["workspace-file-content"] });
       queryClient.invalidateQueries({ queryKey: ["file_changes"] });
       queryClient.invalidateQueries({ queryKey: ["file_diff"] });
       bumpWorkspaceMutationCounter();
-      toast.success(`Saved ${savedPath}`);
+      if (source !== "editor") toast.success(`Saved ${savedPath}`);
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to save file");

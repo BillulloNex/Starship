@@ -10,7 +10,9 @@ import {
 import { MarkdownRenderer } from "#/components/features/markdown/markdown-renderer";
 import { isMarkdownFilePath } from "#/utils/is-markdown-file-path";
 import { useFilesTabStore } from "#/stores/files-tab-store";
-import { FileCodeEditor } from "./file-code-editor";
+import { DocumentEditor } from "#/components/features/ide-layout/editor/document-editor";
+import { workbenchDocuments } from "#/components/features/ide-layout/workbench/document-registry";
+import { useWorkspaceRuntime } from "#/context/workspace-runtime-context";
 import { HighlightedSourceView } from "./highlighted-source-view";
 import type { ViewMode } from "./view-mode";
 
@@ -77,6 +79,18 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   // changes after every agent-side edit, forcing a fresh fetch even when
   // the *path* hasn't moved.
   const mutationCounter = useWorkspaceMutationCounter((state) => state.count);
+  const { workspaceKey } = useWorkspaceRuntime();
+
+  // An open document keeps its editor mounted while the file re-reads after
+  // an edit, so the cursor and unsaved changes stay put.
+  if (
+    viewMode === "edit" &&
+    query.isLoading &&
+    !!workspaceKey &&
+    workbenchDocuments.has(workspaceKey, path)
+  ) {
+    return <DocumentEditor path={path} diskText={null} />;
+  }
 
   if (query.isLoading) {
     return (
@@ -105,7 +119,7 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
   // ----- Edit mode: editable Monaco code editor with save functionality. -----
   if (viewMode === "edit") {
     if (kind === "text" && text !== null) {
-      return <FileCodeEditor path={path} initialContent={text} />;
+      return <DocumentEditor path={path} diskText={text} />;
     }
     return <UnpreviewableFallback path={path} />;
   }
@@ -134,7 +148,7 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
     return (
       <div className="flex h-full w-full min-h-0 divide-x divide-[var(--oh-border)]">
         <div className="flex-1 h-full min-h-0 min-w-0">
-          <FileCodeEditor path={path} initialContent={text} />
+          <DocumentEditor path={path} diskText={text} />
         </div>
         <div className="flex-1 h-full min-h-0 min-w-0 overflow-auto bg-[var(--oh-surface)] custom-scrollbar-always">
           {isMarkdown ? (

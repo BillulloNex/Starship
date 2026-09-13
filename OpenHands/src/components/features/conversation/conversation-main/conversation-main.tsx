@@ -17,6 +17,7 @@ import { useIdeViewStore } from "#/stores/ide-view-store";
 import { useIdeViewShortcut } from "#/hooks/use-ide-view-shortcut";
 import { ViewModeToggle } from "#/components/features/ide-layout/view-mode-toggle";
 import { IdeLayout } from "#/components/features/ide-layout/ide-layout";
+import { IdeHeader } from "#/components/features/ide-layout/ide-header";
 
 function getDesktopTabPanelClass(isRightPanelShown: boolean) {
   return isRightPanelShown
@@ -31,7 +32,7 @@ export function ConversationMain() {
   const agentPhaseClass = useAgentPhaseStore((s) => s.phaseClass);
   const viewMode = useIdeViewStore((s) => s.viewMode);
 
-  // Register Cmd+Shift+I keyboard shortcut for toggling IDE mode
+  // Register the Agent ↔ IDE keyboard shortcut (⌘⇧I / Ctrl+Alt+I)
   useIdeViewShortcut();
 
   const { leftWidth, rightWidth, isDragging, containerRef, handleMouseDown } =
@@ -46,21 +47,7 @@ export function ConversationMain() {
   if (viewMode === "ide" && !isMobile) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Thin header bar with conversation name and mode toggle */}
-        <div
-          data-testid="ide-header"
-          className={cn(
-            "flex h-10 min-h-10 shrink-0 items-center px-2 border-b border-[var(--oh-border)] bg-[#0d0d0d]",
-            isSidebarRailHidden && "gap-2 pl-2.5",
-          )}
-        >
-          {isSidebarRailHidden ? <SidebarMobileMenuToggle /> : null}
-          <div className="min-w-0 flex-1">
-            <ConversationNameWithStatus />
-          </div>
-          <ViewModeToggle />
-        </div>
-        {/* Dockview IDE layout fills the rest */}
+        <IdeHeader />
         <div className="flex-1 min-h-0">
           <IdeLayout />
         </div>

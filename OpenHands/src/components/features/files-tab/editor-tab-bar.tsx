@@ -19,12 +19,15 @@ interface EditorTabBarProps {
   onOpenSearchModal: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  /** The IDE layout owns its explorer panel, so it hides this toggle. */
+  showSidebarToggle?: boolean;
 }
 
 export function EditorTabBar({
   onOpenSearchModal,
   onRefresh: _onRefresh,
   isRefreshing: _isRefreshing,
+  showSidebarToggle = true,
 }: EditorTabBarProps) {
   const {
     openTabs,
@@ -213,22 +216,24 @@ export function EditorTabBar({
         </button>
 
         {/* Sidebar Toggle */}
-        <button
-          type="button"
-          data-testid="editor-toggle-sidebar-button"
-          title={
-            isSidebarCollapsed ? "Show File Explorer" : "Hide File Explorer"
-          }
-          aria-label="Toggle Sidebar"
-          onClick={toggleSidebar}
-          className="p-1.5 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
-        >
-          {isSidebarCollapsed ? (
-            <PanelLeft className="w-3.5 h-3.5" />
-          ) : (
-            <PanelLeftClose className="w-3.5 h-3.5" />
-          )}
-        </button>
+        {showSidebarToggle && (
+          <button
+            type="button"
+            data-testid="editor-toggle-sidebar-button"
+            title={
+              isSidebarCollapsed ? "Show File Explorer" : "Hide File Explorer"
+            }
+            aria-label="Toggle Sidebar"
+            onClick={toggleSidebar}
+            className="p-1.5 rounded text-[var(--oh-muted)] hover:text-white hover:bg-[var(--oh-surface-raised)] cursor-pointer"
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeft className="w-3.5 h-3.5" />
+            ) : (
+              <PanelLeftClose className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Tab context menu */}

@@ -21,7 +21,14 @@ import {
 } from "#/utils/status";
 import { I18nKey } from "#/i18n/declaration";
 
-export function ConversationNameWithStatus() {
+interface ConversationNameWithStatusProps {
+  /** The IDE view manages its own panels, so it hides the Agent view's toggle. */
+  showRightPanelToggle?: boolean;
+}
+
+export function ConversationNameWithStatus({
+  showRightPanelToggle = true,
+}: ConversationNameWithStatusProps = {}) {
   const { t } = useTranslation("openhands");
   const { conversationId } = useConversationId();
   const { data: conversation } = useActiveConversation();
@@ -148,7 +155,7 @@ export function ConversationNameWithStatus() {
           <HandoffToJobBoardButton />
         </div>
       </div>
-      <RightPanelToggle className="mr-2" />
+      {showRightPanelToggle && <RightPanelToggle className="mr-2" />}
     </div>
   );
 }

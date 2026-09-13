@@ -6,6 +6,7 @@ import { I18nKey } from "#/i18n/declaration";
 import { useHasAttachedSource } from "#/hooks/use-has-attached-source";
 import { useHasGitCommits } from "#/hooks/query/use-has-git-commits";
 import { useAutoRefreshFilesOnEdit } from "#/hooks/use-auto-refresh-files-on-edit";
+import { useDocumentLifecycle } from "#/components/features/ide-layout/workbench/use-document-lifecycle";
 import { useUnifiedGetGitChanges } from "#/hooks/query/use-unified-get-git-changes";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import { useConversationLocalStorageState } from "#/utils/conversation-local-storage";
@@ -28,6 +29,7 @@ function FilesTab() {
   const { t } = useTranslation("openhands");
 
   useAutoRefreshFilesOnEdit();
+  useDocumentLifecycle();
 
   const { hasAttachedSource, isLoading: isAttachedSourceLoading } =
     useHasAttachedSource();

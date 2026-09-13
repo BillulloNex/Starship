@@ -2,6 +2,11 @@ import AgentServerRuntimeService, {
   CommandResult,
 } from "./agent-server-runtime-service";
 
+// Base64 characters per command. Each chunk must fit, with the rest of the
+// python one-liner, under the kernel's per-argument limit (MAX_ARG_STRLEN,
+// 128KB).
+const SAVE_CHUNK_SIZE = 96_000;
+
 function toBase64(str: string): string {
   const bytes = new TextEncoder().encode(str);
   let binary = "";
@@ -61,6 +66,11 @@ export class WorkspaceFileOperationsService {
 
   /**
    * Saves text content to an existing or new file at `relativePath`.
+   *
+   * The content travels base64-encoded inside the command line, which the
+   * kernel caps at ~128KB per argument. Larger files are streamed into a
+   * temporary sibling in chunks and then moved into place atomically, which
+   * also means readers never observe a half-written file.
    */
   static async saveFileContent(
     conversationUrl: string | null | undefined,
@@ -72,12 +82,46 @@ export class WorkspaceFileOperationsService {
     const b64Path = toBase64(relativePath);
     const b64Content = toBase64(content);
 
-    const script = `python3 -c "import base64, pathlib; p = pathlib.Path(base64.b64decode('${b64Path}').decode('utf-8')); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(base64.b64decode('${b64Content}').decode('utf-8'))"`;
+    if (b64Content.length <= SAVE_CHUNK_SIZE) {
+      const script = `python3 -c "import base64, pathlib; p = pathlib.Path(base64.b64decode('${b64Path}').decode('utf-8')); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(base64.b64decode('${b64Content}').decode('utf-8'))"`;
 
+      return AgentServerRuntimeService.executeCommand(
+        conversationUrl,
+        sessionApiKey,
+        script,
+        workingDir,
+        20,
+      );
+    }
+
+    const tmpSuffix = `.grokbot-save-${Date.now().toString(36)}`;
+    const b64Suffix = toBase64(tmpSuffix);
+    const tmpExpr = `pathlib.Path(base64.b64decode('${b64Path}').decode('utf-8') + base64.b64decode('${b64Suffix}').decode('utf-8'))`;
+
+    for (
+      let offset = 0;
+      offset < b64Content.length;
+      offset += SAVE_CHUNK_SIZE
+    ) {
+      const chunk = b64Content.slice(offset, offset + SAVE_CHUNK_SIZE);
+      const mode = offset === 0 ? "wb" : "ab";
+      const script = `python3 -c "import base64, pathlib; t = ${tmpExpr}; t.parent.mkdir(parents=True, exist_ok=True); f = open(t, '${mode}'); f.write(base64.b64decode('${chunk}')); f.close()"`;
+      // Chunks must land in order, so they are awaited one at a time.
+      const result = await AgentServerRuntimeService.executeCommand(
+        conversationUrl,
+        sessionApiKey,
+        script,
+        workingDir,
+        20,
+      );
+      if (result.exit_code !== 0) return result;
+    }
+
+    const finalize = `python3 -c "import base64, os, pathlib; p = pathlib.Path(base64.b64decode('${b64Path}').decode('utf-8')); t = ${tmpExpr}; os.replace(t, p)"`;
     return AgentServerRuntimeService.executeCommand(
       conversationUrl,
       sessionApiKey,
-      script,
+      finalize,
       workingDir,
       20,
     );

@@ -1,5 +1,9 @@
+/* eslint-disable i18next/no-literal-string */
+import { useMemo } from "react";
 import { Monitor, MessageSquare } from "lucide-react";
 import { cn } from "#/utils/utils";
+import { formatKeybinding, isMacPlatform } from "./workbench/keybindings";
+import { getToggleViewModeKeybinding } from "./workbench/commands";
 import {
   useIdeViewStore,
   type ConversationViewMode,
@@ -15,8 +19,16 @@ import {
 export function ViewModeToggle() {
   const viewMode = useIdeViewStore((s) => s.viewMode);
   const setViewMode = useIdeViewStore((s) => s.setViewMode);
+  const shortcut = useMemo(() => {
+    const isMac = isMacPlatform();
+    return formatKeybinding(getToggleViewModeKeybinding(isMac), isMac);
+  }, []);
 
-  const modes: { value: ConversationViewMode; icon: typeof Monitor; label: string }[] = [
+  const modes: {
+    value: ConversationViewMode;
+    icon: typeof Monitor;
+    label: string;
+  }[] = [
     { value: "agent", icon: MessageSquare, label: "Agent" },
     { value: "ide", icon: Monitor, label: "IDE" },
   ];
@@ -33,6 +45,7 @@ export function ViewModeToggle() {
           type="button"
           role="tab"
           aria-selected={viewMode === value}
+          title={`${label} view (${shortcut})`}
           onClick={() => setViewMode(value)}
           className={cn(
             "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-150",
