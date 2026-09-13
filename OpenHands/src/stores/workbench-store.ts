@@ -2,6 +2,14 @@ import { create } from "zustand";
 import type { DockviewApi } from "dockview-react";
 import type { editor } from "monaco-editor";
 
+export interface InlineEditTarget {
+  path: string;
+  startLine: number;
+  endLine: number;
+  language: string;
+  code: string;
+}
+
 export type QuickOpenMode = "files" | "commands" | "line";
 
 export interface ActiveModelInfo {
@@ -39,6 +47,8 @@ interface WorkbenchState {
   reviewPath: string | null;
   /** Per-path counters; bumping one asks for that file to be linted. */
   lintRequests: Record<string, number>;
+  /** The code the user is asking the agent to edit (⌘K). */
+  inlineEdit: InlineEditTarget | null;
 }
 
 interface WorkbenchActions {
@@ -55,6 +65,7 @@ interface WorkbenchActions {
   requestSearchFocus: () => void;
   setReviewPath: (path: string | null) => void;
   requestLint: (path: string) => void;
+  setInlineEdit: (target: InlineEditTarget | null) => void;
 }
 
 const QUICK_OPEN_PREFIX: Record<QuickOpenMode, string> = {
@@ -88,6 +99,7 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     searchFocusRequest: 0,
     reviewPath: null,
     lintRequests: {},
+    inlineEdit: null,
 
     setApi: (api) => set({ api }),
     setOpenPanels: (openPanels) => set({ openPanels }),
@@ -110,6 +122,7 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
     requestSearchFocus: () =>
       set((state) => ({ searchFocusRequest: state.searchFocusRequest + 1 })),
     setReviewPath: (reviewPath) => set({ reviewPath }),
+    setInlineEdit: (inlineEdit) => set({ inlineEdit }),
     requestLint: (path) =>
       set((state) => ({
         lintRequests: {

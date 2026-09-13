@@ -13,6 +13,7 @@ import { WorkbenchStatusBar } from "../editor/workbench-status-bar";
 import { ConflictBanner } from "../editor/conflict-banner";
 import { FilePreview } from "../editor/file-preview";
 import { EditorWatermark } from "../editor/editor-watermark";
+import { InlineEditPrompt } from "../editor/inline-edit-prompt";
 import { workbenchDocuments } from "../workbench/document-registry";
 import { ReviewDiffView } from "../review/review-diff-view";
 import { useReviewChanges } from "../review/use-review";
@@ -92,6 +93,7 @@ export function EditorPanel() {
       />
       {selectedPath && <EditorBreadcrumbs path={selectedPath} />}
       {selectedPath && hasConflict && <ConflictBanner path={selectedPath} />}
+      {selectedPath && !isReviewing && <InlineEditPrompt />}
       {selectedPath && isText && hasUnreviewedChanges && !isReviewing && (
         <UnreviewedChangesBanner path={selectedPath} />
       )}

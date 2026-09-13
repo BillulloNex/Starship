@@ -8,6 +8,7 @@ export interface WorkbenchCommandContext {
   openQuickOpen: (mode: QuickOpenMode) => void;
   focusSearch: () => void;
   addSelectionToChat: () => void;
+  editSelectionWithAgent: () => void;
   saveActiveFile: () => void;
   closeActiveTab: () => void;
   toggleViewMode: () => void;
@@ -28,6 +29,8 @@ export interface WorkbenchCommand {
    * uses Control (which would otherwise go to the shell, e.g. Ctrl+B, Ctrl+W).
    */
   runsInTerminal?: boolean;
+  /** Limits when the keybinding applies (the palette can always run it). */
+  when?: (event: KeyboardEvent) => boolean;
   run: () => void;
 }
 
@@ -50,6 +53,7 @@ export const KEYBINDINGS = {
   toggleExplorer: { code: "KeyB", mod: true },
   findInFiles: { code: "KeyF", mod: true, shift: true },
   addToChat: { code: "KeyL", mod: true },
+  inlineEdit: { code: "KeyK", mod: true },
   review: { code: "KeyG", mod: true, shift: true },
   toggleTerminal: { code: "Backquote", ctrl: true },
   toggleTerminalAlt: { code: "KeyJ", mod: true },
@@ -90,6 +94,16 @@ export function createWorkbenchCommands(
       title: "Add Selection to Chat",
       keybindings: [KEYBINDINGS.addToChat],
       run: ctx.addSelectionToChat,
+    },
+    {
+      id: "chat.editSelection",
+      title: "Edit Selection with Agent",
+      keybindings: [KEYBINDINGS.inlineEdit],
+      // ⌘K stays the app's command menu outside the editor.
+      when: (event) =>
+        event.target instanceof Element &&
+        !!event.target.closest('[data-testid="workbench-editor"]'),
+      run: ctx.editSelectionWithAgent,
     },
     {
       id: "file.save",

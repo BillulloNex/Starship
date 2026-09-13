@@ -12,14 +12,13 @@ import {
 export function EditorWatermark() {
   const isMac = isMacPlatform();
 
+  // A short list: panels have header toggles, everything else is in ⇧⌘P.
   const hints: { label: string; keybinding: Keybinding }[] = [
     { label: "Go to File", keybinding: KEYBINDINGS.quickOpen },
     { label: "Show All Commands", keybinding: KEYBINDINGS.commandPalette },
     { label: "Find in Files", keybinding: KEYBINDINGS.findInFiles },
+    { label: "Edit Selection with Agent", keybinding: KEYBINDINGS.inlineEdit },
     { label: "Add Selection to Chat", keybinding: KEYBINDINGS.addToChat },
-    { label: "Toggle Explorer", keybinding: KEYBINDINGS.toggleExplorer },
-    { label: "Toggle Terminal", keybinding: KEYBINDINGS.toggleTerminal },
-    { label: "Toggle Chat", keybinding: KEYBINDINGS.toggleChat },
     {
       label: "Switch to Agent View",
       keybinding: getToggleViewModeKeybinding(isMac),

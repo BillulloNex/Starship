@@ -161,6 +161,37 @@ describe("IDE layout", () => {
     xterm.remove();
   });
 
+  it("keeps ⌘K for the app's command menu outside the editor", () => {
+    renderIde();
+    const outside = new KeyboardEvent("keydown", {
+      code: "KeyK",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      document.body.dispatchEvent(outside);
+    });
+    expect(outside.defaultPrevented).toBe(false);
+
+    const editor = document.createElement("div");
+    editor.dataset.testid = "workbench-editor";
+    const textarea = document.createElement("textarea");
+    editor.appendChild(textarea);
+    document.body.appendChild(editor);
+    const inside = new KeyboardEvent("keydown", {
+      code: "KeyK",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      textarea.dispatchEvent(inside);
+    });
+    expect(inside.defaultPrevented).toBe(true);
+    editor.remove();
+  });
+
   it("releases the dockview API on unmount", () => {
     const { unmount } = renderIde();
     expect(useWorkbenchStore.getState().api).not.toBeNull();
