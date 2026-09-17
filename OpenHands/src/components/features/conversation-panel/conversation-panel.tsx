@@ -477,7 +477,11 @@ export function ConversationPanel({
     // For local backends, inject folders for registered workspaces that have
     // no conversations yet, then hide workspace folders stale for 30+ days.
     if (isLocal && resolvedWorkspaces.length > 0) {
-      const merged = mergeWorkspaceFolders(groups, resolvedWorkspaces);
+      const merged = mergeWorkspaceFolders(
+        groups,
+        resolvedWorkspaces,
+        groupLabels.emptyWorkspace,
+      );
       return filterStaleWorkspaceFolders(merged);
     }
 

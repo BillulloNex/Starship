@@ -741,9 +741,24 @@ export function moveGroupFolderOrder(
 export function mergeWorkspaceFolders(
   groups: ConversationGroup[],
   workspaces: readonly LocalWorkspace[],
+  emptyWorkspaceLabel: string,
 ): ConversationGroup[] {
   const existingGroupIds = new Set(groups.map((g) => g.id));
   const merged = [...groups];
+
+  // Always ensure the "No workspace" bucket exists so conversations without
+  // a selected_workspace (or unmatched working_dir) have a visible folder,
+  // even when those conversations haven't been loaded yet.
+  if (!existingGroupIds.has("__none_workspace")) {
+    merged.push({
+      id: "__none_workspace",
+      label: emptyWorkspaceLabel,
+      conversations: [],
+      launch: {},
+      kind: "workspace",
+    });
+    existingGroupIds.add("__none_workspace");
+  }
 
   for (const ws of workspaces) {
     const wsPath = ws.path.replace(/\/+$/, "");
