@@ -382,7 +382,7 @@ if [ -x /opt/agent-canvas/tools/automation_workspace_gc.py ]; then
   PIDS+=($!)
 fi
 
-# ── 3. Wait for backends to be ready ─────────────────────────────────────────
+# ── Helper: wait for a TCP port to accept connections ────────────────────────
 wait_for_port() {
   local port=$1 name=$2 max_wait=${3:-30}
   local elapsed=0
@@ -397,32 +397,11 @@ wait_for_port() {
   log "$name is ready on port $port"
 }
 
-wait_for_port "$AGENT_SERVER_PORT" "Agent Server" 60 &
-WAIT_PID1=$!
-wait_for_port "$AUTOMATION_PORT" "Automation Server" 60 &
-WAIT_PID2=$!
-wait "$WAIT_PID1" "$WAIT_PID2"
-
-# Warm OpenCode's ACP HTTP stack (SQLite + Bun modules) so the first user
-# chat does not pay a fully cold Server.listen. MCP is attached later per
-# conversation; this only pre-heats the binary.
-if command -v opencode >/dev/null 2>&1 && [ -x /opt/agent-canvas/opencode-acp-prewarm.sh ]; then
-  log "Pre-warming OpenCode ACP..."
-  /opt/agent-canvas/opencode-acp-prewarm.sh >/tmp/opencode-acp-prewarm.log 2>&1 &
-  PIDS+=($!)
-fi
-
-# ── 4. Start optional Telegram bridge ───────────────────────────────────────
-if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
-  log "Starting Telegram mobile bridge..."
-  export GROKBOT_AGENT_SERVER_URL="${GROKBOT_AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
-  export GROKBOT_AGENT_SERVER_API_KEY="${GROKBOT_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
-  export TELEGRAM_STATE_PATH="${TELEGRAM_STATE_PATH:-${STATE_DIR}/telegram-bridge.json}"
-  node /opt/agent-canvas/telegram-bridge.mjs &
-  PIDS+=($!)
-fi
-
-# ── 5. Start static server (frontend + proxy) ────────────────────────────────
+# ── 3. Start static server (frontend + proxy) ────────────────────────────────
+# Start the static server BEFORE waiting for backends. Port 8000 binds
+# immediately (~2s), and proxied routes (/health, /api/*) return 502 until
+# the Python backends are ready. Docker's healthcheck naturally polls until
+# the first 200, so there are no false-positive "healthy" states.
 log "Starting frontend + proxy on port $PORT..."
 
 # Describe the local runtime services so the frontend can populate the agent's
@@ -483,12 +462,6 @@ else
   log "Live app preview disabled (set PREVIEW_HOST_PATTERN to enable)"
 fi
 
-# Auto-start persistent registered applications in the background
-if [ -f /opt/agent-canvas/grokbot-app.mjs ]; then
-  log "Auto-starting persistent web apps from registry..."
-  node /opt/agent-canvas/grokbot-app.mjs auto-start || true
-fi
-
 # Job board CLI + dispatcher use the same in-container agent-server credentials.
 export GROKBOT_AGENT_SERVER_URL="${GROKBOT_AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
 export GROKBOT_AGENT_SERVER_API_KEY="${GROKBOT_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
@@ -514,6 +487,40 @@ node /opt/agent-canvas/static-server.mjs \
   --route "/openapi.json=http://127.0.0.1:${AGENT_SERVER_PORT}" &
 STATIC_PID=$!
 PIDS+=("$STATIC_PID")
+
+# ── 4. Start optional Telegram bridge ───────────────────────────────────────
+# Telegram bridge doesn't need backends ready — it queues messages internally.
+if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
+  log "Starting Telegram mobile bridge..."
+  export TELEGRAM_STATE_PATH="${TELEGRAM_STATE_PATH:-${STATE_DIR}/telegram-bridge.json}"
+  node /opt/agent-canvas/telegram-bridge.mjs &
+  PIDS+=($!)
+fi
+
+# ── 5. Wait for backends to be ready ─────────────────────────────────────────
+# The static server is already listening on :8000 but proxied routes return 502
+# until the Python backends are up. This wait is for logging and for services
+# that genuinely need the backends (OpenCode prewarm, auto-start apps).
+wait_for_port "$AGENT_SERVER_PORT" "Agent Server" 60 &
+WAIT_PID1=$!
+wait_for_port "$AUTOMATION_PORT" "Automation Server" 60 &
+WAIT_PID2=$!
+wait "$WAIT_PID1" "$WAIT_PID2"
+
+# Warm OpenCode's ACP HTTP stack (SQLite + Bun modules) so the first user
+# chat does not pay a fully cold Server.listen. MCP is attached later per
+# conversation; this only pre-heats the binary.
+if command -v opencode >/dev/null 2>&1 && [ -x /opt/agent-canvas/opencode-acp-prewarm.sh ]; then
+  log "Pre-warming OpenCode ACP..."
+  /opt/agent-canvas/opencode-acp-prewarm.sh >/tmp/opencode-acp-prewarm.log 2>&1 &
+  PIDS+=($!)
+fi
+
+# Auto-start persistent registered applications in the background
+if [ -f /opt/agent-canvas/grokbot-app.mjs ]; then
+  log "Auto-starting persistent web apps from registry..."
+  node /opt/agent-canvas/grokbot-app.mjs auto-start || true
+fi
 
 # ── 6. (Optional) Public-mode static server ─────────────────────────────────
 # When PUBLIC_MODE_PORT is set, start a second static-server instance that

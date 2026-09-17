@@ -624,6 +624,7 @@ function setStaticHeaders(res, pathname) {
 
 function createStaticMiddleware(dirAbs) {
   return sirv(dirAbs, {
+    dev: true, // Filesystem lookup per request — allows Fast Mode file syncs
     etag: true,
     single: false,
     setHeaders: setStaticHeaders,

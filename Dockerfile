@@ -402,6 +402,14 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 COPY wrapper-entrypoint.sh /opt/agent-canvas/wrapper-entrypoint.sh
 RUN chmod +x /opt/agent-canvas/wrapper-entrypoint.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-prewarm.sh
 
+# Precompile Python bytecode for heavy AI packages to accelerate cold boot by
+# ~4-6s. Without this, Python parses and compiles thousands of .py files to
+# bytecode on every container start.
+RUN python3 -c "import openhands, litellm, ddtrace, pydantic; print('Core imports OK')" && \
+    python3 -m compileall -q /agent-server/.venv/lib/python3.12/site-packages/openhands \
+                             /agent-server/.venv/lib/python3.12/site-packages/litellm \
+                             /agent-server/.venv/lib/python3.12/site-packages/pydantic || true
+
 # Stay as root — the wrapper entrypoint drops to openhands after fixing
 # file ownership on mounted volumes. This is needed because the old
 # container ran as root, so persisted files have root:root ownership.
@@ -417,7 +425,11 @@ VOLUME ["/home/openhands/.openhands", "/projects"]
 EXPOSE 8000
 
 # Docker-level health check so Coolify (and Docker itself) can detect failures.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
+# Tuned for Starship's boot sequence:
+#   - start-period=30s: Python cold-boot takes 15-25s; 30s gives safe headroom
+#   - start-interval=2s: poll frequently during startup to detect health ASAP
+#   - interval=10s: steady-state polling after the container is healthy
+HEALTHCHECK --interval=10s --timeout=4s --start-period=30s --start-interval=2s --retries=3 \
   CMD curl -sf http://localhost:8000/health || exit 1
 
 # Wrapper fixes permissions, then execs the real entrypoint as openhands

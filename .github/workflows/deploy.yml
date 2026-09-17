@@ -7,7 +7,7 @@ on:
 jobs:
   build-and-deploy:
     name: Build Image & Trigger Deploy
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
@@ -95,14 +95,14 @@ jobs:
       - name: Wait for deployment
         run: |
           echo "Waiting for Coolify to finish deploying..."
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://ship.beenex.org/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ App is live (HTTP $HTTP_CODE)"
               break
             fi
-            echo "⏳ Attempt $i/30 — HTTP $HTTP_CODE"
-            sleep 10
+            echo "⏳ Attempt $i/90 — HTTP $HTTP_CODE"
+            sleep 2
           done
       
       - name: Run smoke test

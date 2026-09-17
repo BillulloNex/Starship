@@ -1,0 +1,8 @@
+{
+  "name": "starship",
+  "private": true,
+  "scripts": {
+    "deploy:fast": "./scripts/deploy-fast.sh",
+    "deploy:rollback": "./scripts/deploy-fast.sh --rollback"
+  }
+}
