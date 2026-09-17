@@ -13,11 +13,13 @@ import {
   SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH,
 } from "#/hooks/use-breakpoint";
 import { SidebarMobileMenuToggle } from "#/components/features/sidebar/sidebar-mobile-menu-toggle";
-import { useIdeViewStore } from "#/stores/ide-view-store";
-import { useIdeViewShortcut } from "#/hooks/use-ide-view-shortcut";
-import { ViewModeToggle } from "#/components/features/ide-layout/view-mode-toggle";
-import { IdeLayout } from "#/components/features/ide-layout/ide-layout";
-import { IdeHeader } from "#/components/features/ide-layout/ide-header";
+// --- SUNSET: IDE View ---
+// import { useIdeViewStore } from "#/stores/ide-view-store";
+// import { useIdeViewShortcut } from "#/hooks/use-ide-view-shortcut";
+// import { ViewModeToggle } from "#/components/features/ide-layout/view-mode-toggle";
+// import { IdeLayout } from "#/components/features/ide-layout/ide-layout";
+// import { IdeHeader } from "#/components/features/ide-layout/ide-header";
+// --- END SUNSET: IDE View ---
 
 function getDesktopTabPanelClass(isRightPanelShown: boolean) {
   return isRightPanelShown
@@ -30,10 +32,13 @@ export function ConversationMain() {
   const isSidebarRailHidden = useBreakpoint(SIDEBAR_RAIL_COLLAPSE_MAX_WIDTH);
   const { isRightPanelShown } = useConversationStore();
   const agentPhaseClass = useAgentPhaseStore((s) => s.phaseClass);
-  const viewMode = useIdeViewStore((s) => s.viewMode);
 
-  // Register the Agent ↔ IDE keyboard shortcut (⌘⇧I / Ctrl+Alt+I)
-  useIdeViewShortcut();
+  // --- SUNSET: IDE View ---
+  // const viewMode = useIdeViewStore((s) => s.viewMode);
+  //
+  // // Register the Agent ↔ IDE keyboard shortcut (⌘⇧I / Ctrl+Alt+I)
+  // useIdeViewShortcut();
+  // --- END SUNSET: IDE View ---
 
   const { leftWidth, rightWidth, isDragging, containerRef, handleMouseDown } =
     useResizablePanels({
@@ -43,17 +48,19 @@ export function ConversationMain() {
       storageKey: "desktop-layout-panel-width",
     });
 
-  // IDE mode: render the dockview layout (desktop only, falls back to agent on mobile)
-  if (viewMode === "ide" && !isMobile) {
-    return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <IdeHeader />
-        <div className="flex-1 min-h-0">
-          <IdeLayout />
-        </div>
-      </div>
-    );
-  }
+  // --- SUNSET: IDE View ---
+  // // IDE mode: render the dockview layout (desktop only, falls back to agent on mobile)
+  // if (viewMode === "ide" && !isMobile) {
+  //   return (
+  //     <div className="h-full flex flex-col overflow-hidden">
+  //       <IdeHeader />
+  //       <div className="flex-1 min-h-0">
+  //         <IdeLayout />
+  //       </div>
+  //     </div>
+  //   );
+  // }
+  // --- END SUNSET: IDE View ---
 
   // Agent mode: original chat-first layout
   return (
@@ -107,12 +114,14 @@ export function ConversationMain() {
             <div className="min-w-0 flex-1">
               <ConversationNameWithStatus />
             </div>
+            {/* --- SUNSET: IDE View --- */}
             {/* View mode toggle in the agent header (desktop only) */}
-            {!isMobile && (
+            {/* {!isMobile && (
               <div className="mr-2">
                 <ViewModeToggle />
               </div>
-            )}
+            )} */}
+            {/* --- END SUNSET: IDE View --- */}
           </div>
           <div className="flex-1 min-h-0 flex flex-col">
             <ChatInterfaceWrapper

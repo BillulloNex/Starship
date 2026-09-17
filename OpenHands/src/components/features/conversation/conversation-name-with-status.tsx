@@ -12,7 +12,9 @@ import { AgentState } from "#/types/agent-state";
 import DebugStackframeDot from "#/icons/debug-stackframe-dot.svg?react";
 import { ServerStatusContextMenu } from "../controls/server-status-context-menu";
 import { ConversationName } from "./conversation-name";
-import { HandoffToJobBoardButton } from "../job-board/handoff-to-job-board-button";
+// --- SUNSET: Job Board ---
+// import { HandoffToJobBoardButton } from "../job-board/handoff-to-job-board-button";
+// --- END SUNSET: Job Board ---
 import { RightPanelToggle } from "./right-panel-toggle";
 import {
   isExecutionActive,
@@ -151,9 +153,11 @@ export function ConversationNameWithStatus({
           ) : null}
         </div>
         <ConversationName />
-        <div className="ml-2 shrink-0">
+        {/* // --- SUNSET: Job Board --- */}
+        {/* <div className="ml-2 shrink-0">
           <HandoffToJobBoardButton />
-        </div>
+        </div> */}
+        {/* // --- END SUNSET: Job Board --- */}
       </div>
       {showRightPanelToggle && <RightPanelToggle className="mr-2" />}
     </div>

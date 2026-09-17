@@ -20,7 +20,9 @@ export default [
     route("plugins", "routes/plugins-redirect.tsx"),
     route("mcp", "routes/mcp-redirect.tsx"),
 
-    route("jobs", "routes/jobs.tsx"),
+    // --- SUNSET: Job Board (preserved for future use) ---
+    // route("jobs", "routes/jobs.tsx"),
+    // --- END SUNSET: Job Board ---
     route("files", "routes/files-explorer.tsx"),
     route("terminal", "routes/terminal-console.tsx"),
     route("settings", "routes/settings.tsx", [

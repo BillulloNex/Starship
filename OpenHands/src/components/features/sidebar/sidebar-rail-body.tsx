@@ -23,7 +23,9 @@ import {
 } from "#/hooks/use-standalone-workspace-runtime";
 import AutomationsIcon from "#/icons/automations.svg?react";
 import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
-import StickerHandIcon from "#/icons/sticker-hand.svg?react";
+// --- SUNSET: Job Board ---
+// import StickerHandIcon from "#/icons/sticker-hand.svg?react";
+// --- END SUNSET: Job Board ---
 import StickerStarIcon from "#/icons/sticker-star.svg?react";
 import StickerTerminalIcon from "#/icons/sticker-terminal.svg?react";
 import {
@@ -193,7 +195,8 @@ export function SidebarRailBody({
             />
           }
         />
-        <SidebarNavLink
+        {/* // --- SUNSET: Job Board --- */}
+        {/* <SidebarNavLink
           to="/jobs"
           label="Job Board"
           testId="sidebar-jobs-link"
@@ -205,7 +208,8 @@ export function SidebarRailBody({
               className={STICKER_ICON_CLASS}
             />
           }
-        />
+        /> */}
+        {/* // --- END SUNSET: Job Board --- */}
         {supportsStandaloneFiles ? (
           <SidebarNavLink
             to="/files"
