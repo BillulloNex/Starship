@@ -39,17 +39,22 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 - `scripts/deploy-frontend.sh` builds the Vite SPA and deploys it to Cloudflare Pages (legacy fallback only).
 - `OpenHands/config/defaults.json` holds version pins; `OpenHands/package.json` is the upstream npm version — do not confuse with Grokbot's `VERSION`.
 
-## Deployment Workflow (CRITICAL — Unified Coolify)
+## Deployment Workflow (CRITICAL — Dual-Mode)
 
 Starship uses a **unified deployment**: the Docker container serves both the frontend
 (via `scripts/static-server.mjs` on port 8000) and the backend (agent-server on 18000,
 automation on 18001). The static server injects the session API key, proxies API calls,
 and handles WebSockets — all on a single origin.
 
-### Primary URL: `https://ship.beenex.org`
+There are **two deployment modes**. Agents MUST choose the correct one:
 
-- **Pushing or merging to `main` runs `.github/workflows/deploy.yml`, which builds
-  the image and triggers Coolify deployment** for the entire stack (frontend + backend).
+### Normal Mode (Full CI/CD — 90-120s)
+
+**Use when**: Dockerfile, Python, entrypoint, `package-lock.json`, patches, `.py` files,
+CI workflows, system scripts, or npm dependencies have changed.
+
+- **Pushing or merging to `main` runs `.github/workflows/deploy.yml`**, which builds
+  the Docker image on a 4vCPU Blacksmith runner and triggers Coolify deployment.
 - **NEVER call the manual Coolify `deploy` tool after pushing to `main`.**
 - **How to verify deployment:**
   1. Commit and push to `main`.
@@ -58,6 +63,49 @@ and handles WebSockets — all on a single origin.
   4. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`.
 - **MANDATORY: Always monitor deployments to completion.** The definition of
   "deployed" is a `finished` status AND a passing health check.
+
+### Fast Mode (In-Place Frontend Sync — 7-10s)
+
+**Use when**: ONLY React components, CSS/Tailwind, UI state/hooks, translations,
+static assets, or frontend TypeScript in `OpenHands/src/` have changed. Nothing else.
+
+- **Command**: `./scripts/deploy-fast.sh` (or `npm run deploy:fast` from repo root)
+- **Rollback**: `./scripts/deploy-fast.sh --rollback` (or `npm run deploy:rollback`)
+- **How it works**: Builds frontend locally with `npm run build`, streams the build
+  output into the running container over SSH/Tailscale, and performs an atomic directory
+  swap. Zero container restart, zero Python cold-start, zero dropped WebSockets.
+- **Safety**: A diff guard checks committed, staged, and unstaged changes. If any
+  Dockerfile, `.py`, entrypoint, `package-lock.json`, or patch files are modified,
+  Fast Mode refuses to run and tells you to use Normal Mode instead.
+- **Rollback**: The previous frontend is backed up inside the container. Run
+  `./scripts/deploy-fast.sh --rollback` to restore it in under 1 second.
+- **Audit trail**: A `.deploy-sha` marker (`<commit>+fast-<timestamp>`) is written
+  into the container at `/opt/agent-canvas/frontend/.deploy-sha`.
+- **Prerequisite**: `OpenHands/.env.production.local` must exist with Vite telemetry
+  keys (it is gitignored). Without it, the build succeeds but observability keys
+  won't be embedded.
+- **AI agents inside the container cannot use Fast Mode** because it requires SSH
+  back to the host. Agents running inside the container must use Normal Mode.
+
+### Decision Matrix for Agents
+
+| Changed Files | Deploy Mode | Command |
+|:---|:---|:---|
+| `OpenHands/src/**` (React, CSS, hooks) | Fast Mode | `./scripts/deploy-fast.sh` |
+| `OpenHands/public/**` (images, fonts) | Fast Mode | `./scripts/deploy-fast.sh` |
+| `OpenHands/tailwind.config.*` | Fast Mode | `./scripts/deploy-fast.sh` |
+| `Dockerfile` | Normal Mode | `git push origin main` |
+| `OpenHands/docker/entrypoint.sh` | Normal Mode | `git push origin main` |
+| `wrapper-entrypoint.sh` | Normal Mode | `git push origin main` |
+| Any `.py` file | Normal Mode | `git push origin main` |
+| `OpenHands/package.json` or `package-lock.json` | Normal Mode | `git push origin main` |
+| `patches/**` | Normal Mode | `git push origin main` |
+| `OpenHands/scripts/static-server.mjs` | Normal Mode | `git push origin main` |
+| `.github/workflows/**` | Normal Mode | `git push origin main` |
+| Mixed frontend + backend | Normal Mode | `git push origin main` |
+
+### Primary URL: `https://ship.beenex.org`
+
 - `https://grok.beenex.org` and `https://grok-api.beenex.org` also work as
   aliases but `ship.beenex.org` is the canonical production URL.
 - Run `npm --prefix OpenHands run lint` / `build` before pushing to catch errors early.
