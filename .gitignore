@@ -6,3 +6,5 @@ dist/
 .env.local
 .env*.local
 patches/__pycache__/
+measurable/
+scratch_github.py

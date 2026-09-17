@@ -1,6 +1,7 @@
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import type { BackendKind } from "#/api/backend-registry/types";
 import type { Provider } from "#/types/settings";
+import type { LocalWorkspace } from "#/types/workspace";
 import {
   AUTOMATION_NAME_TAG_KEY,
   AUTOMATION_TAG_KEYS,
@@ -19,13 +20,23 @@ export type ConversationGroupKind = "workspace" | "repository" | "automation";
 export const AUTOMATION_GROUP_ID_PREFIX = "auto:";
 
 /** Max conversations shown under a workspace/repo folder before "View more". */
-export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 5;
+export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 3;
 
-/** Max workspace/repository folders shown before the global "Load more". */
-export const GROUP_FOLDERS_PREVIEW_LIMIT = 5;
+/**
+ * Max workspace/repository folders shown before the global "Load more".
+ * Set to Infinity so every registered workspace is visible immediately.
+ */
+export const GROUP_FOLDERS_PREVIEW_LIMIT = Number.POSITIVE_INFINITY;
 
 /** Guardrail for automatically finding the first five workspace folders. */
 export const MAX_INITIAL_GROUP_DISCOVERY_PAGES = 5;
+
+/**
+ * Workspace folders whose most recent conversation is older than this many
+ * days are hidden from the grouped sidebar view. Workspaces with zero
+ * conversations are always shown (the user explicitly configured them).
+ */
+export const WORKSPACE_STALE_DAYS = 30;
 
 /** Safeguard cap on backend pages fetched when user requests loading all pages. */
 export const MAX_LOAD_ALL_PAGES = 50;
@@ -381,7 +392,43 @@ export function sortConversationsByField(
   );
 }
 
-function workspaceGroup(conversation: AppConversation): {
+/**
+ * Best-effort match of a conversation's `workspace.working_dir` to a known
+ * workspace path. Returns the workspace path if `workingDir` starts with
+ * (or equals) a known workspace path, `null` otherwise.
+ *
+ * The agent-server sometimes creates per-conversation worktrees under the
+ * workspace root, so a prefix match is intentional (e.g. working_dir
+ * `/projects/Starship/.openhands/worktree-abc` → workspace `/projects/Starship`).
+ */
+function resolveWorkspaceFromWorkingDir(
+  workingDir: string | null | undefined,
+  knownWorkspaces: readonly LocalWorkspace[],
+): LocalWorkspace | null {
+  if (!workingDir) return null;
+  const normalized = workingDir.trim().replace(/\/+$/, "");
+  if (!normalized) return null;
+
+  // Exact match first, then longest-prefix match to avoid false positives
+  // from short workspace paths like `/projects`.
+  let bestMatch: LocalWorkspace | null = null;
+  let bestLength = 0;
+  for (const ws of knownWorkspaces) {
+    const wsPath = ws.path.replace(/\/+$/, "");
+    if (normalized === wsPath || normalized.startsWith(`${wsPath}/`)) {
+      if (wsPath.length > bestLength) {
+        bestMatch = ws;
+        bestLength = wsPath.length;
+      }
+    }
+  }
+  return bestMatch;
+}
+
+function workspaceGroup(
+  conversation: AppConversation,
+  knownWorkspaces?: readonly LocalWorkspace[],
+): {
   id: string;
   label: string;
 } {
@@ -397,11 +444,24 @@ function workspaceGroup(conversation: AppConversation): {
   const normalized = conversation.selected_workspace
     ?.trim()
     .replace(/\/+$/, "");
-  if (!normalized) {
-    return { id: "__none_workspace", label: "" };
+  if (normalized) {
+    const label = normalized.split("/").filter(Boolean).pop() ?? normalized;
+    return { id: `ws:${normalized}`, label };
   }
-  const label = normalized.split("/").filter(Boolean).pop() ?? normalized;
-  return { id: `ws:${normalized}`, label };
+
+  // Fallback: try matching workspace.working_dir to a known workspace.
+  if (knownWorkspaces && knownWorkspaces.length > 0) {
+    const matched = resolveWorkspaceFromWorkingDir(
+      conversation.workspace?.working_dir,
+      knownWorkspaces,
+    );
+    if (matched) {
+      const wsPath = matched.path.replace(/\/+$/, "");
+      return { id: `ws:${wsPath}`, label: matched.name };
+    }
+  }
+
+  return { id: "__none_workspace", label: "" };
 }
 
 function automationGroup(conversation: AppConversation): {
@@ -444,6 +504,7 @@ function repositoryGroup(conversation: AppConversation): {
 function getConversationGroupIdentity(
   conversation: AppConversation,
   backendKind: BackendKind,
+  knownWorkspaces?: readonly LocalWorkspace[],
 ): { id: string; label: string } {
   // Automation runs get their own folder keyed by automation name, even when
   // they inherited the same selected workspace/repo as a manual conversation.
@@ -452,7 +513,7 @@ function getConversationGroupIdentity(
     return automationGroup(conversation);
   }
   return backendKind === "local"
-    ? workspaceGroup(conversation)
+    ? workspaceGroup(conversation, knownWorkspaces)
     : repositoryGroup(conversation);
 }
 
@@ -489,7 +550,10 @@ export function getGroupDiscoveryConversationIds(
   items: readonly AppConversation[],
   pageByConversationId: ReadonlyMap<string, number>,
   backendKind: BackendKind,
-  options?: { forceIncludeConversationId?: string | null },
+  options?: {
+    forceIncludeConversationId?: string | null;
+    knownWorkspaces?: readonly LocalWorkspace[];
+  },
 ): Set<string> {
   // Resolve each conversation's folder identity exactly once; both passes
   // below (finding each folder's discovery page, then collecting the ids on
@@ -497,7 +561,11 @@ export function getGroupDiscoveryConversationIds(
   // workspace/repository normalization.
   const resolved = items.map((conversation) => ({
     conversationId: conversation.id,
-    groupId: getConversationGroupIdentity(conversation, backendKind).id,
+    groupId: getConversationGroupIdentity(
+      conversation,
+      backendKind,
+      options?.knownWorkspaces,
+    ).id,
     page: pageByConversationId.get(conversation.id) ?? 0,
   }));
 
@@ -536,6 +604,7 @@ export function groupConversations(
     emptyRepository: string;
     unnamedAutomation: string;
   },
+  knownWorkspaces?: readonly LocalWorkspace[],
 ): ConversationGroup[] {
   const unnamedAutomationGroupId = `${AUTOMATION_GROUP_ID_PREFIX}${UNNAMED_AUTOMATION_FACET}`;
   const byId = new Map<
@@ -547,6 +616,7 @@ export function groupConversations(
     const { id, label: rawLabel } = getConversationGroupIdentity(
       c,
       backendKind,
+      knownWorkspaces,
     );
     const label =
       id === "__none_workspace"
@@ -661,4 +731,61 @@ export function moveGroupFolderOrder(
     position === "before" ? adjustedTargetIndex : adjustedTargetIndex + 1;
   nextOrder.splice(insertIndex, 0, activeGroupId);
   return nextOrder;
+}
+
+/**
+ * Ensures every registered workspace appears as a folder in the grouped view,
+ * even if no loaded conversations belong to it. Existing conversation-derived
+ * groups take precedence when a workspace already has a matching folder.
+ */
+export function mergeWorkspaceFolders(
+  groups: ConversationGroup[],
+  workspaces: readonly LocalWorkspace[],
+): ConversationGroup[] {
+  const existingGroupIds = new Set(groups.map((g) => g.id));
+  const merged = [...groups];
+
+  for (const ws of workspaces) {
+    const wsPath = ws.path.replace(/\/+$/, "");
+    const groupId = `ws:${wsPath}`;
+    if (existingGroupIds.has(groupId)) continue;
+
+    merged.push({
+      id: groupId,
+      label: ws.name,
+      conversations: [],
+      launch: { workingDir: wsPath },
+      kind: "workspace",
+    });
+  }
+
+  return merged;
+}
+
+/**
+ * Hides workspace/repository folders whose most recent conversation is older
+ * than `WORKSPACE_STALE_DAYS`. Folders with zero conversations are always
+ * kept (the user explicitly configured the workspace). Automation folders
+ * bypass this filter entirely.
+ */
+export function filterStaleWorkspaceFolders(
+  groups: ConversationGroup[],
+  staleDays: number = WORKSPACE_STALE_DAYS,
+): ConversationGroup[] {
+  const cutoffMs = Date.now() - staleDays * 24 * 60 * 60 * 1000;
+
+  return groups.filter((group) => {
+    // Automation folders are never stale-filtered.
+    if (group.kind === "automation") return true;
+
+    // Empty workspace folders are always shown (explicitly configured).
+    if (group.conversations.length === 0) return true;
+
+    // Check if the most recent conversation is within the cutoff.
+    const mostRecentMs = group.conversations.reduce(
+      (max, c) => Math.max(max, parseConversationTimeMs(c.updated_at)),
+      0,
+    );
+    return mostRecentMs >= cutoffMs;
+  });
 }

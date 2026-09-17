@@ -40,11 +40,13 @@ import {
   applyGroupFolderOrder,
   collectAutomationNameFacets,
   filterOutPinnedConversations,
+  filterStaleWorkspaceFolders,
   getGroupDiscoveryConversationIds,
   groupConversations,
   GROUP_FOLDERS_PREVIEW_LIMIT,
   MAX_INITIAL_GROUP_DISCOVERY_PAGES,
   MAX_LOAD_ALL_PAGES,
+  mergeWorkspaceFolders,
   resolvePinnedConversations,
   sortConversationsByField,
   type ConversationGroupLaunch,
@@ -52,6 +54,7 @@ import {
 } from "./conversation-panel-list-helpers";
 import { useArchivedConversationsStore } from "#/stores/archived-conversations-store";
 import { usePinnedConversationsStore } from "#/stores/pinned-conversations-store";
+import { useResolvedWorkspaces } from "#/hooks/query/use-resolved-workspaces";
 
 interface ConversationPanelProps {
   onClose?: () => void;
@@ -99,6 +102,8 @@ export function ConversationPanel({
   const { conversationId: currentConversationId, navigate } = useNavigation();
   const { backend: activeBackend } = useActiveBackend();
   const backendScopedPath = useBackendScopedPath();
+  const isLocal = activeBackend.kind === "local";
+  const { workspaces: resolvedWorkspaces } = useResolvedWorkspaces();
   // Click-outside is only relevant in the legacy drawer mode where an
   // onClose handler is provided. When the panel is rendered inline (e.g.
   // as the always-visible conversation list pane), clicking outside should
@@ -450,36 +455,40 @@ export function ConversationPanel({
     if (compact || listOrganizeMode !== "grouped") {
       return null;
     }
-    // Use the unsorted partitions: groupConversations sorts each bucket
-    // internally by `sortField`, so pre-sorting the merged input is wasted
-    // work in grouped mode (the per-group sort overrides any global order).
-    return [...recentScoped, ...(showOlderConversations ? olderScoped : [])];
-  }, [
-    compact,
-    olderScoped,
-    listOrganizeMode,
-    recentScoped,
-    showOlderConversations,
-  ]);
+    // In grouped mode, show ALL conversations — bypass the 1-hour
+    // recent/older partition so every workspace folder shows its full
+    // chat history instead of hiding most behind "Show older".
+    return [...scopedConversations];
+  }, [compact, listOrganizeMode, scopedConversations]);
 
   const conversationGroups = React.useMemo(() => {
     if (!groupedSourceConversations) {
       return null;
     }
-    // Keep every loaded conversation in the group model. Folder discovery only
-    // freezes the collapsed preview — expanding a folder must reach later-page
-    // rows for that same workspace/repo.
-    return groupConversations(
+    // Pass known workspaces for best-effort working_dir fallback matching.
+    const groups = groupConversations(
       groupedSourceConversations,
       activeBackend.kind,
       conversationSort,
       groupLabels,
+      isLocal ? resolvedWorkspaces : undefined,
     );
+
+    // For local backends, inject folders for registered workspaces that have
+    // no conversations yet, then hide workspace folders stale for 30+ days.
+    if (isLocal && resolvedWorkspaces.length > 0) {
+      const merged = mergeWorkspaceFolders(groups, resolvedWorkspaces);
+      return filterStaleWorkspaceFolders(merged);
+    }
+
+    return groups;
   }, [
     activeBackend.kind,
     conversationSort,
     groupLabels,
     groupedSourceConversations,
+    isLocal,
+    resolvedWorkspaces,
   ]);
 
   const groupDiscoveryConversationIds = React.useMemo(() => {
@@ -493,13 +502,18 @@ export function ConversationPanel({
       groupedSourceConversations,
       conversationPageById,
       activeBackend.kind,
-      { forceIncludeConversationId: currentConversationId },
+      {
+        forceIncludeConversationId: currentConversationId,
+        knownWorkspaces: isLocal ? resolvedWorkspaces : undefined,
+      },
     );
   }, [
     activeBackend.kind,
     conversationPageById,
     currentConversationId,
     groupedSourceConversations,
+    isLocal,
+    resolvedWorkspaces,
     visibleGroupLimit,
   ]);
 
@@ -559,8 +573,12 @@ export function ConversationPanel({
   // workspaces (or the backend is exhausted), instead of making the user press
   // "Load more" once per workspace. Bound the discovery pass so accounts with
   // fewer than five workspaces do not download an unbounded history.
+  //
+  // On local backends, workspace folders are sourced directly from
+  // useResolvedWorkspaces, so this discovery loop is unnecessary.
   React.useEffect(() => {
     if (
+      isLocal ||
       compact ||
       listOrganizeMode !== "grouped" ||
       visibleGroupCount >= GROUP_FOLDERS_PREVIEW_LIMIT ||
@@ -578,6 +596,7 @@ export function ConversationPanel({
     hasNextPage,
     isFetching,
     isFetchingNextPage,
+    isLocal,
     loadedPageCount,
     listOrganizeMode,
     visibleGroupCount,
