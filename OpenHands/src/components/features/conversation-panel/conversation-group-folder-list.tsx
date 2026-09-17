@@ -11,6 +11,7 @@ import type { AppConversation } from "#/api/conversation-service/agent-server-co
 import { I18nKey } from "#/i18n/declaration";
 import { ConversationGroupFolderRow } from "./conversation-group-folder-row";
 import {
+  getGroupPreviewLimit,
   moveGroupFolderOrder,
   type ConversationGroup,
   type ConversationGroupLaunch,
@@ -25,8 +26,11 @@ interface ConversationGroupFolderListProps {
   collapsedGroupIds: ReadonlySet<string>;
   expandedGroupPreviewIds: ReadonlySet<string>;
   discoveryConversationIds: ReadonlySet<string> | null;
+  activeGroupId: string | null;
+  hasNextPage: boolean;
+  loadingGroupId: string | null;
   onToggleGroupCollapsed: (groupId: string) => void;
-  onToggleGroupPreviewExpanded: (groupId: string) => void;
+  onRequestGroupMore: (groupId: string) => void;
   isCreatingConversationFlow: boolean;
   activeConversationId?: string | null;
   onLaunchFromGroup: (launch: ConversationGroupLaunch) => void;
@@ -41,8 +45,11 @@ export function ConversationGroupFolderList({
   collapsedGroupIds,
   expandedGroupPreviewIds,
   discoveryConversationIds,
+  activeGroupId,
+  hasNextPage,
+  loadingGroupId,
   onToggleGroupCollapsed,
-  onToggleGroupPreviewExpanded,
+  onRequestGroupMore,
   isCreatingConversationFlow,
   activeConversationId,
   onLaunchFromGroup,
@@ -148,6 +155,9 @@ export function ConversationGroupFolderList({
           isCreatingConversationFlow={isCreatingConversationFlow}
           activeConversationId={activeConversationId}
           discoveryConversationIds={discoveryConversationIds}
+          previewLimit={getGroupPreviewLimit(group.id === activeGroupId)}
+          hasNextPage={hasNextPage}
+          isLoadingMore={loadingGroupId === group.id}
           onToggleExpanded={() => onToggleGroupCollapsed(group.id)}
           onDragStart={() => {
             setAnimateLayout(true);
@@ -175,7 +185,7 @@ export function ConversationGroupFolderList({
             event.preventDefault();
             handleDrop(group.id, computeDropPosition(event));
           }}
-          onTogglePreviewExpanded={() => onToggleGroupPreviewExpanded(group.id)}
+          onRequestMore={() => onRequestGroupMore(group.id)}
           onLaunchFromGroup={() => onLaunchFromGroup(group.launch)}
           renderConversationCard={renderConversationCard}
         />

@@ -2112,7 +2112,7 @@ describe("ConversationPanel", () => {
       });
     });
 
-    it("keeps collapsed folder previews stable while still exposing later-page conversations on expand", async () => {
+    it("reveals remaining loaded chats in a folder without fetching another page", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
@@ -2124,31 +2124,8 @@ describe("ConversationPanel", () => {
       );
       const searchSpy = vi
         .spyOn(AgentServerConversationService, "searchConversations")
-        .mockResolvedValueOnce({
+        .mockResolvedValue({
           items: noWorkspaceConversations,
-          next_page_id: "page-2",
-        })
-        .mockResolvedValueOnce({
-          items: [
-            createMockConversation({
-              id: "no-workspace-7",
-              title: "No workspace 7",
-            }),
-            createMockConversation({
-              id: "no-workspace-8",
-              title: "No workspace 8",
-            }),
-          ],
-          next_page_id: "page-3",
-        })
-        .mockResolvedValueOnce({
-          items: [
-            createMockConversation({
-              id: "alpha",
-              title: "Alpha conversation",
-              selected_workspace: "/workspace/alpha",
-            }),
-          ],
           next_page_id: null,
         });
 
@@ -2159,39 +2136,12 @@ describe("ConversationPanel", () => {
         "thread-folder-__none_workspace",
       );
       expect(
-        within(noWorkspaceFolder).getByTestId(
-          "thread-folder-children-__none_workspace",
-        ),
-      ).not.toHaveClass("ml-5");
-      expect(
-        within(noWorkspaceFolder).getByTestId(
-          "thread-folder-children-__none_workspace",
-        ),
-      ).not.toHaveClass("border-l");
-      expect(
         within(noWorkspaceFolder).getAllByTestId("conversation-card"),
-      ).toHaveLength(5);
+      ).toHaveLength(3);
       expect(
-        within(noWorkspaceFolder).queryByText("No workspace 7"),
+        screen.queryByTestId("load-more-conversations"),
       ).not.toBeInTheDocument();
 
-      // A single click walks past the deepen-only page 2 (its rows are hidden
-      // from the collapsed preview, so they are not success) and keeps paging
-      // until the brand-new folder on page 3 is discovered.
-      await user.click(screen.getByTestId("load-more-conversations"));
-      await screen.findByTestId("thread-folder-ws--workspace-alpha");
-      expect(searchSpy).toHaveBeenCalledTimes(3);
-      expect(
-        within(noWorkspaceFolder).getAllByTestId("conversation-card"),
-      ).toHaveLength(5);
-      expect(
-        within(noWorkspaceFolder).queryByText("No workspace 7"),
-      ).not.toBeInTheDocument();
-
-      // Collapsed preview stays frozen; expanding reveals every loaded row.
-      expect(
-        within(noWorkspaceFolder).getAllByTestId("conversation-card"),
-      ).toHaveLength(5);
       await user.click(
         within(noWorkspaceFolder).getByTestId(
           "thread-folder-view-more-__none_workspace",
@@ -2199,60 +2149,49 @@ describe("ConversationPanel", () => {
       );
       expect(
         within(noWorkspaceFolder).getAllByTestId("conversation-card"),
-      ).toHaveLength(8);
-      expect(
-        within(noWorkspaceFolder).getByText("No workspace 7"),
-      ).toBeInTheDocument();
-      expect(
-        within(noWorkspaceFolder).getByText("No workspace 8"),
-      ).toBeInTheDocument();
+      ).toHaveLength(6);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("shows five workspace folders by default and reveals the next batch with one click", async () => {
+    it("shows every registered workspace folder without a global load more control", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
-      const searchSpy = vi
-        .spyOn(AgentServerConversationService, "searchConversations")
-        .mockResolvedValue({
-          items: Array.from({ length: 6 }, (_, index) =>
-            createMockConversation({
-              id: `workspace-${index + 1}`,
-              title: `Workspace ${index + 1} chat`,
-              selected_workspace: `/workspace/project-${index + 1}`,
-            }),
-          ),
-          next_page_id: null,
-        });
+      vi.spyOn(
+        AgentServerConversationService,
+        "searchConversations",
+      ).mockResolvedValue({
+        items: Array.from({ length: 6 }, (_, index) =>
+          createMockConversation({
+            id: `workspace-${index + 1}`,
+            title: `Workspace ${index + 1} chat`,
+            selected_workspace: `/workspace/project-${index + 1}`,
+          }),
+        ),
+        next_page_id: null,
+      });
 
-      const user = userEvent.setup();
       renderConversationPanel();
 
-      await screen.findByTestId("thread-folder-ws--workspace-project-5");
+      await screen.findByTestId("thread-folder-ws--workspace-project-6");
       expect(
         document.querySelectorAll('section[data-testid^="thread-folder-"]'),
-      ).toHaveLength(5);
+      ).toHaveLength(6);
       expect(
-        screen.queryByTestId("thread-folder-ws--workspace-project-6"),
+        screen.queryByTestId("load-more-conversations"),
       ).not.toBeInTheDocument();
-      expect(searchSpy).toHaveBeenCalledTimes(1);
-
-      await user.click(screen.getByTestId("load-more-conversations"));
-
-      expect(
-        await screen.findByTestId("thread-folder-ws--workspace-project-6"),
-      ).toBeInTheDocument();
-      expect(searchSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("loads all pages and reveals all workspaces with their top 5 chats when load more is clicked", async () => {
+    it("pages a workspace folder until that folder grows instead of draining every page", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
-      const searchSpy = vi
-        .spyOn(AgentServerConversationService, "searchConversations")
-        .mockResolvedValueOnce({
-          items: Array.from({ length: 6 }, (_, index) =>
+      const pages: Record<
+        string,
+        { items: AppConversation[]; next_page_id: string | null }
+      > = {
+        "": {
+          items: Array.from({ length: 3 }, (_, index) =>
             createMockConversation({
               id: `ws-a-${index + 1}`,
               title: `Workspace A Chat ${index + 1}`,
@@ -2260,8 +2199,8 @@ describe("ConversationPanel", () => {
             }),
           ),
           next_page_id: "page-2",
-        })
-        .mockResolvedValueOnce({
+        },
+        "page-2": {
           items: [
             createMockConversation({
               id: "ws-b-1",
@@ -2270,8 +2209,18 @@ describe("ConversationPanel", () => {
             }),
           ],
           next_page_id: "page-3",
-        })
-        .mockResolvedValueOnce({
+        },
+        "page-3": {
+          items: [
+            createMockConversation({
+              id: "ws-a-4",
+              title: "Workspace A Chat 4",
+              selected_workspace: "/workspace/a",
+            }),
+          ],
+          next_page_id: "page-4",
+        },
+        "page-4": {
           items: [
             createMockConversation({
               id: "ws-c-1",
@@ -2280,79 +2229,135 @@ describe("ConversationPanel", () => {
             }),
           ],
           next_page_id: null,
+        },
+      };
+      const searchSpy = vi
+        .spyOn(AgentServerConversationService, "searchConversations")
+        .mockImplementation(async (_limit, pageId) => {
+          return pages[pageId ?? ""] ?? { items: [], next_page_id: null };
         });
 
       const user = userEvent.setup();
       renderConversationPanel();
 
-      const folderA = await screen.findByTestId("thread-folder-ws--workspace-a");
-      expect(within(folderA).getAllByTestId("conversation-card")).toHaveLength(5);
-      expect(screen.getByTestId("load-more-conversations")).toBeInTheDocument();
+      const folderA = await screen.findByTestId(
+        "thread-folder-ws--workspace-a",
+      );
+      expect(within(folderA).getAllByTestId("conversation-card")).toHaveLength(
+        3,
+      );
+      expect(
+        screen.queryByTestId("load-more-conversations"),
+      ).not.toBeInTheDocument();
 
-      await user.click(screen.getByTestId("load-more-conversations"));
+      await user.click(
+        within(folderA).getByTestId("thread-folder-view-more-ws--workspace-a"),
+      );
 
-      await screen.findByTestId("thread-folder-ws--workspace-b");
-      await screen.findByTestId("thread-folder-ws--workspace-c");
-      expect(searchSpy).toHaveBeenCalledTimes(3);
-      expect(screen.queryByTestId("load-more-conversations")).not.toBeInTheDocument();
+      expect(await screen.findByText("Workspace A Chat 4")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(searchSpy).toHaveBeenCalledTimes(3);
+      });
+      expect(screen.queryByText("Workspace C Chat 1")).not.toBeInTheDocument();
     });
 
     it("caps initial workspace discovery when no new folder appears", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
-      const deepenOnlyPage = (page: number, nextPageId: string) => ({
-        items: Array.from({ length: 2 }, (_, index) =>
-          createMockConversation({
-            id: `no-workspace-p${page}-${index + 1}`,
-            title: `No workspace p${page}-${index + 1}`,
-          }),
-        ),
-        next_page_id: nextPageId,
-      });
       const searchSpy = vi
         .spyOn(AgentServerConversationService, "searchConversations")
-        .mockResolvedValueOnce(deepenOnlyPage(1, "page-2"))
-        .mockResolvedValueOnce(deepenOnlyPage(2, "page-3"))
-        .mockResolvedValueOnce(deepenOnlyPage(3, "page-4"))
-        .mockResolvedValueOnce(deepenOnlyPage(4, "page-5"))
-        .mockResolvedValueOnce(deepenOnlyPage(5, "page-6"));
+        .mockResolvedValue({
+          items: Array.from({ length: 2 }, (_, index) =>
+            createMockConversation({
+              id: `no-workspace-${index + 1}`,
+              title: `No workspace ${index + 1}`,
+            }),
+          ),
+          next_page_id: "page-2",
+        });
 
       renderConversationPanel();
 
       await screen.findByTestId("thread-folder-__none_workspace");
-      await waitFor(() => {
-        expect(searchSpy).toHaveBeenCalledTimes(5);
-      });
-      expect(screen.getByTestId("load-more-conversations")).toBeInTheDocument();
-      expect(searchSpy).toHaveBeenCalledTimes(5);
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByTestId("thread-folder-view-more-__none_workspace"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("load-more-conversations"),
+      ).not.toBeInTheDocument();
     });
 
-    it("force-includes the active conversation in a folder preview even when it arrived on a later page", async () => {
+    it("force-includes the active conversation in a folder preview even when it arrived after the preview window", async () => {
       useConversationPanelPreferencesStore.setState({
         organizeMode: "grouped",
       });
-      vi.spyOn(AgentServerConversationService, "searchConversations")
-        .mockResolvedValueOnce({
-          items: Array.from({ length: 5 }, (_, index) =>
+      vi.spyOn(
+        AgentServerConversationService,
+        "searchConversations",
+      ).mockResolvedValue({
+        items: [
+          ...Array.from({ length: 8 }, (_, index) =>
             createMockConversation({
               id: `alpha-${index + 1}`,
               title: `Alpha ${index + 1}`,
               selected_workspace: "/workspace/alpha",
             }),
           ),
-          next_page_id: "page-2",
-        })
-        .mockResolvedValueOnce({
-          items: [
-            createMockConversation({
-              id: "alpha-active",
-              title: "Alpha Active",
-              selected_workspace: "/workspace/alpha",
-            }),
-          ],
-          next_page_id: null,
-        });
+          createMockConversation({
+            id: "alpha-active",
+            title: "Alpha Active",
+            selected_workspace: "/workspace/alpha",
+          }),
+        ],
+        next_page_id: null,
+      });
+
+      renderConversationPanel({
+        navigation: {
+          conversationId: "alpha-active",
+          currentPath: "/conversations/alpha-active",
+        },
+      });
+
+      await screen.findByTestId("thread-folder-ws--workspace-alpha");
+      await waitFor(() => {
+        expect(
+          within(
+            screen.getByTestId("thread-folder-ws--workspace-alpha"),
+          ).getByText("Alpha Active"),
+        ).toBeInTheDocument();
+      });
+      expect(
+        within(
+          screen.getByTestId("thread-folder-ws--workspace-alpha"),
+        ).getAllByTestId("conversation-card"),
+      ).toHaveLength(8);
+    });
+
+    it("collapses other workspace folders while a conversation in one workspace is open", async () => {
+      useConversationPanelPreferencesStore.setState({
+        organizeMode: "grouped",
+      });
+      vi.spyOn(
+        AgentServerConversationService,
+        "searchConversations",
+      ).mockResolvedValue({
+        items: [
+          createMockConversation({
+            id: "alpha-active",
+            title: "Alpha Active",
+            selected_workspace: "/workspace/alpha",
+          }),
+          createMockConversation({
+            id: "beta-chat",
+            title: "Beta Chat",
+            selected_workspace: "/workspace/beta",
+          }),
+        ],
+        next_page_id: null,
+      });
 
       renderConversationPanel({
         navigation: {
@@ -2364,19 +2369,11 @@ describe("ConversationPanel", () => {
       const alphaFolder = await screen.findByTestId(
         "thread-folder-ws--workspace-alpha",
       );
-      await waitFor(() => {
-        expect(
-          within(
-            screen.getByTestId("thread-folder-ws--workspace-alpha"),
-          ).getByText("Alpha Active"),
-        ).toBeInTheDocument();
-      });
-      // Still a collapsed preview (limit 5), not the full expanded list.
+      const betaFolder = screen.getByTestId("thread-folder-ws--workspace-beta");
+      expect(within(alphaFolder).getByText("Alpha Active")).toBeInTheDocument();
       expect(
-        within(
-          screen.getByTestId("thread-folder-ws--workspace-alpha"),
-        ).getAllByTestId("conversation-card"),
-      ).toHaveLength(5);
+        within(betaFolder).queryByTestId("conversation-card"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -2527,8 +2524,8 @@ describe("ConversationPanel", () => {
     });
   });
 
-  it("shows only five pinned conversations before a More control", async () => {
-    const manyConversations = Array.from({ length: 6 }, (_, index) =>
+  it("shows only three pinned conversations before a More control", async () => {
+    const manyConversations = Array.from({ length: 4 }, (_, index) =>
       createMockConversation({
         id: String(index + 1),
         title: `Conversation ${index + 1}`,
@@ -2554,7 +2551,7 @@ describe("ConversationPanel", () => {
     );
     expect(
       within(pinnedSection).getAllByTestId("conversation-card"),
-    ).toHaveLength(5);
+    ).toHaveLength(3);
     expect(
       within(pinnedSection).getByTestId("conversation-panel-pinned-view-more"),
     ).toHaveTextContent("CONVERSATION_PANEL$MORE");

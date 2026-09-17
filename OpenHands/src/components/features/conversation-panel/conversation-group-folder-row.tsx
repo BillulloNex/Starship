@@ -7,11 +7,13 @@ import { I18nKey } from "#/i18n/declaration";
 import StickerFolderIcon from "#/icons/sticker-folder.svg?react";
 import { cn } from "#/utils/utils";
 import { hoverRevealActionClassName } from "#/utils/hover-reveal-classes";
-import type {
-  ConversationGroup,
-  GroupFolderDropPosition,
+import { ConversationCardSkeleton } from "./conversation-card/conversation-card-skeleton";
+import {
+  canShowGroupMore,
+  getGroupConversationPreview,
+  type ConversationGroup,
+  type GroupFolderDropPosition,
 } from "./conversation-panel-list-helpers";
-import { getGroupConversationPreview } from "./conversation-panel-list-helpers";
 
 interface ConversationGroupFolderRowProps {
   group: ConversationGroup;
@@ -23,13 +25,16 @@ interface ConversationGroupFolderRowProps {
   isCreatingConversationFlow: boolean;
   activeConversationId?: string | null;
   discoveryConversationIds?: ReadonlySet<string> | null;
+  previewLimit: number;
+  hasNextPage: boolean;
+  isLoadingMore: boolean;
   onToggleExpanded: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLElement>) => void;
   onDragLeave: () => void;
   onDrop: (event: DragEvent<HTMLElement>) => void;
-  onTogglePreviewExpanded: () => void;
+  onRequestMore: () => void;
   onLaunchFromGroup: () => void;
   renderConversationCard: (conversation: AppConversation) => ReactNode;
 }
@@ -44,13 +49,16 @@ export function ConversationGroupFolderRow({
   isCreatingConversationFlow,
   activeConversationId,
   discoveryConversationIds,
+  previewLimit,
+  hasNextPage,
+  isLoadingMore,
   onToggleExpanded,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDragLeave,
   onDrop,
-  onTogglePreviewExpanded,
+  onRequestMore,
   onLaunchFromGroup,
   renderConversationCard,
 }: ConversationGroupFolderRowProps) {
@@ -58,12 +66,20 @@ export function ConversationGroupFolderRow({
   const sectionRef = useRef<HTMLElement>(null);
   const headingId = `thread-folder-${group.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const groupTestIdSuffix = group.id.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const { visibleConversations, isPreviewTruncated, isShowingAll } =
-    getGroupConversationPreview(group.conversations, {
+  const { visibleConversations } = getGroupConversationPreview(
+    group.conversations,
+    {
+      limit: previewLimit,
       expanded: previewExpanded,
       activeConversationId,
       discoveryConversationIds: discoveryConversationIds ?? undefined,
-    });
+    },
+  );
+  const showMore = canShowGroupMore({
+    loadedCount: group.conversations.length,
+    visibleCount: visibleConversations.length,
+    hasNextPage,
+  });
 
   return (
     <motion.section
@@ -217,17 +233,19 @@ export function ConversationGroupFolderRow({
             className="mt-0.5 space-y-0.5"
           >
             {visibleConversations.map(renderConversationCard)}
-            {isPreviewTruncated ? (
+            {isLoadingMore ? (
+              <div className="py-1">
+                <ConversationCardSkeleton />
+              </div>
+            ) : showMore ? (
               <div className="pl-2">
                 <button
                   type="button"
                   data-testid={`thread-folder-view-more-${groupTestIdSuffix}`}
-                  onClick={onTogglePreviewExpanded}
+                  onClick={onRequestMore}
                   className="cursor-pointer text-sm font-medium text-[var(--oh-text-secondary)] hover:text-white"
                 >
-                  {isShowingAll
-                    ? t(I18nKey.CONVERSATION_PANEL$LESS)
-                    : t(I18nKey.CONVERSATION_PANEL$MORE)}
+                  {t(I18nKey.CONVERSATION_PANEL$MORE)}
                 </button>
               </div>
             ) : null}

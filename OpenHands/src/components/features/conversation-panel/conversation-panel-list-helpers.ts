@@ -19,8 +19,14 @@ export type ConversationGroupKind = "workspace" | "repository" | "automation";
 /** Folder-id prefix for conversations spawned by an automation run. */
 export const AUTOMATION_GROUP_ID_PREFIX = "auto:";
 
-/** Max conversations shown under a workspace/repo folder before "View more". */
+/** Max conversations shown under an unfocused workspace/repo folder before "More". */
 export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 3;
+
+/**
+ * Max conversations shown in the folder that contains the open conversation
+ * before "More". Matches the Cursor-style in-workspace recents list.
+ */
+export const GROUP_CONVERSATIONS_FOCUSED_PREVIEW_LIMIT = 8;
 
 /**
  * Max workspace/repository folders shown before the global "Load more".
@@ -333,6 +339,36 @@ export type ConversationGroup = {
   launch: ConversationGroupLaunch;
   kind: ConversationGroupKind;
 };
+
+export function getGroupPreviewLimit(isFocused: boolean): number {
+  return isFocused
+    ? GROUP_CONVERSATIONS_FOCUSED_PREVIEW_LIMIT
+    : GROUP_CONVERSATIONS_PREVIEW_LIMIT;
+}
+
+export function findConversationGroupId(
+  groups: readonly ConversationGroup[],
+  conversationId: string | null | undefined,
+): string | null {
+  if (!conversationId) {
+    return null;
+  }
+  return (
+    groups.find((group) =>
+      group.conversations.some(
+        (conversation) => conversation.id === conversationId,
+      ),
+    )?.id ?? null
+  );
+}
+
+export function canShowGroupMore(options: {
+  loadedCount: number;
+  visibleCount: number;
+  hasNextPage: boolean;
+}): boolean {
+  return options.loadedCount > options.visibleCount || options.hasNextPage;
+}
 
 export function isAutomationGroupId(id: string): boolean {
   return id.startsWith(AUTOMATION_GROUP_ID_PREFIX);

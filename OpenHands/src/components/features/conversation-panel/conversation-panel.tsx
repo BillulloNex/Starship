@@ -41,11 +41,15 @@ import {
   collectAutomationNameFacets,
   filterOutPinnedConversations,
   filterStaleWorkspaceFolders,
+  findConversationGroupId,
+  getGroupConversationPreview,
   getGroupDiscoveryConversationIds,
+  getGroupPreviewLimit,
   groupConversations,
   GROUP_FOLDERS_PREVIEW_LIMIT,
   MAX_INITIAL_GROUP_DISCOVERY_PAGES,
   MAX_LOAD_ALL_PAGES,
+  MAX_PAGES_PER_LOAD_MORE_CLICK,
   mergeWorkspaceFolders,
   resolvePinnedConversations,
   sortConversationsByField,
@@ -257,18 +261,6 @@ export function ConversationPanel({
     });
   }, []);
 
-  const toggleGroupPreviewExpanded = React.useCallback((groupId: string) => {
-    setExpandedGroupPreviewIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
-  }, []);
-
   React.useEffect(() => {
     if (listOrganizeMode !== "grouped") {
       setCollapsedGroupIds(new Set());
@@ -279,6 +271,7 @@ export function ConversationPanel({
   React.useEffect(() => {
     setVisibleGroupLimit(GROUP_FOLDERS_PREVIEW_LIMIT);
     setIsLoadingAll(false);
+    setGroupLoadMore(null);
   }, [activeBackend.id, listOrganizeMode]);
 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -541,6 +534,30 @@ export function ConversationPanel({
     [conversationGroups],
   );
 
+  const activeGroupId = React.useMemo(
+    () =>
+      findConversationGroupId(conversationGroups ?? [], currentConversationId),
+    [conversationGroups, currentConversationId],
+  );
+
+  const previousActiveGroupIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (compact || listOrganizeMode !== "grouped" || !activeGroupId) {
+      previousActiveGroupIdRef.current = activeGroupId;
+      return;
+    }
+    if (previousActiveGroupIdRef.current === activeGroupId) {
+      return;
+    }
+    previousActiveGroupIdRef.current = activeGroupId;
+    setCollapsedGroupIds(
+      new Set(
+        conversationGroupIds.filter((groupId) => groupId !== activeGroupId),
+      ),
+    );
+  }, [activeGroupId, compact, conversationGroupIds, listOrganizeMode]);
+
   const compactVisibleConversations = React.useMemo(
     () =>
       sortConversationsByField(
@@ -624,6 +641,11 @@ export function ConversationPanel({
   // *visible* rows (filtered out by the active scope, or deduped as overlap),
   // "Load more" loads all remaining pages and reveals all workspaces with their top 5 chats.
   const [isLoadingAll, setIsLoadingAll] = React.useState(false);
+  const [groupLoadMore, setGroupLoadMore] = React.useState<{
+    groupId: string;
+    conversationFloor: number;
+    pageFloor: number;
+  } | null>(null);
 
   const requestLoadMore = React.useCallback(() => {
     if (listOrganizeMode === "grouped") {
@@ -634,6 +656,56 @@ export function ConversationPanel({
       fetchNextPage();
     }
   }, [fetchNextPage, hasNextPage, listOrganizeMode]);
+
+  const requestGroupMore = React.useCallback(
+    (groupId: string) => {
+      const group = conversationGroups?.find(
+        (candidate) => candidate.id === groupId,
+      );
+      if (!group) {
+        return;
+      }
+      const preview = getGroupConversationPreview(group.conversations, {
+        limit: getGroupPreviewLimit(groupId === activeGroupId),
+        expanded: expandedGroupPreviewIds.has(groupId),
+        activeConversationId: currentConversationId,
+        discoveryConversationIds: groupDiscoveryConversationIds ?? undefined,
+      });
+      if (preview.visibleConversations.length < group.conversations.length) {
+        setExpandedGroupPreviewIds((prev) => {
+          const next = new Set(prev);
+          next.add(groupId);
+          return next;
+        });
+        return;
+      }
+      if (!hasNextPage || groupLoadMore != null) {
+        return;
+      }
+      setExpandedGroupPreviewIds((prev) => {
+        const next = new Set(prev);
+        next.add(groupId);
+        return next;
+      });
+      setGroupLoadMore({
+        groupId,
+        conversationFloor: group.conversations.length,
+        pageFloor: loadedPageCount,
+      });
+      fetchNextPage();
+    },
+    [
+      activeGroupId,
+      conversationGroups,
+      currentConversationId,
+      expandedGroupPreviewIds,
+      fetchNextPage,
+      groupDiscoveryConversationIds,
+      groupLoadMore,
+      hasNextPage,
+      loadedPageCount,
+    ],
+  );
 
   React.useEffect(() => {
     if (!isLoadingAll) {
@@ -653,6 +725,36 @@ export function ConversationPanel({
     isFetching,
     isFetchingNextPage,
     isLoadingAll,
+    loadedPageCount,
+  ]);
+
+  React.useEffect(() => {
+    if (!groupLoadMore) {
+      return;
+    }
+    const group = conversationGroups?.find(
+      (candidate) => candidate.id === groupLoadMore.groupId,
+    );
+    const loadedInGroup = group?.conversations.length ?? 0;
+    if (
+      loadedInGroup > groupLoadMore.conversationFloor ||
+      !hasNextPage ||
+      loadedPageCount >= groupLoadMore.pageFloor + MAX_PAGES_PER_LOAD_MORE_CLICK
+    ) {
+      setGroupLoadMore(null);
+      return;
+    }
+    if (isFetchingNextPage || isFetching) {
+      return;
+    }
+    fetchNextPage();
+  }, [
+    conversationGroups,
+    fetchNextPage,
+    groupLoadMore,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
     loadedPageCount,
   ]);
 
@@ -677,7 +779,10 @@ export function ConversationPanel({
   // `requestLoadMore`'s floor driver keeps paging until a visible row
   // appears, so a single click walks past pages that are entirely filtered.
   const showLoadMore =
-    (hasLoadedHiddenGroups || !!hasNextPage) && !olderHidden && !compact;
+    listOrganizeMode !== "grouped" &&
+    (hasLoadedHiddenGroups || !!hasNextPage) &&
+    !olderHidden &&
+    !compact;
 
   const { mutate: createConversation } = useCreateConversation();
   const isCreatingConversationFlow = useIsCreatingConversation();
@@ -1144,8 +1249,11 @@ export function ConversationPanel({
             collapsedGroupIds={collapsedGroupIds}
             expandedGroupPreviewIds={expandedGroupPreviewIds}
             discoveryConversationIds={groupDiscoveryConversationIds}
+            activeGroupId={activeGroupId}
+            hasNextPage={!!hasNextPage}
+            loadingGroupId={groupLoadMore?.groupId ?? null}
             onToggleGroupCollapsed={toggleGroupCollapsed}
-            onToggleGroupPreviewExpanded={toggleGroupPreviewExpanded}
+            onRequestGroupMore={requestGroupMore}
             isCreatingConversationFlow={isCreatingConversationFlow}
             activeConversationId={currentConversationId}
             onLaunchFromGroup={launchFromGroup}

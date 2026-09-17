@@ -5,8 +5,11 @@ import {
   collectAutomationNameFacets,
   getGroupConversationPreview,
   getGroupDiscoveryConversationIds,
+  getGroupPreviewLimit,
   groupConversations,
+  GROUP_CONVERSATIONS_FOCUSED_PREVIEW_LIMIT,
   GROUP_CONVERSATIONS_PREVIEW_LIMIT,
+  canShowGroupMore,
   getAutomationConversationBadgeLabel,
   isAutomationConversation,
   isAutomationGroupId,
@@ -230,7 +233,7 @@ describe("conversation-panel-list-helpers", () => {
     ]);
   });
 
-  it("limits grouped folder previews to five conversations with an expand path", () => {
+  it("limits unfocused folder previews to three conversations with an expand path", () => {
     const conversations = Array.from({ length: 6 }, (_, index) => ({
       ...base,
       id: `c-${index}`,
@@ -245,8 +248,6 @@ describe("conversation-panel-list-helpers", () => {
       "c-0",
       "c-1",
       "c-2",
-      "c-3",
-      "c-4",
     ]);
     expect(truncated.isPreviewTruncated).toBe(true);
     expect(truncated.isShowingAll).toBe(false);
@@ -264,8 +265,40 @@ describe("conversation-panel-list-helpers", () => {
     });
     expect(
       withActiveBeyondPreview.visibleConversations.map((c) => c.id),
-    ).toEqual(["c-0", "c-1", "c-2", "c-3", "c-5"]);
-    expect(GROUP_CONVERSATIONS_PREVIEW_LIMIT).toBe(5);
+    ).toEqual(["c-0", "c-1", "c-5"]);
+    expect(GROUP_CONVERSATIONS_PREVIEW_LIMIT).toBe(3);
+  });
+
+  it("uses a longer preview limit for the focused workspace folder", () => {
+    expect(getGroupPreviewLimit(false)).toBe(GROUP_CONVERSATIONS_PREVIEW_LIMIT);
+    expect(getGroupPreviewLimit(true)).toBe(
+      GROUP_CONVERSATIONS_FOCUSED_PREVIEW_LIMIT,
+    );
+    expect(GROUP_CONVERSATIONS_FOCUSED_PREVIEW_LIMIT).toBe(8);
+  });
+
+  it("shows More when loaded chats are hidden or another backend page exists", () => {
+    expect(
+      canShowGroupMore({
+        loadedCount: 8,
+        visibleCount: 3,
+        hasNextPage: false,
+      }),
+    ).toBe(true);
+    expect(
+      canShowGroupMore({
+        loadedCount: 3,
+        visibleCount: 3,
+        hasNextPage: true,
+      }),
+    ).toBe(true);
+    expect(
+      canShowGroupMore({
+        loadedCount: 3,
+        visibleCount: 3,
+        hasNextPage: false,
+      }),
+    ).toBe(false);
   });
 
   it("freezes discovery preview ids per folder and force-includes the active conversation", () => {
@@ -300,17 +333,18 @@ describe("conversation-panel-list-helpers", () => {
     ]);
 
     expect([
+      ...getGroupDiscoveryConversationIds(items, pageByConversationId, "local"),
+    ]).toEqual(["none-1", "alpha-1"]);
+
+    expect([
       ...getGroupDiscoveryConversationIds(
         items,
         pageByConversationId,
         "local",
+        {
+          forceIncludeConversationId: "none-2",
+        },
       ),
-    ]).toEqual(["none-1", "alpha-1"]);
-
-    expect([
-      ...getGroupDiscoveryConversationIds(items, pageByConversationId, "local", {
-        forceIncludeConversationId: "none-2",
-      }),
     ]).toEqual(["none-1", "alpha-1", "none-2"]);
 
     const grouped = groupConversations(items, "local", "updated", GROUP_LABELS);
@@ -541,7 +575,12 @@ describe("conversation-panel-list-helpers", () => {
       updated_at: "2024-01-03T00:00:00.000Z",
     };
 
-    const groups = groupConversations([r1, r2], "cloud", "updated", GROUP_LABELS);
+    const groups = groupConversations(
+      [r1, r2],
+      "cloud",
+      "updated",
+      GROUP_LABELS,
+    );
 
     expect(groups.map((g) => g.label)).toEqual(["sdk", "agent-canvas"]);
     expect(groups[0].launch).toEqual({
