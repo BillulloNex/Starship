@@ -938,10 +938,15 @@ async function handlePreviewAppsRequest(
 export function startStaticServer(config) {
   // Ship structured request/error logs to PostHog Logs (no-op without a
   // POSTHOG_* API key; see scripts/posthog-logs.mjs). Coolify owns the key.
-  initPostHogLogs({
-    serviceName: "canvas-static-server",
-    serviceVersion: (process.env.GROKBOT_VERSION || "").trim() || undefined,
-  });
+  // Guarded: logging must never prevent the server from listening.
+  try {
+    initPostHogLogs({
+      serviceName: "canvas-static-server",
+      serviceVersion: (process.env.GROKBOT_VERSION || "").trim() || undefined,
+    });
+  } catch {
+    // ignore — console/file logging below is unaffected
+  }
   const route = createRouter(config.routes);
   const proxy = createProxyHandlers({ label: `static:${config.port}` });
   const dirAbs = resolve(config.dir);

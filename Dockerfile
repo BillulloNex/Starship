@@ -325,6 +325,8 @@ COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 
 # Copy the static-server scripts and their production runtime deps.
 COPY OpenHands/scripts/static-server.mjs /opt/agent-canvas/static-server.mjs
+# Shared PostHog Logs shipper (imported by static-server.mjs and logger.mjs).
+COPY OpenHands/scripts/posthog-logs.mjs /opt/agent-canvas/posthog-logs.mjs
 # IDE terminals: WebSocket handler (served by static-server) + stdlib PTY bridge.
 COPY OpenHands/scripts/workbench-terminal.mjs /opt/agent-canvas/workbench-terminal.mjs
 COPY OpenHands/scripts/workbench-pty-bridge.py /opt/agent-canvas/workbench-pty-bridge.py
