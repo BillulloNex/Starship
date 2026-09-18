@@ -40,6 +40,8 @@ class LangfuseBackend implements ObservabilityBackend {
       cacheWriteTokens: data.cacheWriteTokens,
       reasoningTokens: data.reasoningTokens,
       responseLatencies: data.responseLatencies,
+      input: data.input,
+      output: data.output,
     });
   }
 

@@ -103,6 +103,120 @@ export function startTrace({
 }
 
 // ---------------------------------------------------------------------------
+// Native OTLP Ingestion for Langfuse v4
+// Bypasses legacy /api/public/ingestion which is restricted in events_only mode.
+// ---------------------------------------------------------------------------
+
+function toTraceId(id: string): string {
+  const clean = id.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
+  if (clean.length === 32) return clean;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < id.length; i++) {
+    const ch = id.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 =
+    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 =
+    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const part1 = (h1 >>> 0).toString(16).padStart(8, "0");
+  const part2 = (h2 >>> 0).toString(16).padStart(8, "0");
+  return (clean + part1 + part2 + "0123456789abcdef0123456789abcdef").slice(
+    0,
+    32,
+  );
+}
+
+function generateSpanId(): string {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const buf = new Uint8Array(8);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return Math.random().toString(16).slice(2).padStart(16, "0").slice(0, 16);
+}
+
+interface OtlpAttribute {
+  key: string;
+  value: Record<string, unknown>;
+}
+
+async function sendOtlpSpans(
+  traceId: string,
+  spans: Array<{
+    spanId: string;
+    parentSpanId?: string;
+    name: string;
+    startTimeNs: number;
+    endTimeNs: number;
+    attributes: OtlpAttribute[];
+  }>,
+): Promise<boolean> {
+  const host = getLangfuseBaseUrl();
+  if (!host || !publicKey) return false;
+
+  const authVal = secretKey ? `${publicKey}:${secretKey}` : `${publicKey}:`;
+  const basicAuth = btoa(authVal);
+
+  const body = {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "service.name",
+              value: { stringValue: "starship-agent-canvas" },
+            },
+            {
+              key: "deployment.environment.name",
+              value: { stringValue: "production" },
+            },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "starship.observability", version: "1.0.0" },
+            spans: spans.map((s) => ({
+              traceId,
+              spanId: s.spanId,
+              parentSpanId: s.parentSpanId,
+              name: s.name,
+              kind: 1,
+              flags: 1,
+              startTimeUnixNano: String(s.startTimeNs),
+              endTimeUnixNano: String(s.endTimeNs),
+              attributes: s.attributes,
+              status: { code: 1 },
+            })),
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    // eslint-disable-next-line local/no-direct-agent-server-fetch
+    const res = await fetch(`${host}/api/public/otel/v1/traces`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        "Content-Type": "application/json",
+        "x-langfuse-ingestion-version": "4",
+      },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch (err) {
+    warnLangfuseFailure("sendOtlpSpans", err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Generation recording (original API — kept for backward compat)
 // ---------------------------------------------------------------------------
 
@@ -128,44 +242,17 @@ export function recordGeneration({
   cost,
   input,
   output,
-  startTime,
-  endTime = new Date(),
 }: RecordGenerationOptions) {
-  const client = getLangfuseClient();
-  if (!client) return;
-
-  try {
-    const trace = traceId
-      ? client.trace({ id: traceId })
-      : client.trace({
-          id: `${conversationId}-${Date.now()}`,
-          sessionId: conversationId,
-          name: "LLM Generation",
-        });
-
-    trace.generation({
-      name: "Agent Step Generation",
-      model,
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens: promptTokens + completionTokens,
-      },
-      metadata: {
-        cost,
-      },
-      input,
-      output,
-      startTime: startTime ?? new Date(Date.now() - 1000),
-      endTime,
-    });
-
-    client.flushAsync().catch((flushErr) => {
-      warnLangfuseFailure("flush (recordGeneration)", flushErr);
-    });
-  } catch (err) {
-    warnLangfuseFailure("recordGeneration", err);
-  }
+  recordStatsGeneration({
+    conversationId,
+    generationId: traceId,
+    modelName: model,
+    accumulatedCost: cost ?? 0,
+    promptTokens,
+    completionTokens,
+    input,
+    output,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -198,8 +285,8 @@ export interface RecordStatsGenerationOptions {
  * Records an LLM generation derived from the v1 agent-server
  * `ConversationStateUpdateEvent` with `key: "stats"`.
  *
- * This is the *live* path that the WebSocket handler should call
- * whenever a stats event arrives with token usage data.
+ * Dispatches natively via Langfuse v4 OTLP ingest so full input and output
+ * are captured reliably without legacy SDK rejection.
  */
 export function recordStatsGeneration({
   conversationId,
@@ -218,69 +305,143 @@ export function recordStatsGeneration({
   input,
   output,
 }: RecordStatsGenerationOptions) {
-  const client = getLangfuseClient();
-  if (!client) return;
+  if (!isLangfuseEnabled()) return;
 
-  try {
-    const traceId = generationId
-      ? `${conversationId}-stats-${generationId}`
-      : `${conversationId}-stats-${Date.now()}`;
-    const trace = client.trace({
-      id: traceId,
-      sessionId: conversationId,
-      name: "Agent Stats Update",
-      metadata: {
-        client: "Starship Agent Canvas",
-        source: "websocket_stats_event",
-        executionProvider,
-        usageAvailable: usageAvailable !== false,
-        costAvailable: costAvailable !== false,
-      },
+  const traceId = toTraceId(conversationId);
+  const spanId = generateSpanId();
+
+  const nowMs = Date.now();
+  const lastLatency = responseLatencies?.length
+    ? responseLatencies[responseLatencies.length - 1]
+    : null;
+  const durationMs = lastLatency ? lastLatency.latency * 1000 : 1000;
+  const startMs = nowMs - durationMs;
+
+  const startNs = BigInt(Math.floor(startMs)) * BigInt(1_000_000);
+  const endNs = BigInt(Math.floor(nowMs)) * BigInt(1_000_000);
+
+  const attributes: OtlpAttribute[] = [
+    { key: "langfuse.observation.type", value: { stringValue: "generation" } },
+    {
+      key: "langfuse.observation.model.name",
+      value: { stringValue: modelName },
+    },
+    { key: "langfuse.session.id", value: { stringValue: conversationId } },
+  ];
+
+  if (input !== undefined && input !== null) {
+    const inputStr = typeof input === "string" ? input : JSON.stringify(input);
+    attributes.push({
+      key: "langfuse.observation.input",
+      value: { stringValue: inputStr },
     });
+  }
 
-    // Compute latency from the most recent response if available
-    const lastLatency = responseLatencies?.length
-      ? responseLatencies[responseLatencies.length - 1]
-      : null;
+  if (output !== undefined && output !== null) {
+    const outputStr =
+      typeof output === "string" ? output : JSON.stringify(output);
+    attributes.push({
+      key: "langfuse.observation.output",
+      value: { stringValue: outputStr },
+    });
+  }
 
-    const endTime = new Date();
-    const startTime = lastLatency
-      ? new Date(endTime.getTime() - lastLatency.latency * 1000)
-      : new Date(endTime.getTime() - 1000);
+  if (usageAvailable !== false) {
+    attributes.push({
+      key: "gen_ai.usage.input_tokens",
+      value: { intValue: String(promptTokens) },
+    });
+    attributes.push({
+      key: "gen_ai.usage.output_tokens",
+      value: { intValue: String(completionTokens) },
+    });
+    attributes.push({
+      key: "gen_ai.usage.total_tokens",
+      value: { intValue: String(promptTokens + completionTokens) },
+    });
+  }
 
-    trace.generation({
+  if (costAvailable !== false && accumulatedCost > 0) {
+    attributes.push({
+      key: "langfuse.observation.calculatedTotalCost",
+      value: { doubleValue: accumulatedCost },
+    });
+  }
+
+  if (cacheReadTokens) {
+    attributes.push({
+      key: "langfuse.observation.metadata.cacheReadTokens",
+      value: { intValue: String(cacheReadTokens) },
+    });
+  }
+
+  if (cacheWriteTokens) {
+    attributes.push({
+      key: "langfuse.observation.metadata.cacheWriteTokens",
+      value: { intValue: String(cacheWriteTokens) },
+    });
+  }
+
+  if (reasoningTokens) {
+    attributes.push({
+      key: "langfuse.observation.metadata.reasoningTokens",
+      value: { intValue: String(reasoningTokens) },
+    });
+  }
+
+  if (executionProvider) {
+    attributes.push({
+      key: "langfuse.observation.metadata.executionProvider",
+      value: { stringValue: executionProvider },
+    });
+  }
+
+  if (generationId) {
+    attributes.push({
+      key: "langfuse.observation.metadata.generationId",
+      value: { stringValue: generationId },
+    });
+  }
+
+  sendOtlpSpans(traceId, [
+    {
+      spanId,
       name: "LLM Generation",
-      model: modelName,
-      usage:
-        usageAvailable === false
-          ? undefined
-          : {
-              promptTokens,
-              completionTokens,
-              totalTokens: promptTokens + completionTokens,
-            },
-      metadata: {
-        accumulatedCost: costAvailable === false ? undefined : accumulatedCost,
-        executionProvider,
-        usageAvailable: usageAvailable !== false,
-        costAvailable: costAvailable !== false,
-        cacheReadTokens,
-        cacheWriteTokens,
-        reasoningTokens,
-        responseId: lastLatency?.response_id,
-        latencySeconds: lastLatency?.latency,
-      },
-      input: input ? [{ role: "user", content: input }] : undefined,
-      output: output ? [{ role: "assistant", content: output }] : undefined,
-      startTime,
-      endTime,
-    });
+      startTimeNs: Number(startNs),
+      endTimeNs: Number(endNs),
+      attributes,
+    },
+  ]).catch((err) => {
+    warnLangfuseFailure("sendOtlpSpans (recordStatsGeneration)", err);
+  });
 
-    client.flushAsync().catch((flushErr) => {
-      warnLangfuseFailure("flush (recordStatsGeneration)", flushErr);
-    });
-  } catch (err) {
-    warnLangfuseFailure("recordStatsGeneration", err);
+  // Legacy client fallback (if dual write is enabled on server)
+  try {
+    const client = getLangfuseClient();
+    if (client) {
+      const legacyTrace = client.trace({
+        id: `${conversationId}-stats-${generationId || Date.now()}`,
+        sessionId: conversationId,
+        name: "Agent Stats Update",
+      });
+      legacyTrace.generation({
+        name: "LLM Generation",
+        model: modelName,
+        input: input ? [{ role: "user", content: input }] : undefined,
+        output: output ? [{ role: "assistant", content: output }] : undefined,
+        usage:
+          usageAvailable === false
+            ? undefined
+            : {
+                promptTokens,
+                completionTokens,
+                totalTokens: promptTokens + completionTokens,
+              },
+      });
+      client.flushAsync().catch(() => {});
+    }
+  } catch {
+    // Non-fatal legacy attempt
   }
 }
 
@@ -311,41 +472,74 @@ export function recordMcpToolCall({
   status = "SUCCESS",
   errorMessage,
 }: RecordMcpToolOptions) {
-  const client = getLangfuseClient();
-  if (!client) return;
+  if (!isLangfuseEnabled()) return;
 
-  try {
-    const trace = traceId
-      ? client.trace({ id: traceId })
-      : client.trace({
-          id: `${conversationId}-${Date.now()}`,
-          sessionId: conversationId,
-          name: "MCP Tool Execution",
-        });
+  const tid = toTraceId(traceId || conversationId);
+  const spanId = generateSpanId();
 
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - Math.max(0, durationMs));
+  const nowMs = Date.now();
+  const dur = Math.max(0, durationMs);
+  const startMs = nowMs - dur;
 
-    trace.span({
-      name: `MCP Tool: ${toolName}`,
-      metadata: {
-        serverName,
-        durationMs,
-      },
-      input,
-      output: status === "ERROR" ? { error: errorMessage, output } : output,
-      statusMessage: errorMessage,
-      level: status === "ERROR" ? "ERROR" : "DEFAULT",
-      startTime,
-      endTime,
+  const startNs = BigInt(Math.floor(startMs)) * BigInt(1_000_000);
+  const endNs = BigInt(Math.floor(nowMs)) * BigInt(1_000_000);
+
+  const attributes: OtlpAttribute[] = [
+    { key: "langfuse.observation.type", value: { stringValue: "tool" } },
+    { key: "langfuse.session.id", value: { stringValue: conversationId } },
+    {
+      key: "langfuse.observation.metadata.serverName",
+      value: { stringValue: serverName },
+    },
+    {
+      key: "langfuse.observation.metadata.status",
+      value: { stringValue: status },
+    },
+  ];
+
+  if (input !== undefined && input !== null) {
+    const inputStr = typeof input === "string" ? input : JSON.stringify(input);
+    attributes.push({
+      key: "langfuse.observation.input",
+      value: { stringValue: inputStr },
     });
-
-    client.flushAsync().catch((flushErr) => {
-      warnLangfuseFailure("flush (recordMcpToolCall)", flushErr);
-    });
-  } catch (err) {
-    warnLangfuseFailure("recordMcpToolCall", err);
   }
+
+  if (output !== undefined && output !== null) {
+    const outputPayload =
+      status === "ERROR" ? { error: errorMessage, output } : output;
+    const outputStr =
+      typeof outputPayload === "string"
+        ? outputPayload
+        : JSON.stringify(outputPayload);
+    attributes.push({
+      key: "langfuse.observation.output",
+      value: { stringValue: outputStr },
+    });
+  }
+
+  if (errorMessage) {
+    attributes.push({
+      key: "langfuse.observation.level",
+      value: { stringValue: "ERROR" },
+    });
+    attributes.push({
+      key: "langfuse.observation.statusMessage",
+      value: { stringValue: errorMessage },
+    });
+  }
+
+  sendOtlpSpans(tid, [
+    {
+      spanId,
+      name: `MCP Tool: ${toolName}`,
+      startTimeNs: Number(startNs),
+      endTimeNs: Number(endNs),
+      attributes,
+    },
+  ]).catch((err) => {
+    warnLangfuseFailure("sendOtlpSpans (recordMcpToolCall)", err);
+  });
 }
 
 // ---------------------------------------------------------------------------
