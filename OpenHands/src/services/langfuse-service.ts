@@ -1,16 +1,18 @@
 import { Langfuse } from "langfuse";
 import { displayWarningToast } from "#/utils/custom-toast-handlers";
 
-// Keys come only from build-time env (Coolify build variables) so no secrets
-// live in this repo. When unset, browser-side tracing disables itself; the
-// server-side OTEL path (docker/entrypoint.sh) still traces all models.
-const publicKey = import.meta.env.VITE_LANGFUSE_PUBLIC_KEY as
-  | string
-  | undefined;
-const secretKey = import.meta.env.VITE_LANGFUSE_SECRET_KEY as
-  | string
-  | undefined;
-const baseUrl = import.meta.env.VITE_LANGFUSE_BASE_URL as string | undefined;
+import {
+  LANGFUSE_PUBLIC_KEY,
+  LANGFUSE_SECRET_KEY,
+  LANGFUSE_BASE_URL,
+} from "./backends/observability-config";
+
+// Keys resolve in order: window.__OBSERVABILITY_CONFIG__ (runtime) -> import.meta.env (build-time).
+// When unset, browser-side tracing disables itself; the server-side OTEL path
+// (docker/entrypoint.sh) still traces all models.
+const publicKey = LANGFUSE_PUBLIC_KEY || undefined;
+const secretKey = LANGFUSE_SECRET_KEY || undefined;
+const baseUrl = LANGFUSE_BASE_URL || undefined;
 
 let langfuseInstance: Langfuse | null = null;
 

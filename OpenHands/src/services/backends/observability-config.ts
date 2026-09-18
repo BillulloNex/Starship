@@ -70,3 +70,11 @@ export const RAINDROP_BASE_URL = getConfig(
   "VITE_RAINDROP_BASE_URL",
   "https://api.raindrop.ai/v1/",
 );
+
+// ─── Langfuse ─────────────────────────────────────────────────────────────
+export const LANGFUSE_PUBLIC_KEY =
+  getConfig("LANGFUSE_PUBLIC_KEY") || getConfig("VITE_LANGFUSE_PUBLIC_KEY");
+export const LANGFUSE_SECRET_KEY =
+  getConfig("LANGFUSE_SECRET_KEY") || getConfig("VITE_LANGFUSE_SECRET_KEY");
+export const LANGFUSE_BASE_URL =
+  getConfig("LANGFUSE_BASE_URL") || getConfig("VITE_LANGFUSE_BASE_URL");
