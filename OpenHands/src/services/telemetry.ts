@@ -27,6 +27,7 @@
  */
 
 import type { BootstrapConfig, CaptureResult, PostHog } from "posthog-js";
+import { GROKBOT_VERSION } from "#/constants/grokbot-version";
 import { getLockedCloudAuthMode } from "#/api/agent-server-config";
 import defaults from "../../config/defaults.json";
 
@@ -387,6 +388,19 @@ export async function initializePostHogClient(
         capture_pageview: POSTHOG_PAGEVIEW_CAPTURE_MODE,
         autocapture: true,
         disable_session_recording: true,
+        // Ship browser logs (structured posthog.logger records + console.*
+        // autocapture) to PostHog Logs with OTel resource attributes so
+        // frontend records are queryable by service / environment / version
+        // next to backend logs. See https://posthog.com/docs/logs/installation/javascript
+        logs: {
+          captureConsoleLogs: true,
+          serviceName: "agent-canvas-frontend",
+          environment:
+            import.meta.env.MODE === "production"
+              ? "production"
+              : "development",
+          serviceVersion: GROKBOT_VERSION,
+        },
         bootstrap: pendingBootstrap,
         before_send: addCanvasEventProperties,
       },
@@ -872,6 +886,44 @@ export async function trackException(
   if (!posthog) return;
 
   posthog.captureException(error, properties);
+}
+
+export type PostHogLogLevel =
+  | "trace"
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "fatal";
+
+/**
+ * Ship one structured log record through the same consent-aware client as
+ * custom events. No-op until the SDK is initialized and consent is granted.
+ * Prefer this over raw console.* for anything worth querying in PostHog Logs.
+ */
+export async function trackLog(
+  level: PostHogLogLevel,
+  body: string,
+  attributes: Record<string, unknown> = {},
+): Promise<void> {
+  const posthog = await getPostHogForConsentedCapture();
+  if (!posthog) return;
+
+  try {
+    const logger = (
+      posthog as unknown as {
+        logger?: Record<
+          PostHogLogLevel,
+          (body: string, attrs?: unknown) => void
+        >;
+      }
+    ).logger;
+    if (logger && typeof logger[level] === "function") {
+      logger[level](body, attributes);
+    }
+  } catch {
+    // Telemetry failures must not break the application.
+  }
 }
 
 /**

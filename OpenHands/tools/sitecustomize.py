@@ -567,7 +567,34 @@ def _init_automation_shared_venv():
         )
 
 
+def _init_posthog_logs():
+    """Ship stdlib logging (DEBUG+) to PostHog Logs via OTLP/HTTP.
+
+    Stdlib-only helper (tools/posthog_logs.py); no-op without a
+    POSTHOG_* API key. Never raises — logging must not break workers.
+    """
+    try:
+        from posthog_logs import init_posthog_logs
+
+        service = (os.environ.get("POSTHOG_LOG_SERVICE_NAME") or "").strip()
+        if not service:
+            argv0 = os.path.basename(sys.argv[0]) if sys.argv else ""
+            service = "automation-worker" if "automat" in argv0 else "agent-server"
+        if init_posthog_logs(service_name=service):
+            print(
+                "[grokbot-sitecustomize] PostHog Logs shipping ON "
+                f"(service={service})",
+                file=sys.stderr, flush=True,
+            )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] PostHog Logs skipped: {e}",
+            file=sys.stderr, flush=True,
+        )
+
+
 _init_llmobs()
+_init_posthog_logs()
 _init_antigravity_acp()
 _init_acp_background_warmup()
 _init_mcp_oauth_public_callback()

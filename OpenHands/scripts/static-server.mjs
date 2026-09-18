@@ -84,6 +84,7 @@ import {
 } from "./job-board.mjs";
 import { handleSkillInstallRequest } from "./skill-installer.mjs";
 import { createWorkbenchTerminalHandler } from "./workbench-terminal.mjs";
+import { initPostHogLogs, phLog } from "./posthog-logs.mjs";
 
 /** Where the frontend reads the live-preview state from. */
 const PREVIEW_PORTS_PATH = "/api/preview/ports";
@@ -935,6 +936,12 @@ async function handlePreviewAppsRequest(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function startStaticServer(config) {
+  // Ship structured request/error logs to PostHog Logs (no-op without a
+  // POSTHOG_* API key; see scripts/posthog-logs.mjs). Coolify owns the key.
+  initPostHogLogs({
+    serviceName: "canvas-static-server",
+    serviceVersion: (process.env.GROKBOT_VERSION || "").trim() || undefined,
+  });
   const route = createRouter(config.routes);
   const proxy = createProxyHandlers({ label: `static:${config.port}` });
   const dirAbs = resolve(config.dir);
@@ -966,6 +973,30 @@ export function startStaticServer(config) {
   });
 
   const server = createServer(async (req, res) => {
+    // One wide log per request: method + path + status + latency. Emitted on
+    // finish/close so every branch above (proxy, static, API) is covered.
+    const reqStartMs = Date.now();
+    const reqPath = (req.url ?? "/").split("?")[0];
+    let reqLogged = false;
+    const emitRequestLog = () => {
+      if (reqLogged) return;
+      reqLogged = true;
+      const status = res.statusCode || 0;
+      const level = status >= 500 ? "error" : status >= 400 ? "warn" : "info";
+      try {
+        phLog(level, `${req.method} ${reqPath} -> ${status}`, {
+          http_method: req.method,
+          http_path: reqPath,
+          http_status: status,
+          duration_ms: Date.now() - reqStartMs,
+          host: req.headers.host,
+        });
+      } catch {
+        // Logging must never break request handling.
+      }
+    };
+    res.on("finish", emitRequestLog);
+    res.on("close", emitRequestLog);
     // Live app preview is matched on Host before anything else: a preview
     // hostname must never fall through to the canvas SPA, its API routes, or
     // the static handler, all of which are keyed on path alone.
@@ -1220,6 +1251,14 @@ export function startStaticServer(config) {
       basePath,
     ).catch((err) => {
       console.error(`Static handler error for ${req.url}:`, err);
+      try {
+        phLog("error", `Static handler error for ${req.url}`, {
+          http_path: reqPath,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } catch {
+        // Logging must never break request handling.
+      }
       if (!res.headersSent) {
         res.writeHead(500);
         res.end("Internal Server Error");

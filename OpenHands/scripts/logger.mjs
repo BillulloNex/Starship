@@ -3,13 +3,15 @@
  *
  * Writes log output to a daily-rotating file under
  * <state-dir>/logs/agent-canvas.YYYY-MM-DD.log (7-day retention) alongside
- * the existing console output (which is unchanged).
+ * the existing console output (which is unchanged), and forwards the same
+ * lines to PostHog Logs when a POSTHOG_* API key is configured
+ * (see ./posthog-logs.mjs; no-op otherwise).
  *
  * winston is loaded dynamically and treated as optional: when it isn't
  * resolvable — most importantly inside the packaged Electron desktop app,
  * whose `afterPack` hook strips `Resources/app/node_modules/` — `fileLog`
- * becomes a no-op and console logging continues to work unchanged. See
- * AGENTS.md "Electron desktop packaging" for the strip-hook details.
+ * becomes a file no-op but PostHog forwarding still works (stdlib only).
+ * See AGENTS.md "Electron desktop packaging" for the strip-hook details.
  */
 
 import { mkdirSync } from "node:fs";
@@ -57,8 +59,7 @@ async function createFileLogger() {
   try {
     mkdirSync(logDir, { recursive: true });
 
-    const DailyRotateFile =
-      DailyRotateFileMod.default ?? DailyRotateFileMod;
+    const DailyRotateFile = DailyRotateFileMod.default ?? DailyRotateFileMod;
     const fileTransport = new DailyRotateFile({
       dirname: logDir,
       filename: "agent-canvas.%DATE%.log",
@@ -92,6 +93,43 @@ async function createFileLogger() {
 
 const fileLogger = await createFileLogger();
 
+let posthogLogsModulePromise = null;
+
+/**
+ * Forward to PostHog Logs (best-effort). The shipper is stdlib-only and a
+ * no-op without a POSTHOG_* API key, so dev stacks without keys are
+ * unaffected. Failures never propagate to callers.
+ *
+ * @param {string} level
+ * @param {string} message
+ */
+function forwardToPostHog(level, message) {
+  try {
+    if (!posthogLogsModulePromise) {
+      posthogLogsModulePromise = (async () => {
+        try {
+          const mod = await import("./posthog-logs.mjs");
+          const active = mod.initPostHogLogs({ serviceName: "canvas-dev" });
+          return active ? mod : null;
+        } catch {
+          return null;
+        }
+      })();
+    }
+    posthogLogsModulePromise
+      .then((mod) => {
+        try {
+          mod?.phLog(level, message);
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Write a message to the rotating log file. No-ops when winston isn't
  * available (e.g. the packaged desktop app). ANSI escape codes are
@@ -101,6 +139,9 @@ const fileLogger = await createFileLogger();
  * @param {string} message
  */
 export function fileLog(level, message) {
-  if (!fileLogger) return;
-  fileLogger.log(level, stripAnsi(message));
+  const clean = stripAnsi(message);
+  if (fileLogger) {
+    fileLogger.log(level, clean);
+  }
+  forwardToPostHog(level, clean);
 }
