@@ -5,6 +5,7 @@ import { AxiosError } from "axios";
 import AgentServerConversationService from "#/api/conversation-service/agent-server-conversation-service.api";
 import { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import { useActiveBackend } from "#/contexts/active-backend-context";
+import { trackAsyncDuration } from "#/utils/perf-tracking";
 
 const FIVE_MINUTES = 1000 * 60 * 5;
 const FIFTEEN_MINUTES = 1000 * 60 * 15;
@@ -53,9 +54,17 @@ export const useUserConversation = (
       if (!cid) return null;
 
       // Use the V1 batch API endpoint to get a single conversation
-      const results =
-        await AgentServerConversationService.batchGetAppConversations([cid]);
-      return results[0] ?? null;
+      return trackAsyncDuration(
+        "workspace.metadata_fetch",
+        async () => {
+          const results =
+            await AgentServerConversationService.batchGetAppConversations([
+              cid,
+            ]);
+          return results[0] ?? null;
+        },
+        { conversationId: cid },
+      );
     },
     enabled: !!cid && !cid.startsWith("task-") && !backendChanged,
     retry: false,

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import EventService from "#/api/event-service/event-service.api";
 import { useUserConversation } from "#/hooks/query/use-user-conversation";
 import type { OpenHandsEvent } from "#/types/agent-server/core";
+import { trackAsyncDuration } from "#/utils/perf-tracking";
 
 /**
  * Number of events to load on the initial REST history fetch and on each
@@ -45,14 +46,19 @@ export const useConversationHistory = (conversationId?: string) => {
         return { events: [], hasMore: false, nextPageId: null };
       }
 
-      const page = await EventService.searchEvents(
-        conversationId,
-        conversation?.conversation_url ?? null,
-        conversation?.session_api_key ?? null,
-        {
-          limit: INITIAL_HISTORY_PAGE_SIZE,
-          sortOrder: "TIMESTAMP_DESC",
-        },
+      const page = await trackAsyncDuration(
+        "workspace.history_fetch",
+        () =>
+          EventService.searchEvents(
+            conversationId,
+            conversation?.conversation_url ?? null,
+            conversation?.session_api_key ?? null,
+            {
+              limit: INITIAL_HISTORY_PAGE_SIZE,
+              sortOrder: "TIMESTAMP_DESC",
+            },
+          ),
+        { conversationId },
       );
 
       if (!Array.isArray(page.items)) {

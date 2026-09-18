@@ -6,6 +6,15 @@ import {
   mergeStreamingDeltaEvent,
 } from "#/utils/handle-event-for-ui";
 import { isStreamingDeltaEvent } from "#/types/agent-server/type-guards";
+import { trackDuration } from "#/utils/perf-tracking";
+
+/**
+ * Only report per-event append timings to RUM when they exceed a dropped-
+ * frame budget. Streaming can add hundreds of events/minute; sending an
+ * action for every single one would spam Datadog without adding signal, so
+ * we only care about the calls that are actually slow enough to jank the UI.
+ */
+const SLOW_APPEND_THRESHOLD_MS = 8;
 
 export type OHEvent = OpenHandsEvent & {
   isFromPlanningAgent?: boolean;
@@ -150,10 +159,22 @@ export const useEventStore = create<EventState>()((set) => ({
   eventIds: new Set(),
   uiEvents: [],
   loadedConversationId: null,
-  addEvent: (event: OHEvent) => set((state) => applyAddEvent(state, event)),
+  addEvent: (event: OHEvent) =>
+    set((state) => {
+      const start = performance.now();
+      const next = applyAddEvent(state, event);
+      const duration = performance.now() - start;
+      if (duration > SLOW_APPEND_THRESHOLD_MS) {
+        trackDuration("event_store.slow_append", duration, {
+          eventCount: state.events.length,
+        });
+      }
+      return next;
+    }),
   addEvents: (incoming: OHEvent[]) =>
     set((state) => {
       if (incoming.length === 0) return state;
+      const start = performance.now();
 
       const eventIds = new Set(state.eventIds);
       const events = [...state.events];
@@ -190,6 +211,11 @@ export const useEventStore = create<EventState>()((set) => ({
       if (!added) {
         return state;
       }
+
+      trackDuration("event_store.bulk_append", performance.now() - start, {
+        incomingCount: incoming.length,
+        eventCount: state.events.length,
+      });
 
       return sortEventState({
         ...state,

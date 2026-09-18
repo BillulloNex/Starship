@@ -58,6 +58,14 @@ import {
   applyColorTheme,
   readPersistedColorTheme,
 } from "#/themes/color-themes";
+import { markPerf, measurePerf } from "#/utils/perf-tracking";
+
+// Marked as soon as this module (the app root) is evaluated — the earliest
+// point in the React tree we control. Paired with "app_interactive" below to
+// measure boot latency (config/health/onboarding gates) from module load to
+// the first render of the real app.
+markPerf("app_boot_start");
+let appInteractiveTracked = false;
 
 /** Applies the persisted color-theme palette to document.body on mount. */
 function ColorThemeApplier() {
@@ -462,10 +470,22 @@ export default function App() {
 
   return (
     <>
+      <AppInteractiveTracker />
       <Outlet />
       <TelemetryConsentBanner />
     </>
   );
+}
+
+/** Fires once, the first time the real app (past all bootstrap gates) mounts. */
+function AppInteractiveTracker() {
+  React.useEffect(() => {
+    if (appInteractiveTracked) return;
+    appInteractiveTracked = true;
+    markPerf("app_interactive");
+    measurePerf("app.boot_to_interactive", "app_boot_start", "app_interactive");
+  }, []);
+  return null;
 }
 
 /* eslint-disable i18next/no-literal-string */

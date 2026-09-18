@@ -35,6 +35,19 @@ const DD_SESSION_REPLAY_SAMPLE_RATE = Number(
 
 let ddInitialised = false;
 
+type DatadogRum = typeof import("@datadog/browser-rum").datadogRum;
+let ddRumInstance: DatadogRum | null = null;
+
+/**
+ * Returns the initialised `datadogRum` SDK instance, or null when Datadog
+ * isn't configured (e.g. local dev without VITE_DD_* vars) or hasn't
+ * finished its dynamic import yet. Callers (perf-tracking.ts) must treat
+ * this as optional and no-op when null.
+ */
+export function getDatadogRum(): DatadogRum | null {
+  return ddRumInstance;
+}
+
 async function initDatadog() {
   if (ddInitialised) return;
   if (!DD_APPLICATION_ID || !DD_CLIENT_TOKEN) return;
@@ -45,6 +58,7 @@ async function initDatadog() {
     import("@datadog/browser-rum"),
     import("@datadog/browser-logs"),
   ]);
+  ddRumInstance = datadogRum;
 
   datadogRum.init({
     applicationId: DD_APPLICATION_ID,

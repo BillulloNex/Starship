@@ -59,6 +59,7 @@ import EventService from "#/api/event-service/event-service.api";
 import { getAgentServerClientOptions } from "#/api/agent-server-client-options";
 import { useConversationStore } from "#/stores/conversation-store";
 import { trackError } from "#/utils/error-handler";
+import { trackDuration } from "#/utils/perf-tracking";
 import {
   fanoutGeneration,
   fanoutToolCall,
@@ -174,6 +175,13 @@ export function ConversationWebSocketProvider({
   // Don't show errors until after first successful connection
   const hasConnectedRefMain = React.useRef(false);
   const hasConnectedRefPlanning = React.useRef(false);
+
+  // Perf tracking: timestamp of the main socket's `onOpen`, used to measure
+  // "time to first event" once the first message arrives. Reset whenever the
+  // conversation changes so a stale timestamp from a previous conversation
+  // never gets attributed to the new one.
+  const mainSocketOpenedAtRef = React.useRef<number | null>(null);
+  const firstEventTrackedRef = React.useRef(false);
 
   const queryClient = useQueryClient();
   const addEvent = useEventStore((state) => state.addEvent);
@@ -675,6 +683,8 @@ export function ConversationWebSocketProvider({
     hasConnectedRefPlanning.current = false;
     // Reset the tracked event ref when conversation changes
     latestPlanningFileEventRef.current = null;
+    mainSocketOpenedAtRef.current = null;
+    firstEventTrackedRef.current = false;
   }, [conversationId]);
 
   // Merged loading history state - true if either connection is still loading
@@ -694,6 +704,16 @@ export function ConversationWebSocketProvider({
 
         // Use type guard to validate v1 event structure
         if (isAgentServerEvent(event)) {
+          if (!firstEventTrackedRef.current) {
+            firstEventTrackedRef.current = true;
+            if (mainSocketOpenedAtRef.current !== null) {
+              trackDuration(
+                "workspace.time_to_first_event",
+                performance.now() - mainSocketOpenedAtRef.current,
+                { conversationId: conversationId ?? "" },
+              );
+            }
+          }
           // A reconnect replays the backlog from a stale anchor. The store
           // dedups by id, but the side-effects below aren't idempotent, so skip
           // them for replayed events (#1656).
@@ -1204,6 +1224,8 @@ export function ConversationWebSocketProvider({
         setMainConnectionState("OPEN");
         hasConnectedRefMain.current = true; // Mark that we've successfully connected
         clearConnectionError(); // Clear a previous connection error; keep sticky conversation errors
+        mainSocketOpenedAtRef.current = performance.now();
+        firstEventTrackedRef.current = false;
       },
       onClose: () => {
         setMainConnectionState("CLOSED");
