@@ -147,6 +147,14 @@ export interface RuntimeServicesInfo {
       openapi_url?: string;
       auth_env_var?: string;
     };
+    computer?: {
+      description?: string;
+      broker_url?: string;
+      auth_env_var?: string;
+      cli?: string;
+      commands?: Record<string, string>;
+      recipe?: string[];
+    };
     /**
      * Public, browser-facing URL for servers the agent starts. `url_template`
      * contains a literal `{port}` placeholder and works for any port;
@@ -245,7 +253,7 @@ export function buildRuntimeServicesSystemSuffix(
   );
 
   const { agent_server, ingress, automation } = info.services;
-  const { frontend, app_preview: appPreview } = info.services;
+  const { frontend, app_preview: appPreview, computer } = info.services;
 
   if (agent_server?.url_from_agent) {
     lines.push(
@@ -286,6 +294,25 @@ export function buildRuntimeServicesSystemSuffix(
   } else {
     lines.push(
       "* Automation backend: not running in this dev mode (skip /api/automation calls).",
+    );
+  }
+
+  if (computer?.broker_url) {
+    lines.push(
+      `* On-demand desktop: ${computer.broker_url}`,
+      `    ${computer.description ?? "Computer on Demand broker: one isolated Linux desktop per agent."}`,
+    );
+    if (computer.auth_env_var) {
+      lines.push(
+        `    Auth:    header 'Authorization: Bearer $${computer.auth_env_var}'`,
+      );
+    }
+    for (const step of computer.recipe ?? []) {
+      lines.push(`    ${step}`);
+    }
+  } else {
+    lines.push(
+      "* On-demand desktop: not configured on this host (no computer broker).",
     );
   }
 

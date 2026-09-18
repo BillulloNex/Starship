@@ -428,11 +428,25 @@ if [ -n "$PREVIEW_HOST_PATTERN" ]; then
   )
 fi
 
+# Tell the agent about on-demand desktops (Computer on Demand broker) so each
+# conversation can claim one isolated Linux desktop. Unset COMPUTER_BROKER_URL
+# disables the feature; the agent simply never sees a `computer` section.
+# COMPUTER_BROKER_API_KEY must be set alongside (Coolify runtime var) — it is
+# already in container env, which is what the agent sandbox inherits.
+RSI_COMPUTER_ARGS=()
+if [ -n "${COMPUTER_BROKER_URL:-}" ]; then
+  RSI_COMPUTER_ARGS=(--computer-broker-url "$COMPUTER_BROKER_URL")
+  log "Computer broker enabled: $COMPUTER_BROKER_URL"
+else
+  log "Computer broker disabled (set COMPUTER_BROKER_URL to enable)"
+fi
+
 RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
   --mode docker \
   --agent-host-alias 127.0.0.1 \
   --agent-server-url "$AGENT_SERVER_URL" \
   ${RSI_PREVIEW_ARGS[@]+"${RSI_PREVIEW_ARGS[@]}"} \
+  ${RSI_COMPUTER_ARGS[@]+"${RSI_COMPUTER_ARGS[@]}"} \
   --automation-url "$AUTOMATION_BASE_URL")"
 
 # ── Live app preview ─────────────────────────────────────────────────────────

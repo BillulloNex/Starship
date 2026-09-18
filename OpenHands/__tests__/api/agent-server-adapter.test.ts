@@ -1192,6 +1192,37 @@ describe("buildRuntimeServicesSystemSuffix", () => {
     );
   });
 
+  it("renders the computer broker section with claim recipe when configured", () => {
+    const suffix = buildRuntimeServicesSystemSuffix({
+      mode: "docker",
+      services: {
+        agent_server: { url_from_agent: "http://127.0.0.1:18000" },
+        computer: {
+          description: "Computer on Demand broker.",
+          broker_url: "https://computers.beenex.cloud",
+          auth_env_var: "COMPUTER_BROKER_API_KEY",
+          cli: "grokbot-computer",
+          commands: { claim: "grokbot-computer claim" },
+          recipe: ["1. Claim exactly once per conversation."],
+        },
+      },
+    });
+    expect(suffix).toContain("https://computers.beenex.cloud");
+    expect(suffix).toContain("Authorization: Bearer $COMPUTER_BROKER_API_KEY");
+    expect(suffix).toContain("1. Claim exactly once per conversation.");
+    expect(suffix).not.toContain("not configured on this host");
+  });
+
+  it("renders a not-configured line when no computer broker is present", () => {
+    const suffix = buildRuntimeServicesSystemSuffix({
+      mode: "docker",
+      services: {
+        agent_server: { url_from_agent: "http://127.0.0.1:18000" },
+      },
+    });
+    expect(suffix).toContain("On-demand desktop: not configured on this host");
+  });
+
   it("uses the configured agent-server URL in the don't-guess line (not a hardcoded :8000)", () => {
     // dev:safe runs the agent-server on :18000, not :8000. Make sure the
     // rendered block doesn't lie to the agent about its own URL.

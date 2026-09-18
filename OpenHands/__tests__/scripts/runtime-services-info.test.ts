@@ -30,6 +30,11 @@ interface RuntimeServicesInfoShape {
       url_template: string;
       reserved_ports: number[];
     };
+    computer?: {
+      broker_url: string;
+      auth_env_var: string;
+      cli: string;
+    };
   };
 }
 
@@ -126,6 +131,32 @@ describe("runtime-services-info.mjs", () => {
     });
   });
 
+  describe("computer broker", () => {
+    it("advertises the broker with claim recipe when url is provided", () => {
+      const info = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+        computer: { url: "https://computers.beenex.cloud" },
+      }) as RuntimeServicesInfoShape;
+      expect(info.services.computer).toMatchObject({
+        broker_url: "https://computers.beenex.cloud",
+        auth_env_var: "COMPUTER_BROKER_API_KEY",
+        cli: "grokbot-computer",
+      });
+    });
+
+    it("omits the computer section when no url is provided", () => {
+      const withEmpty = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+        computer: {},
+      }) as RuntimeServicesInfoShape;
+      expect(withEmpty.services.computer).toBeUndefined();
+      const without = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+      }) as RuntimeServicesInfoShape;
+      expect(without.services.computer).toBeUndefined();
+    });
+  });
+
   describe("parseArgs", () => {
     it("maps flags to builder options", () => {
       const opts = parseArgs([
@@ -149,6 +180,21 @@ describe("runtime-services-info.mjs", () => {
     it("omits automation when no --automation-url is given", () => {
       const opts = parseArgs(["--agent-server-url", "http://127.0.0.1:18000"]);
       expect(opts.automation).toBeUndefined();
+    });
+
+    it("maps computer broker flags to builder options", () => {
+      const opts = parseArgs([
+        "--agent-server-url",
+        "http://127.0.0.1:18000",
+        "--computer-broker-url",
+        "https://computers.beenex.cloud",
+      ]);
+      expect(opts.computer).toEqual({ url: "https://computers.beenex.cloud" });
+    });
+
+    it("omits computer when no --computer-broker-url is given", () => {
+      const opts = parseArgs(["--agent-server-url", "http://127.0.0.1:18000"]);
+      expect(opts.computer).toBeUndefined();
     });
 
     it("throws on an unknown flag", () => {

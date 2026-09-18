@@ -65,8 +65,19 @@ import { pathToFileURL } from "node:url";
  *   prefix all automation routes are mounted under.
  * @param {string} [options.automation.authEnvVar="OPENHANDS_AUTOMATION_API_KEY"]
  *   - Env var holding the API key.
+ * @param {object} [options.computer] - On-demand desktop broker info. Skipped
+ *   entirely unless `.url` is provided, so passing `{}` is safe.
+ * @param {string} [options.computer.url] - Broker base URL, from the agent's
+ *   POV (e.g. "https://computers.beenex.cloud"). The agent reaches per-desktop
+ *   MCP/REST only through broker-proxied routes under this URL.
+ * @param {string} [options.computer.authEnvVar="COMPUTER_BROKER_API_KEY"]
+ *   - Env var holding the broker Bearer key.
  * @returns {object} A JSON-serializable runtime services info object.
  */
+
+/** Default env var holding the computer-broker Bearer key (Rule 2: no magic strings). */
+export const COMPUTER_BROKER_AUTH_ENV_DEFAULT = "COMPUTER_BROKER_API_KEY";
+
 export function buildRuntimeServicesInfo(options) {
   const {
     mode,
@@ -80,6 +91,7 @@ export function buildRuntimeServicesInfo(options) {
     frontendKind = "vite",
     automation,
     appPreview,
+    computer,
   } = options;
 
   // Prefer an explicit URL (containers reach the agent-server over a specific
@@ -149,6 +161,41 @@ export function buildRuntimeServicesInfo(options) {
       docs_url: `${automationBaseUrl}${apiPrefix}/docs`,
       openapi_url: `${automationBaseUrl}${apiPrefix}/openapi.json`,
       auth_env_var: authEnvVar,
+    };
+  }
+
+  // On-demand desktops (Computer on Demand broker). Omit entirely when no
+  // broker URL was supplied, rather than advertising desktops the agent
+  // cannot reach. Raw per-desktop host ports are NOT reachable from the
+  // sandbox — the agent must use the broker-proxied MCP/REST routes and the
+  // grokbot-computer CLI below.
+  if (computer?.url) {
+    const computerAuthEnvVar =
+      computer.authEnvVar ?? COMPUTER_BROKER_AUTH_ENV_DEFAULT;
+    services.computer = {
+      description:
+        "Computer on Demand broker: one isolated Linux desktop per agent. " +
+        "Claim a desktop, drive it through its broker-proxied MCP endpoint " +
+        "(screenshot, click, type, shell, files), heartbeat long tasks, and " +
+        "release it when done. Authenticate with header " +
+        `'Authorization: Bearer $${computerAuthEnvVar}'.`,
+      broker_url: computer.url,
+      auth_env_var: computerAuthEnvVar,
+      cli: "grokbot-computer",
+      commands: {
+        claim: "grokbot-computer claim",
+        status: "grokbot-computer status",
+        mcp_url: "grokbot-computer mcp-url",
+        heartbeat: "grokbot-computer heartbeat",
+        release: "grokbot-computer release",
+        destroy: "grokbot-computer destroy",
+      },
+      recipe: [
+        "1. Claim exactly once per conversation: `grokbot-computer claim`. Booting takes minutes — the command waits and prints the endpoints. The CLI stores the claim in ~/.grokbot/computer.json — reuse it across turns, never claim twice.",
+        "2. Drive the desktop: point an MCP client at the printed broker_mcp_url, or curl the broker_api_url. Never use raw host ports.",
+        "3. Long tasks: run `grokbot-computer heartbeat` more often than every 30 minutes or the idle reaper stops the desktop.",
+        "4. Done: `grokbot-computer release` stops the desktop but keeps its files; `grokbot-computer destroy` wipes it.",
+      ],
     };
   }
 
@@ -243,6 +290,7 @@ export function buildRuntimeServicesInfo(options) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function parseArgs(argv) {
+  /** @type {{mode?: string, agentHostAlias?: string, agentServerUrl?: string, agentServerPort?: number, frontendPort?: number, frontendKind?: string, automation?: {url?: string, port?: number, apiPrefix?: string, authEnvVar?: string}, appPreview?: {urlTemplate?: string, reservedPorts?: number[]}, computer?: {url?: string, authEnvVar?: string}}} */
   const options = { automation: {}, appPreview: {} };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -274,6 +322,12 @@ export function parseArgs(argv) {
       case "--automation-auth-env":
         options.automation.authEnvVar = argv[++i];
         break;
+      case "--computer-broker-url":
+        options.computer = { url: argv[++i] || undefined };
+        break;
+      case "--computer-broker-auth-env":
+        options.computer = { ...options.computer, authEnvVar: argv[++i] };
+        break;
       default:
         throw new Error(`Unknown flag: ${flag}`);
     }
@@ -281,6 +335,9 @@ export function parseArgs(argv) {
   // Omit the automation entry entirely when no URL was supplied, rather than
   // advertising a backend the agent cannot reach.
   if (!options.automation.url) delete options.automation;
+  // Same rule as automation: omit the broker entry rather than advertise
+  // desktops the deployment has not actually configured.
+  if (!options.computer?.url) delete options.computer;
   // Same rule as automation: omit the entry rather than advertise a preview
   // the deployment has not actually published hostnames for.
   if (!options.appPreview.urlTemplate) delete options.appPreview;
