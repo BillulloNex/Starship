@@ -336,6 +336,55 @@ describe("LlmSettingsScreen", () => {
     );
     expect(pollLogin.mock.calls[0]?.[0]).toBe("device-code");
   });
+
+  it("shows Cloudflare account ID fields and keeps the constructed Workers AI base URL", async () => {
+    const saveSettingsSpy = vi
+      .spyOn(SettingsService, "saveSettings")
+      .mockResolvedValue(true);
+    vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+      buildSettings({
+        llm_model: "cloudflare/@cf/moonshotai/kimi-k2.7-code",
+        llm_base_url:
+          "https://api.cloudflare.com/client/v4/accounts/acct-1/ai/v1",
+        llm_api_key_set: true,
+        agent_settings: {
+          ...MOCK_DEFAULT_USER_SETTINGS.agent_settings,
+          llm: {
+            model: "cloudflare/@cf/moonshotai/kimi-k2.7-code",
+            api_key: null,
+            base_url:
+              "https://api.cloudflare.com/client/v4/accounts/acct-1/ai/v1",
+          },
+        },
+      }),
+    );
+
+    renderLlmSettingsScreen();
+
+    await screen.findByTestId("cloudflare-workers-ai-fields");
+    expect(screen.getByTestId("llm-settings-form-basic")).toBeInTheDocument();
+    expect(screen.getByTestId("cloudflare-account-id-input")).toHaveValue(
+      "acct-1",
+    );
+    expect(screen.queryByTestId("base-url-input")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("cloudflare-account-id-input"), {
+      target: { value: "acct-2" },
+    });
+    fireEvent.change(screen.getByTestId("llm-api-key-input"), {
+      target: { value: "cf-token" },
+    });
+    fireEvent.click(screen.getByTestId("save-button"));
+
+    await waitFor(() => expect(saveSettingsSpy).toHaveBeenCalled());
+    const payload = saveSettingsSpy.mock.calls[0][0] as Record<string, unknown>;
+    const llmPayload = (payload.agent_settings_diff as Record<string, unknown>)
+      .llm as Record<string, unknown>;
+    expect(llmPayload.api_key).toBe("cf-token");
+    expect(llmPayload.base_url).toBe(
+      "https://api.cloudflare.com/client/v4/accounts/acct-2/ai/v1",
+    );
+  });
 });
 
 describe("LlmSettingsRoute - backend mode rendering", () => {

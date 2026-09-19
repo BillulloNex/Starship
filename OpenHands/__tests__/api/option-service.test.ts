@@ -125,6 +125,7 @@ describe("OptionService", () => {
       "anthropic",
       "openai",
       "openhands",
+      "cloudflare",
     ]);
     expect(models.default_model).toBeTruthy();
   });

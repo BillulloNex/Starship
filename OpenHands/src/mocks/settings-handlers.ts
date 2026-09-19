@@ -597,6 +597,9 @@ const MOCK_MODELS = [
   "openhands/claude-opus-4-5-20251101",
   "openhands/glm-5.2",
   "sambanova/Meta-Llama-3.1-8B-Instruct",
+  "cloudflare/@cf/moonshotai/kimi-k2.7-code",
+  "cloudflare/@cf/moonshotai/kimi-k2.6",
+  "cloudflare/@cf/zai-org/glm-5.3",
 ];
 
 const MOCK_OPENAI_SUBSCRIPTION_MODELS = ["gpt-5.2", "gpt-5.3-codex"];
@@ -609,6 +612,9 @@ const MOCK_VERIFIED_MODELS = new Set([
   "openhands/claude-opus-4-5-20251101",
   "openhands/claude-sonnet-4-5-20250929",
   "openhands/glm-5.2",
+  "cloudflare/@cf/moonshotai/kimi-k2.7-code",
+  "cloudflare/@cf/moonshotai/kimi-k2.6",
+  "cloudflare/@cf/zai-org/glm-5.3",
 ]);
 
 const MOCK_VERIFIED_PROVIDERS = [
@@ -620,6 +626,7 @@ const MOCK_VERIFIED_PROVIDERS = [
   "deepseek",
   "moonshot",
   "minimax",
+  "cloudflare",
 ];
 
 const MOCK_MODEL_PROVIDERS = Array.from(

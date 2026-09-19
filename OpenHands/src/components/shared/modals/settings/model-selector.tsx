@@ -17,6 +17,14 @@ import { PRODUCT_URL } from "#/utils/constants";
 import { useSearchProviders } from "#/hooks/query/use-search-providers";
 import { useProviderModels } from "#/hooks/query/use-provider-models";
 import {
+  CLOUDFLARE_DEFAULT_MODEL,
+  CLOUDFLARE_PROVIDER_ID,
+  cloudflareModelLabel,
+  isCloudflareProvider,
+  mergeCloudflareWorkersAiModels,
+  mergeCloudflareWorkersAiProviders,
+} from "#/constants/cloudflare-workers-ai";
+import {
   FREE_MODEL_BADGE_LABEL,
   FREE_OPENHANDS_MODEL_NOTE,
   isFreeOpenHandsModel,
@@ -63,12 +71,20 @@ export function ModelSelector({
   );
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
 
-  const { data: providers = [] } = useSearchProviders();
+  const { data: catalogProviders = [] } = useSearchProviders();
   const {
-    data: providerModels = [],
+    data: catalogModels = [],
     isLoading: isLoadingModels,
     error: modelsError,
   } = useProviderModels(selectedProvider);
+  const providers = React.useMemo(
+    () => mergeCloudflareWorkersAiProviders(catalogProviders),
+    [catalogProviders],
+  );
+  const providerModels = React.useMemo(
+    () => mergeCloudflareWorkersAiModels(selectedProvider, catalogModels),
+    [catalogModels, selectedProvider],
+  );
 
   const verifiedProviders = React.useMemo(
     () => providers.filter((p) => p.verified),
@@ -101,6 +117,12 @@ export function ModelSelector({
 
   const handleChangeProvider = (provider: string) => {
     setSelectedProvider(provider);
+    if (isCloudflareProvider(provider)) {
+      setSelectedModel(CLOUDFLARE_DEFAULT_MODEL);
+      setLitellmId(`${CLOUDFLARE_PROVIDER_ID}/${CLOUDFLARE_DEFAULT_MODEL}`);
+      onChange?.(provider, CLOUDFLARE_DEFAULT_MODEL);
+      return;
+    }
     setSelectedModel(null);
     setLitellmId(`${provider}/`);
     onChange?.(provider, null);
@@ -269,9 +291,20 @@ export function ModelSelector({
               classNames={{ heading: "text-[var(--oh-muted)]" }}
             >
               {verifiedModels.map((model) => (
-                <AutocompleteItem key={model.name} textValue={model.name}>
+                <AutocompleteItem
+                  key={model.name}
+                  textValue={
+                    selectedProvider === CLOUDFLARE_PROVIDER_ID
+                      ? cloudflareModelLabel(model.name)
+                      : model.name
+                  }
+                >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate">{model.name}</span>
+                    <span className="truncate">
+                      {selectedProvider === CLOUDFLARE_PROVIDER_ID
+                        ? cloudflareModelLabel(model.name)
+                        : model.name}
+                    </span>
                     {isFreeOpenHandsModel(
                       `${selectedProvider}/${model.name}`,
                     ) ? (
@@ -292,9 +325,15 @@ export function ModelSelector({
                   <AutocompleteItem
                     data-testid={`model-item-${model.name}`}
                     key={model.name}
-                    textValue={model.name}
+                    textValue={
+                      selectedProvider === CLOUDFLARE_PROVIDER_ID
+                        ? cloudflareModelLabel(model.name)
+                        : model.name
+                    }
                   >
-                    {model.name}
+                    {selectedProvider === CLOUDFLARE_PROVIDER_ID
+                      ? cloudflareModelLabel(model.name)
+                      : model.name}
                   </AutocompleteItem>
                 ))}
               </AutocompleteSection>

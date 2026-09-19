@@ -525,6 +525,20 @@ def _init_antigravity_acp():
         print(f"[grokbot-sitecustomize] Antigravity ACP patch skipped: {e}", file=sys.stderr, flush=True)
 
 
+def _init_cloudflare_ai_gateway():
+    """Send cf-aig-gateway-id on Workers AI / AI Gateway LiteLLM calls."""
+    try:
+        from cloudflare_ai_gateway import install_cloudflare_ai_gateway_patch
+
+        install_cloudflare_ai_gateway_patch()
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] Cloudflare AI Gateway patch skipped: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def _init_mcp_oauth_public_callback():
     try:
         from mcp_oauth_public_callback import install_fastmcp_public_callback_patch
@@ -595,6 +609,7 @@ def _init_posthog_logs():
 
 _init_llmobs()
 _init_posthog_logs()
+_init_cloudflare_ai_gateway()
 _init_antigravity_acp()
 _init_acp_background_warmup()
 _init_mcp_oauth_public_callback()

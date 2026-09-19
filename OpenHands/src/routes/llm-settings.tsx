@@ -7,6 +7,7 @@ import { useSettings } from "#/hooks/query/use-settings";
 import { SettingsInput } from "#/components/features/settings/settings-input";
 import { SettingsDropdownInput } from "#/components/features/settings/settings-dropdown-input";
 import { OpenAISubscriptionAuthCard } from "#/components/features/settings/llm-settings/openai-subscription-auth-card";
+import { CloudflareWorkersAiFields } from "#/components/features/settings/llm-settings/cloudflare-workers-ai-fields";
 import { HelpLink } from "#/ui/help-link";
 import { KeyStatusIcon } from "#/components/features/settings/key-status-icon";
 import {
@@ -18,6 +19,11 @@ import { LlmSettingsLocalView } from "#/components/features/settings/llm-profile
 import { I18nKey } from "#/i18n/declaration";
 import { Settings, SettingsSchema, SettingsScope } from "#/types/settings";
 import { extractModelAndProvider } from "#/utils/extract-model-and-provider";
+import {
+  isCloudflareModel,
+  isCloudflareProvider,
+  isCloudflareWorkersAiBaseUrl,
+} from "#/constants/cloudflare-workers-ai";
 import {
   inferInitialView,
   type SettingsFormValues,
@@ -77,6 +83,10 @@ const normalizeBaseUrl = (baseUrl: string) => {
 const isProviderDefaultBaseUrl = (model: string, baseUrl: string) => {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
   const { provider } = extractModelAndProvider(model);
+
+  if (isCloudflareWorkersAiBaseUrl(normalizedBaseUrl)) {
+    return true;
+  }
 
   if (provider) {
     const knownDefaults = KNOWN_PROVIDER_DEFAULT_BASE_URLS[provider];
@@ -210,6 +220,12 @@ export function LlmSettingsScreen({
         typeof values["llm.base_url"] === "string"
           ? values["llm.base_url"]
           : "";
+      const { provider: selectedProvider } =
+        extractModelAndProvider(modelValue);
+      const isCloudflareSelected =
+        isCloudflareProvider(selectedProvider) ||
+        isCloudflareModel(modelValue) ||
+        isCloudflareWorkersAiBaseUrl(baseUrlValue);
       const showOpenHandsApiKeyHelp = modelValue.startsWith("openhands/");
       const authType = resolveLlmAuthType(values[LLM_AUTH_TYPE_KEY]);
       const isSubscriptionAuth = authType === LLM_AUTH_TYPE_SUBSCRIPTION;
@@ -229,7 +245,11 @@ export function LlmSettingsScreen({
         ? apiKeyValue.length > 0
         : Boolean(settings?.llm_api_key_set);
 
-      const renderApiKeyInput = (testId: string, helpTestId: string) => (
+      const renderApiKeyInput = (
+        testId: string,
+        helpTestId: string,
+        options?: { hideHelp?: boolean },
+      ) => (
         <>
           <SettingsInput
             testId={testId}
@@ -246,12 +266,14 @@ export function LlmSettingsScreen({
             }
           />
 
-          <HelpLink
-            testId={helpTestId}
-            text={t(I18nKey.SETTINGS$DONT_KNOW_API_KEY)}
-            linkText={t(I18nKey.SETTINGS$CLICK_FOR_INSTRUCTIONS)}
-            href="https://docs.openhands.dev/usage/local-setup#getting-an-api-key"
-          />
+          {options?.hideHelp ? null : (
+            <HelpLink
+              testId={helpTestId}
+              text={t(I18nKey.SETTINGS$DONT_KNOW_API_KEY)}
+              linkText={t(I18nKey.SETTINGS$CLICK_FOR_INSTRUCTIONS)}
+              href="https://docs.openhands.dev/usage/local-setup#getting-an-api-key"
+            />
+          )}
         </>
       );
 
@@ -364,10 +386,26 @@ export function LlmSettingsScreen({
                       if (nextModel) {
                         onChange("llm.model", nextModel);
                       }
+                      if (
+                        !isCloudflareProvider(provider) &&
+                        isCloudflareWorkersAiBaseUrl(baseUrlValue)
+                      ) {
+                        onChange("llm.base_url", "");
+                      }
                     }}
                     wrapperClassName="!flex-col !gap-6"
                     isDisabled={isDisabled}
                   />
+
+                  {isCloudflareSelected ? (
+                    <CloudflareWorkersAiFields
+                      baseUrl={baseUrlValue}
+                      onBaseUrlChange={(value) =>
+                        onChange("llm.base_url", value)
+                      }
+                      isDisabled={isDisabled}
+                    />
+                  ) : null}
 
                   {showOpenHandsApiKeyHelp ? (
                     <OpenHandsApiKeyHelp testId="openhands-api-key-help" />
@@ -378,6 +416,7 @@ export function LlmSettingsScreen({
                     "llm-api-key-input",
                     // eslint-disable-next-line i18next/no-literal-string -- DOM id, not user-facing
                     "llm-api-key-help-anchor",
+                    { hideHelp: isCloudflareSelected },
                   )}
                 </>
               )}
@@ -413,23 +452,34 @@ export function LlmSettingsScreen({
                     </>
                   ) : null}
 
-                  <SettingsInput
-                    testId="base-url-input"
-                    label={t(I18nKey.SETTINGS$BASE_URL)}
-                    type="text"
-                    className="w-full"
-                    value={baseUrlValue}
-                    // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
-                    placeholder="https://api.openai.com"
-                    onChange={(value) => onChange("llm.base_url", value)}
-                    isDisabled={isDisabled}
-                  />
+                  {isCloudflareSelected ? (
+                    <CloudflareWorkersAiFields
+                      baseUrl={baseUrlValue}
+                      onBaseUrlChange={(value) =>
+                        onChange("llm.base_url", value)
+                      }
+                      isDisabled={isDisabled}
+                    />
+                  ) : (
+                    <SettingsInput
+                      testId="base-url-input"
+                      label={t(I18nKey.SETTINGS$BASE_URL)}
+                      type="text"
+                      className="w-full"
+                      value={baseUrlValue}
+                      // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
+                      placeholder="https://api.openai.com"
+                      onChange={(value) => onChange("llm.base_url", value)}
+                      isDisabled={isDisabled}
+                    />
+                  )}
 
                   {renderApiKeyInput(
                     // eslint-disable-next-line i18next/no-literal-string -- DOM id, not user-facing
                     "llm-api-key-input",
                     // eslint-disable-next-line i18next/no-literal-string -- DOM id, not user-facing
                     "llm-api-key-help-anchor-advanced",
+                    { hideHelp: isCloudflareSelected },
                   )}
                 </>
               )}
@@ -491,7 +541,22 @@ export function LlmSettingsScreen({
           llm.subscription_vendor = null;
         }
         if (context.view === "basic" && llm.model !== undefined) {
-          llm.base_url = getSchemaFieldDefaultValue(schema, "llm.base_url");
+          const selectedModel =
+            typeof llm.model === "string"
+              ? llm.model
+              : String(context.values["llm.model"] ?? "");
+          const selectedBaseUrl =
+            typeof context.values["llm.base_url"] === "string"
+              ? context.values["llm.base_url"]
+              : "";
+          if (
+            isCloudflareModel(selectedModel) ||
+            isCloudflareWorkersAiBaseUrl(selectedBaseUrl)
+          ) {
+            llm.base_url = selectedBaseUrl || null;
+          } else {
+            llm.base_url = getSchemaFieldDefaultValue(schema, "llm.base_url");
+          }
         }
       }
 

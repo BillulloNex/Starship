@@ -147,4 +147,23 @@ describe("ModelSelector", () => {
     expect(modelInput.getAttribute("placeholder") ?? "").toBe("");
   });
 
+  it("always offers Cloudflare Workers AI and defaults to Kimi K2.7 Code", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithQuery(<ModelSelector onChange={onChange} />);
+
+    const providerSelector = screen.getByLabelText("LLM Provider");
+    await user.click(providerSelector);
+    await user.click(screen.getByText("Cloudflare Workers AI"));
+
+    expect(onChange).toHaveBeenCalledWith(
+      "cloudflare",
+      "@cf/moonshotai/kimi-k2.7-code",
+    );
+
+    const modelSelector = screen.getByLabelText("LLM Model");
+    await user.click(modelSelector);
+    expect(screen.getByText("Kimi K2.7 Code")).toBeInTheDocument();
+    expect(screen.getByText("GLM-5.3")).toBeInTheDocument();
+  });
 });

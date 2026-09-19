@@ -17,6 +17,9 @@ function getProviderFromModel(modelName: string): string {
   if (lower.includes("grok")) return "xai";
   if (lower.includes("gemini")) return "google";
   if (lower.includes("kimi") || lower.includes("moonshot")) return "moonshot";
+  if (lower.includes("cloudflare") || lower.includes("@cf/")) {
+    return "cloudflare";
+  }
   return "unknown";
 }
 
