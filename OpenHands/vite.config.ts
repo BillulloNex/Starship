@@ -410,6 +410,29 @@ export default defineConfig(({ mode }) => {
               );
               return;
             }
+            if (parsedUrl.pathname === "/api/cloudflare/models") {
+              const { handleCloudflareModelsProxy } = await import(
+                "./scripts/cloudflare-models-proxy.mjs"
+              );
+              const query = Object.fromEntries(
+                parsedUrl.searchParams.entries(),
+              );
+              handleCloudflareModelsProxy(
+                req,
+                res,
+                parsedUrl.pathname,
+                query,
+              ).catch((err) => {
+                console.error("Cloudflare models proxy error:", err);
+                if (!res.headersSent) {
+                  res.writeHead(500, {
+                    "Content-Type": "application/json; charset=utf-8",
+                  });
+                  res.end(JSON.stringify({ error: err.message }));
+                }
+              });
+              return;
+            }
             next();
           });
         },

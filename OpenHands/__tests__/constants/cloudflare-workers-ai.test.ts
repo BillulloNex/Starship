@@ -43,6 +43,8 @@ describe("cloudflare workers ai helpers", () => {
       true,
     );
     expect(isCloudflareModel(CLOUDFLARE_DEFAULT_MODEL)).toBe(true);
+    expect(isCloudflareModel("moonshotai/kimi-k3")).toBe(true);
+    expect(isCloudflareModel("minimax/m3")).toBe(true);
     expect(isCloudflareModel("openai/gpt-4o")).toBe(false);
     expect(isCloudflareWorkersAiBaseUrl("https://api.openai.com/v1")).toBe(
       false,
@@ -71,9 +73,22 @@ describe("cloudflare workers ai helpers", () => {
     ]);
     expect(models[0]).toEqual({
       provider: "cloudflare",
-      name: CLOUDFLARE_DEFAULT_MODEL,
+      name: "moonshotai/kimi-k3",
       verified: true,
     });
+    expect(
+      models.some((model) => model.name === CLOUDFLARE_DEFAULT_MODEL),
+    ).toBe(true);
     expect(models.some((model) => model.name === "legacy-model")).toBe(true);
+
+    const live = mergeCloudflareWorkersAiModels("cloudflare", [], [
+      { id: "moonshotai/kimi-k3", label: "Kimi K3" },
+      { id: "@cf/moonshotai/kimi-k2.7-code" },
+    ]);
+    expect(live.map((model) => model.name)).toEqual([
+      "moonshotai/kimi-k3",
+      "@cf/moonshotai/kimi-k2.7-code",
+    ]);
+    expect(live.every((model) => model.verified)).toBe(true);
   });
 });

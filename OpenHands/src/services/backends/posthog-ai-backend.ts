@@ -16,10 +16,15 @@ function getProviderFromModel(modelName: string): string {
   if (lower.includes("gpt")) return "openai";
   if (lower.includes("grok")) return "xai";
   if (lower.includes("gemini")) return "google";
-  if (lower.includes("kimi") || lower.includes("moonshot")) return "moonshot";
-  if (lower.includes("cloudflare") || lower.includes("@cf/")) {
+  if (
+    lower.includes("cloudflare") ||
+    lower.includes("@cf/") ||
+    lower.includes("moonshotai/") ||
+    lower.startsWith("minimax/")
+  ) {
     return "cloudflare";
   }
+  if (lower.includes("kimi") || lower.includes("moonshot")) return "moonshot";
   return "unknown";
 }
 

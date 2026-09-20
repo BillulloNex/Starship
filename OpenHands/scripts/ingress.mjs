@@ -39,6 +39,7 @@ import { handleCodexUsageProxy } from "./codex-usage-proxy.mjs";
 import { handleClaudeUsageProxy } from "./claude-usage-proxy.mjs";
 import { handleCursorApiProxy } from "./cursor-api-proxy.mjs";
 import { handleOpencodeApiProxy } from "./opencode-api-proxy.mjs";
+import { handleCloudflareModelsProxy } from "./cloudflare-models-proxy.mjs";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -221,6 +222,20 @@ export function startIngress(config) {
           res.end(JSON.stringify({ error: err.message }));
         }
       });
+      return;
+    }
+
+    if (parsedUrl.pathname === "/api/cloudflare/models") {
+      const query = Object.fromEntries(parsedUrl.searchParams.entries());
+      handleCloudflareModelsProxy(req, res, parsedUrl.pathname, query).catch(
+        (err) => {
+          console.error("Cloudflare models proxy error:", err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        },
+      );
       return;
     }
 

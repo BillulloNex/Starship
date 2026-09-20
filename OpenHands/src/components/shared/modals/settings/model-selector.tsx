@@ -16,10 +16,12 @@ import { HelpLink } from "#/ui/help-link";
 import { PRODUCT_URL } from "#/utils/constants";
 import { useSearchProviders } from "#/hooks/query/use-search-providers";
 import { useProviderModels } from "#/hooks/query/use-provider-models";
+import { useCloudflareCatalogModels } from "#/hooks/query/use-cloudflare-catalog-models";
 import {
   CLOUDFLARE_DEFAULT_MODEL,
   CLOUDFLARE_PROVIDER_ID,
   cloudflareModelLabel,
+  cloudflareModelSearchText,
   isCloudflareProvider,
   mergeCloudflareWorkersAiModels,
   mergeCloudflareWorkersAiProviders,
@@ -55,6 +57,8 @@ interface ModelSelectorProps {
   ) => void;
   wrapperClassName?: string;
   labelClassName?: string;
+  cloudflareAccountId?: string;
+  cloudflareApiToken?: string;
 }
 
 export function ModelSelector({
@@ -64,6 +68,8 @@ export function ModelSelector({
   onDefaultValuesChanged,
   wrapperClassName,
   labelClassName,
+  cloudflareAccountId,
+  cloudflareApiToken,
 }: ModelSelectorProps) {
   const [, setLitellmId] = React.useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = React.useState<string | null>(
@@ -77,13 +83,33 @@ export function ModelSelector({
     isLoading: isLoadingModels,
     error: modelsError,
   } = useProviderModels(selectedProvider);
+  const {
+    data: liveCloudflareModels = [],
+    isLoading: isLoadingCloudflareCatalog,
+  } = useCloudflareCatalogModels({
+    accountId: cloudflareAccountId,
+    apiToken: cloudflareApiToken,
+    enabled: isCloudflareProvider(selectedProvider),
+  });
+  const liveCloudflareLabels = React.useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const model of liveCloudflareModels) {
+      if (model.label) labels.set(model.id, model.label);
+    }
+    return labels;
+  }, [liveCloudflareModels]);
   const providers = React.useMemo(
     () => mergeCloudflareWorkersAiProviders(catalogProviders),
     [catalogProviders],
   );
   const providerModels = React.useMemo(
-    () => mergeCloudflareWorkersAiModels(selectedProvider, catalogModels),
-    [catalogModels, selectedProvider],
+    () =>
+      mergeCloudflareWorkersAiModels(
+        selectedProvider,
+        catalogModels,
+        isCloudflareProvider(selectedProvider) ? liveCloudflareModels : null,
+      ),
+    [catalogModels, liveCloudflareModels, selectedProvider],
   );
 
   const verifiedProviders = React.useMemo(
@@ -264,10 +290,15 @@ export function ModelSelector({
             data-testid="llm-model-input"
             isRequired
             isVirtualized={false}
-            isLoading={isLoadingModels}
+            isLoading={
+              isLoadingModels ||
+              (isCloudflareProvider(selectedProvider) &&
+                isLoadingCloudflareCatalog)
+            }
             name="llm-model-input"
             aria-label={t(I18nKey.LLM$MODEL)}
             isClearable={false}
+            allowsCustomValue={isCloudflareProvider(selectedProvider)}
             onSelectionChange={(e) => {
               if (e?.toString()) handleChangeModel(e.toString());
             }}
@@ -295,14 +326,15 @@ export function ModelSelector({
                   key={model.name}
                   textValue={
                     selectedProvider === CLOUDFLARE_PROVIDER_ID
-                      ? cloudflareModelLabel(model.name)
+                      ? cloudflareModelSearchText(model.name)
                       : model.name
                   }
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate">
                       {selectedProvider === CLOUDFLARE_PROVIDER_ID
-                        ? cloudflareModelLabel(model.name)
+                        ? (liveCloudflareLabels.get(model.name) ??
+                          cloudflareModelLabel(model.name))
                         : model.name}
                     </span>
                     {isFreeOpenHandsModel(
@@ -327,12 +359,13 @@ export function ModelSelector({
                     key={model.name}
                     textValue={
                       selectedProvider === CLOUDFLARE_PROVIDER_ID
-                        ? cloudflareModelLabel(model.name)
+                        ? cloudflareModelSearchText(model.name)
                         : model.name
                     }
                   >
                     {selectedProvider === CLOUDFLARE_PROVIDER_ID
-                      ? cloudflareModelLabel(model.name)
+                      ? (liveCloudflareLabels.get(model.name) ??
+                        cloudflareModelLabel(model.name))
                       : model.name}
                   </AutocompleteItem>
                 ))}

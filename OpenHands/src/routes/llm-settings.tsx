@@ -23,6 +23,7 @@ import {
   isCloudflareModel,
   isCloudflareProvider,
   isCloudflareWorkersAiBaseUrl,
+  parseCloudflareAccountIdFromBaseUrl,
 } from "#/constants/cloudflare-workers-ai";
 import {
   inferInitialView,
@@ -381,6 +382,11 @@ export function LlmSettingsScreen({
                 <>
                   <ModelSelector
                     currentModel={modelValue || undefined}
+                    cloudflareAccountId={
+                      parseCloudflareAccountIdFromBaseUrl(baseUrlValue) ??
+                      undefined
+                    }
+                    cloudflareApiToken={apiKeyValue || undefined}
                     onChange={(provider, model) => {
                       const nextModel = buildModelId(provider, model);
                       if (nextModel) {

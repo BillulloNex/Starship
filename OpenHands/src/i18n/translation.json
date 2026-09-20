@@ -2312,7 +2312,7 @@
     "ca": "Creeu un testimoni amb Workers AI Read"
   },
   "SETTINGS$CLOUDFLARE_CREDIT_NOTE": {
-    "en": "Requests use your Cloudflare AI Gateway credits when Unified billing is enabled on the default gateway.",
+    "en": "Requests use your Cloudflare AI Gateway credits when Unified billing is enabled on the default gateway. Paste the Account ID and API token to load Cloudflare's live model catalog.",
     "ja": "デフォルトゲートウェイで Unified billing が有効な場合、リクエストは Cloudflare AI Gateway のクレジットを使います。",
     "zh-CN": "在默认网关上启用 Unified billing 后，请求会使用你的 Cloudflare AI Gateway 额度。",
     "zh-TW": "在預設閘道啟用 Unified billing 後，請求會使用你的 Cloudflare AI Gateway 額度。",

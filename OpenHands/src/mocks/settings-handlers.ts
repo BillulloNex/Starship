@@ -597,6 +597,7 @@ const MOCK_MODELS = [
   "openhands/claude-opus-4-5-20251101",
   "openhands/glm-5.2",
   "sambanova/Meta-Llama-3.1-8B-Instruct",
+  "cloudflare/moonshotai/kimi-k3",
   "cloudflare/@cf/moonshotai/kimi-k2.7-code",
   "cloudflare/@cf/moonshotai/kimi-k2.6",
   "cloudflare/@cf/zai-org/glm-5.3",
@@ -612,6 +613,7 @@ const MOCK_VERIFIED_MODELS = new Set([
   "openhands/claude-opus-4-5-20251101",
   "openhands/claude-sonnet-4-5-20250929",
   "openhands/glm-5.2",
+  "cloudflare/moonshotai/kimi-k3",
   "cloudflare/@cf/moonshotai/kimi-k2.7-code",
   "cloudflare/@cf/moonshotai/kimi-k2.6",
   "cloudflare/@cf/zai-org/glm-5.3",
@@ -774,6 +776,25 @@ export const SETTINGS_HANDLERS = [
 
     return HttpResponse.json({ items: providers, next_page_id: null });
   }),
+
+  http.post("*/api/cloudflare/models", async () =>
+    HttpResponse.json({
+      source: "catalog",
+      modelCount: 2,
+      models: [
+        {
+          id: "moonshotai/kimi-k3",
+          label: "Kimi K3",
+          task: "Text Generation",
+        },
+        {
+          id: "@cf/moonshotai/kimi-k2.7-code",
+          label: "Kimi K2.7 Code",
+          task: "Text Generation",
+        },
+      ],
+    }),
+  ),
 
   // V1 models search
   http.get("*/api/v1/config/models/search", async ({ request }) => {

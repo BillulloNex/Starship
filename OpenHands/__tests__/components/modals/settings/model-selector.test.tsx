@@ -39,6 +39,10 @@ vi.mock("#/hooks/query/use-provider-models", () => ({
   }),
 }));
 
+vi.mock("#/hooks/query/use-cloudflare-catalog-models", () => ({
+  useCloudflareCatalogModels: () => ({ data: [], isLoading: false }),
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => {
@@ -163,7 +167,9 @@ describe("ModelSelector", () => {
 
     const modelSelector = screen.getByLabelText("LLM Model");
     await user.click(modelSelector);
+    expect(screen.getByText("Kimi K3")).toBeInTheDocument();
     expect(screen.getByText("Kimi K2.7 Code")).toBeInTheDocument();
-    expect(screen.getByText("GLM-5.3")).toBeInTheDocument();
+    expect(screen.getByText("GLM-5.3 Flash")).toBeInTheDocument();
+    expect(screen.getByText("MiniMax M3")).toBeInTheDocument();
   });
 });

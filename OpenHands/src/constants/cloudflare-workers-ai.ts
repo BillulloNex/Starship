@@ -30,17 +30,22 @@ export const CLOUDFLARE_ACCOUNT_ID_DOCS_URL =
   "https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/";
 
 /**
- * Agentic Workers AI chat models with official IDs from
- * https://developers.cloudflare.com/workers-ai/models/ (function calling).
- * Default is the coding-oriented Kimi K2.7.
+ * Agentic chat models from Cloudflare's official catalogs:
+ * - Cloudflare AI (`moonshotai/…`, `minimax/…`): https://developers.cloudflare.com/ai/models/
+ * - Workers AI (`@cf/…`): https://developers.cloudflare.com/workers-ai/models/
+ *
+ * Default is the coding-oriented Workers AI Kimi K2.7.
  */
 export const CLOUDFLARE_DEFAULT_MODEL = "@cf/moonshotai/kimi-k2.7-code";
 
 export const CLOUDFLARE_WORKERS_AI_MODELS = [
+  "moonshotai/kimi-k3",
   "@cf/moonshotai/kimi-k2.7-code",
   "@cf/moonshotai/kimi-k2.6",
   "@cf/zai-org/glm-5.3",
+  "@cf/zai-org/glm-5.3-flash",
   "@cf/zai-org/glm-5.2",
+  "minimax/m3",
   "@cf/deepseek-ai/deepseek-v4-pro-0813",
   "@cf/deepseek-ai/deepseek-v4-flash-0731",
   "@cf/qwen/qwen3.8-27b",
@@ -49,10 +54,13 @@ export const CLOUDFLARE_WORKERS_AI_MODELS = [
 ] as const;
 
 export const CLOUDFLARE_WORKERS_AI_MODEL_LABELS: Record<string, string> = {
+  "moonshotai/kimi-k3": "Kimi K3",
   "@cf/moonshotai/kimi-k2.7-code": "Kimi K2.7 Code",
   "@cf/moonshotai/kimi-k2.6": "Kimi K2.6",
   "@cf/zai-org/glm-5.3": "GLM-5.3",
+  "@cf/zai-org/glm-5.3-flash": "GLM-5.3 Flash",
   "@cf/zai-org/glm-5.2": "GLM-5.2",
+  "minimax/m3": "MiniMax M3",
   "@cf/deepseek-ai/deepseek-v4-pro-0813": "DeepSeek V4 Pro",
   "@cf/deepseek-ai/deepseek-v4-flash-0731": "DeepSeek V4 Flash",
   "@cf/qwen/qwen3.8-27b": "Qwen 3.8 27B",
@@ -99,12 +107,20 @@ export function isCloudflareModel(model: string | null | undefined): boolean {
   const trimmed = model.trim();
   return (
     trimmed.startsWith(`${CLOUDFLARE_PROVIDER_ID}/`) ||
-    trimmed.startsWith("@cf/")
+    trimmed.startsWith("@cf/") ||
+    trimmed.startsWith("moonshotai/") ||
+    trimmed.startsWith("minimax/")
   );
 }
 
 export function cloudflareModelLabel(modelId: string): string {
   return CLOUDFLARE_WORKERS_AI_MODEL_LABELS[modelId] ?? modelId;
+}
+
+/** Label plus raw ID so the picker matches dashboard searches like "kimi-k3". */
+export function cloudflareModelSearchText(modelId: string): string {
+  const label = cloudflareModelLabel(modelId);
+  return label === modelId ? modelId : `${label} ${modelId}`;
 }
 
 export function mergeCloudflareWorkersAiProviders(
@@ -123,8 +139,19 @@ export function mergeCloudflareWorkersAiProviders(
 export function mergeCloudflareWorkersAiModels(
   provider: string | null,
   models: LLMModel[],
+  liveModels?: Array<{ id: string; label?: string }> | null,
 ): LLMModel[] {
   if (provider !== CLOUDFLARE_PROVIDER_ID) return models;
+  if (liveModels && liveModels.length > 0) {
+    const live: LLMModel[] = liveModels.map((model) => ({
+      provider,
+      name: model.id,
+      verified: true,
+    }));
+    const seen = new Set(live.map((model) => model.name));
+    const rest = models.filter((model) => !seen.has(model.name));
+    return [...live, ...rest];
+  }
   const curated: LLMModel[] = CLOUDFLARE_WORKERS_AI_MODELS.map((name) => ({
     provider,
     name,
