@@ -20,7 +20,11 @@ import {
   LLM_PROFILES_QUERY_KEYS,
   AGENT_PROFILES_QUERY_KEYS,
   AGENT_PROFILES_RETRY_OPTIONS,
+  SETTINGS_QUERY_KEYS,
 } from "#/hooks/query/query-keys";
+import { agentProfileDetailQueryKey } from "#/hooks/query/use-active-acp-profile-detail";
+import { mergeAgentProfileSaveInput } from "#/components/features/settings/agent-profiles/merge-agent-profile-save-input";
+import SettingsService from "#/api/settings-service/settings-service.api";
 import { pluginReferenceKey } from "#/utils/plugin-display";
 import {
   getStoredConversationMetadata,
@@ -125,7 +129,7 @@ export const useCreateConversation = (options?: {
       // would brick home-launch. agent_settings reflects the active LLM, so the
       // fallback degrades cleanly until the seed mirrors it (SDK #3933).
       // ACP profiles carry no llm_profile_ref, so they're never gated here.
-      const resolvedAgentProfile = requestedAgentProfileId
+      let resolvedAgentProfile = requestedAgentProfileId
         ? agentProfiles?.profiles?.find(
             (profile) => profile.id === requestedAgentProfileId,
           )
@@ -161,6 +165,10 @@ export const useCreateConversation = (options?: {
         //
         // Scoped to local: cloud never writes agent_settings, so it always
         // resolves `default` server-side via agent_profile_id (validated below).
+        //
+        // If leftover agent_settings still describe an ACP agent, this shortcut
+        // is undone below — otherwise home would show an OpenHands LLM (Kimi)
+        // and then start Cursor/OpenCode instead.
         effectiveAgentProfileId = undefined;
       } else if (
         resolvedAgentProfile?.agent_kind === "openhands" &&
@@ -193,6 +201,83 @@ export const useCreateConversation = (options?: {
               "launching from agent_settings instead.",
           );
           effectiveAgentProfileId = undefined;
+        }
+      }
+
+      // Never send leftover ACP agent_settings when the UI is on OpenHands.
+      // Activation is pointer-only, so Cursor/OpenCode can linger in
+      // agent_settings after the user switched to OpenHands and picked Kimi.
+      if (
+        !isCloud &&
+        !effectiveAgentProfileId &&
+        requestedAgentProfileId &&
+        resolvedAgentProfile?.agent_kind === "openhands"
+      ) {
+        let storedAgentKind: string | null = null;
+        try {
+          const settings = await queryClient.ensureQueryData({
+            queryKey: SETTINGS_QUERY_KEYS.personal(),
+            queryFn: SettingsService.getSettings,
+            retry: false,
+          });
+          storedAgentKind =
+            typeof settings?.agent_settings?.agent_kind === "string"
+              ? settings.agent_settings.agent_kind
+              : null;
+        } catch {
+          storedAgentKind = null;
+        }
+        if (storedAgentKind === "acp") {
+          effectiveAgentProfileId = requestedAgentProfileId;
+        }
+      }
+
+      // Home chip shows the standalone active LLM. If we have to launch the
+      // seeded OpenHands `default` via profile id (stale ACP settings, or
+      // cloud), point that profile at the picked LLM before create so the
+      // first turn cannot run a different model.
+      if (
+        effectiveAgentProfileId &&
+        resolvedAgentProfile?.name === WELL_KNOWN_DEFAULT_AGENT_PROFILE_NAME &&
+        resolvedAgentProfile.agent_kind === "openhands"
+      ) {
+        const defaultProfile = resolvedAgentProfile;
+        try {
+          const llm = await queryClient.ensureQueryData({
+            queryKey: [...LLM_PROFILES_QUERY_KEYS.all, backend.id, orgId],
+            queryFn: ProfilesService.listProfiles,
+            retry: false,
+          });
+          const picked = llm.active_profile;
+          if (
+            picked &&
+            picked !== defaultProfile.llm_profile_ref &&
+            llm.profiles.some((profile) => profile.name === picked)
+          ) {
+            const detail = await queryClient.ensureQueryData({
+              queryKey: agentProfileDetailQueryKey(
+                backend.id,
+                orgId,
+                defaultProfile.name,
+              ),
+              queryFn: () =>
+                AgentProfilesService.getProfile(defaultProfile.name),
+              ...AGENT_PROFILES_RETRY_OPTIONS,
+            });
+            await AgentProfilesService.saveProfile(
+              defaultProfile.name,
+              mergeAgentProfileSaveInput(detail.profile, {
+                agent_kind: "openhands",
+                llm_profile_ref: picked,
+              }),
+            );
+            resolvedAgentProfile = {
+              ...defaultProfile,
+              llm_profile_ref: picked,
+            };
+          }
+        } catch {
+          // Launch with the stored ref rather than blocking send.
         }
       }
 

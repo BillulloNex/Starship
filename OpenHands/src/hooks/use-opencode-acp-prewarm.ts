@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useActiveAcpProfileDetail } from "#/hooks/query/use-active-acp-profile-detail";
 import { useCreateConversation } from "#/hooks/mutation/use-create-conversation";
-import { useSettings } from "#/hooks/query/use-settings";
 import {
   isOpenCodeAcpLaunch,
   OPENCODE_ACP_PREWARM_ENTRY,
@@ -34,25 +33,14 @@ export function useOpencodeAcpPrewarm(options: {
   }) => string | null;
 } {
   const profile = useActiveAcpProfileDetail();
-  const { data: settings } = useSettings();
-  const agentSettings = settings?.agent_settings as
-    | {
-        agent_kind?: string;
-        acp_server?: string;
-        acp_command?: string | string[];
-      }
-    | undefined;
-  const isOpenCode =
-    isOpenCodeAcpLaunch({
-      agentKind: profile?.agent_kind,
-      acpServer: profile?.acp_server,
-      acpCommand: profile?.acp_command,
-    }) ||
-    isOpenCodeAcpLaunch({
-      agentKind: agentSettings?.agent_kind,
-      acpServer: agentSettings?.acp_server,
-      acpCommand: agentSettings?.acp_command,
-    });
+  // Only the active AgentProfile decides this. Activation is pointer-only, so
+  // leftover agent_settings can still say OpenCode after the user switched to
+  // OpenHands — pre-creating from those settings would steal the send.
+  const isOpenCode = isOpenCodeAcpLaunch({
+    agentKind: profile?.agent_kind,
+    acpServer: profile?.acp_server,
+    acpCommand: profile?.acp_command,
+  });
   const { mutateAsync: createConversation } = useCreateConversation({
     mutationKey: OPENCODE_ACP_PREWARM_MUTATION_KEY,
   });

@@ -4,7 +4,6 @@ import { OPENCODE_ACP_PREWARM_ENTRY } from "#/hooks/use-opencode-acp-prewarm";
 
 const createConversation = vi.fn();
 const useActiveAcpProfileDetail = vi.fn();
-const useSettings = vi.fn();
 
 vi.mock("#/hooks/mutation/use-create-conversation", () => ({
   useCreateConversation: () => ({ mutateAsync: createConversation }),
@@ -12,10 +11,6 @@ vi.mock("#/hooks/mutation/use-create-conversation", () => ({
 
 vi.mock("#/hooks/query/use-active-acp-profile-detail", () => ({
   useActiveAcpProfileDetail: () => useActiveAcpProfileDetail(),
-}));
-
-vi.mock("#/hooks/query/use-settings", () => ({
-  useSettings: () => useSettings(),
 }));
 
 describe("useOpencodeAcpPrewarm", () => {
@@ -26,14 +21,12 @@ describe("useOpencodeAcpPrewarm", () => {
       acp_server: "custom",
       acp_command: ["opencode-acp"],
     });
-    useSettings.mockReturnValue({ data: undefined });
   });
 
   it("pre-creates an OpenCode conversation and hands it off once", async () => {
     createConversation.mockResolvedValue({ conversation_id: "conv-warm" });
-    const { useOpencodeAcpPrewarm } = await import(
-      "#/hooks/use-opencode-acp-prewarm"
-    );
+    const { useOpencodeAcpPrewarm } =
+      await import("#/hooks/use-opencode-acp-prewarm");
     const { result } = renderHook(() =>
       useOpencodeAcpPrewarm({ enabled: true }),
     );
@@ -63,9 +56,19 @@ describe("useOpencodeAcpPrewarm", () => {
       acp_server: "claude-code",
       acp_command: ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
     });
-    const { useOpencodeAcpPrewarm } = await import(
-      "#/hooks/use-opencode-acp-prewarm"
-    );
+    const { useOpencodeAcpPrewarm } =
+      await import("#/hooks/use-opencode-acp-prewarm");
+    renderHook(() => useOpencodeAcpPrewarm({ enabled: true }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it("does not pre-create from leftover OpenCode agent_settings when OpenHands is active", async () => {
+    useActiveAcpProfileDetail.mockReturnValue(null);
+    const { useOpencodeAcpPrewarm } =
+      await import("#/hooks/use-opencode-acp-prewarm");
     renderHook(() => useOpencodeAcpPrewarm({ enabled: true }));
     await act(async () => {
       await Promise.resolve();

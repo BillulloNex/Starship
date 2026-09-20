@@ -53,17 +53,39 @@ vi.mock("#/hooks/query/use-agent-profiles", () => ({
 // The launch path resolves the active AgentProfile by awaiting
 // `AgentProfilesService.listProfiles` through the query cache (#3727).
 // Default: no active profile, so a plain create stays on the legacy path.
-const { listAgentProfilesMock } = vi.hoisted(() => ({
-  listAgentProfilesMock: vi.fn(),
-}));
+const { listAgentProfilesMock, getAgentProfileMock, saveAgentProfileMock } =
+  vi.hoisted(() => ({
+    listAgentProfilesMock: vi.fn(),
+    getAgentProfileMock: vi.fn(),
+    saveAgentProfileMock: vi.fn(),
+  }));
 vi.mock("#/api/agent-profiles-service/agent-profiles-service.api", () => ({
   __esModule: true,
-  default: { listProfiles: listAgentProfilesMock },
+  default: {
+    listProfiles: listAgentProfilesMock,
+    getProfile: getAgentProfileMock,
+    saveProfile: saveAgentProfileMock,
+  },
   WELL_KNOWN_DEFAULT_AGENT_PROFILE_NAME: "default",
 }));
 listAgentProfilesMock.mockResolvedValue({
   profiles: [],
   active_agent_profile_id: null,
+});
+getAgentProfileMock.mockResolvedValue({ profile: null });
+saveAgentProfileMock.mockResolvedValue({});
+
+// The OpenHands-default shortcut reads stored agent_kind so leftover ACP
+// settings cannot hijack a Kimi/OpenHands pick.
+const { getSettingsMock } = vi.hoisted(() => ({
+  getSettingsMock: vi.fn(),
+}));
+vi.mock("#/api/settings-service/settings-service.api", () => ({
+  __esModule: true,
+  default: { getSettings: getSettingsMock },
+}));
+getSettingsMock.mockResolvedValue({
+  agent_settings: { agent_kind: "openhands" },
 });
 
 // LLM-profile service: real listProfiles calls (the llmProfileExists
@@ -95,9 +117,19 @@ describe("useCreateConversation", () => {
       profiles: [],
       active_profile: null,
     });
+    getAgentProfileMock.mockReset();
+    getAgentProfileMock.mockResolvedValue({ profile: null });
+    saveAgentProfileMock.mockReset();
+    saveAgentProfileMock.mockResolvedValue({});
+    getSettingsMock.mockReset();
+    getSettingsMock.mockResolvedValue({
+      agent_settings: { agent_kind: "openhands" },
+    });
     useLlmProfilesMock.mockReturnValue({ data: { active_profile: null } });
     removeStoredConversationMetadata("conv-with-plugins");
     removeStoredConversationMetadata("conv-ref-stamp");
+    removeStoredConversationMetadata("conv-kimi");
+    removeStoredConversationMetadata("conv-ref-align");
   });
 
   it("passes suggested tasks to the V1 create conversation API", async () => {
@@ -462,6 +494,120 @@ describe("useCreateConversation", () => {
     const call = createConversationSpy.mock.lastCall;
     expect(call?.[0]?.agentProfileId).toBe("profile-acp-default");
     expect(call?.[0]?.agentProfileKind).toBe("acp");
+  });
+
+  it("does not launch leftover ACP settings when OpenHands `default` is active and the user picked an LLM", async () => {
+    // Home shows LLM profile `cf_kimik3` because the active agent is OpenHands.
+    // Activation is pointer-only, so agent_settings can still describe Cursor.
+    // The default→agent_settings shortcut must not start that ACP agent.
+    getSettingsMock.mockResolvedValue({
+      agent_settings: {
+        agent_kind: "acp",
+        acp_server: "cursor",
+        acp_model: "5.6sol",
+      },
+    });
+    listAgentProfilesMock.mockResolvedValue({
+      profiles: [
+        {
+          id: "profile-default",
+          name: "default",
+          agent_kind: "openhands",
+          revision: 1,
+          llm_profile_ref: "cf_kimik3",
+          mcp_server_refs: null,
+        },
+      ],
+      active_agent_profile_id: "profile-default",
+    });
+    listLlmProfilesMock.mockResolvedValue({
+      profiles: [{ name: "cf_kimik3" }],
+      active_profile: "cf_kimik3",
+    });
+    const createConversationSpy = vi
+      .spyOn(AgentServerConversationService, "createConversation")
+      .mockResolvedValue({
+        id: "task-id",
+        app_conversation_id: "conv-kimi",
+        agent_server_url: "http://agent-server.local",
+      } as never);
+
+    const { result } = renderHook(() => useCreateConversation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await result.current.mutateAsync({ query: "hello" });
+
+    const call = createConversationSpy.mock.lastCall;
+    expect(call?.[0]?.agentProfileId).toBe("profile-default");
+    expect(call?.[0]?.agentProfileKind).toBe("openhands");
+    expect(saveAgentProfileMock).not.toHaveBeenCalled();
+  });
+
+  it("points OpenHands `default` at the LLM on the home chip before launching past stale ACP settings", async () => {
+    getSettingsMock.mockResolvedValue({
+      agent_settings: { agent_kind: "acp", acp_server: "cursor" },
+    });
+    listAgentProfilesMock.mockResolvedValue({
+      profiles: [
+        {
+          id: "profile-default",
+          name: "default",
+          agent_kind: "openhands",
+          revision: 1,
+          llm_profile_ref: "gpt",
+          mcp_server_refs: null,
+        },
+      ],
+      active_agent_profile_id: "profile-default",
+    });
+    listLlmProfilesMock.mockResolvedValue({
+      profiles: [{ name: "cf_kimik3" }, { name: "gpt" }],
+      active_profile: "cf_kimik3",
+    });
+    getAgentProfileMock.mockResolvedValue({
+      profile: {
+        name: "default",
+        agent_kind: "openhands",
+        llm_profile_ref: "gpt",
+      },
+    });
+    const createConversationSpy = vi
+      .spyOn(AgentServerConversationService, "createConversation")
+      .mockResolvedValue({
+        id: "task-id",
+        app_conversation_id: "conv-ref-align",
+        agent_server_url: "http://agent-server.local",
+      } as never);
+
+    const { result } = renderHook(() => useCreateConversation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await result.current.mutateAsync({ query: "hello" });
+
+    expect(saveAgentProfileMock).toHaveBeenCalledWith(
+      "default",
+      expect.objectContaining({
+        agent_kind: "openhands",
+        llm_profile_ref: "cf_kimik3",
+      }),
+    );
+    const call = createConversationSpy.mock.lastCall;
+    expect(call?.[0]?.agentProfileId).toBe("profile-default");
+    await waitFor(() =>
+      expect(
+        getStoredConversationMetadata("conv-ref-align")?.active_profile,
+      ).toBe("cf_kimik3"),
+    );
   });
 
   it("launches the seeded `default` profile from its resolved id on cloud (no agent_settings fallback exists there) (#1571)", async () => {
