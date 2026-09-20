@@ -12,10 +12,14 @@
  * Tokens are written to the agent-server secret store as `GITHUB_TOKEN` and
  * `GITHUB_PERSONAL_ACCESS_TOKEN`, and a git credential helper reads them so
  * `git clone https://github.com/...` works with no URL rewriting.
+ *
+ * GitHub App user tokens (`ghu_`) expire in ~8 hours. The live copy lives in
+ * `github-connection.json` and is refreshed on demand. Conversation secrets
+ * are a snapshot — never prefer that env copy over a refreshable connection.
  */
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -418,55 +422,126 @@ async function mintInstallationToken(app, installationId) {
   return data.token;
 }
 
-export async function resolveAccessToken(env = process.env) {
-  const envToken = String(
+export function readEnvGithubToken(env = process.env) {
+  return String(
     env.GITHUB_TOKEN || env.GITHUB_PERSONAL_ACCESS_TOKEN || env.GH_TOKEN || "",
   ).trim();
-  if (envToken) return envToken;
+}
 
-  const connection = await loadGithubConnection(env);
-  if (!connection) return "";
+export function isGithubUserOAuthToken(token) {
+  return /^(ghu_|gho_)/.test(String(token || ""));
+}
 
-  if (connection.userToken) {
-    const expiresAt = Date.parse(connection.userTokenExpiresAt || "");
-    const stillFresh =
-      !Number.isFinite(expiresAt) || expiresAt - Date.now() > 60_000;
-    if (stillFresh) return connection.userToken;
-    if (connection.refreshToken) {
-      const envOAuth = getEnvOAuthClient(env);
-      const app = await loadGithubApp(env);
-      const clientId = envOAuth?.clientId || app?.clientId;
-      const clientSecret = envOAuth?.clientSecret || app?.clientSecret;
-      if (clientId && clientSecret) {
-        const refreshed = await refreshOAuthToken({
-          clientId,
-          clientSecret,
-          refreshToken: connection.refreshToken,
-        });
-        if (refreshed?.access_token) {
-          const next = {
-            ...connection,
-            userToken: refreshed.access_token,
-            refreshToken: refreshed.refresh_token || connection.refreshToken,
-            userTokenExpiresAt: refreshed.expires_in
-              ? new Date(Date.now() + Number(refreshed.expires_in) * 1000).toISOString()
-              : connection.userTokenExpiresAt,
-          };
-          await writeJsonFile(getGithubConnectionPath(env), next);
-          return next.userToken;
-        }
-      }
+export function shouldRefreshGithubConnection(connection, now = Date.now()) {
+  if (!connection?.userToken) return false;
+  const expires = Date.parse(connection.userTokenExpiresAt || "");
+  if (Number.isFinite(expires)) return expires - now <= 60_000;
+  return Boolean(
+    connection.refreshToken && isGithubUserOAuthToken(connection.userToken),
+  );
+}
+
+export function getAgentSecretTarget(env = process.env, extras = {}) {
+  const agentServerUrl = String(
+    extras.agentServerUrl ||
+      env.GROKBOT_AGENT_SERVER_URL ||
+      env.AGENT_SERVER_URL ||
+      "http://127.0.0.1:18000",
+  ).trim();
+  const sessionApiKey = String(
+    extras.sessionApiKey ||
+      env.OH_SESSION_API_KEYS_0 ||
+      env.SESSION_API_KEY ||
+      env.LOCAL_BACKEND_API_KEY ||
+      env.GROKBOT_AGENT_SERVER_API_KEY ||
+      readPersistedSessionApiKey(env) ||
+      "",
+  ).trim();
+  return { agentServerUrl, sessionApiKey };
+}
+
+function readPersistedSessionApiKey(env = process.env) {
+  const persistence = getPersistenceDir(env);
+  const candidates = [
+    path.join(persistence, "agent-canvas", "api-key.txt"),
+    path.join(persistence, "agent-canvas", "session-api-key.txt"),
+  ];
+  for (const file of candidates) {
+    try {
+      if (!existsSync(file)) continue;
+      const value = readFileSync(file, "utf8").trim();
+      if (value) return value;
+    } catch {
+      // best-effort
     }
-    return connection.userToken;
+  }
+  return "";
+}
+
+async function refreshConnectionToken(connection, env = process.env) {
+  if (!connection?.refreshToken) return null;
+  const envOAuth = getEnvOAuthClient(env);
+  const app = await loadGithubApp(env);
+  const clientId = envOAuth?.clientId || app?.clientId;
+  const clientSecret = envOAuth?.clientSecret || app?.clientSecret;
+  if (!clientId || !clientSecret) return null;
+  try {
+    const refreshed = await refreshOAuthToken({
+      clientId,
+      clientSecret,
+      refreshToken: connection.refreshToken,
+    });
+    if (!refreshed?.access_token) return null;
+    const next = {
+      ...connection,
+      userToken: refreshed.access_token,
+      refreshToken: refreshed.refresh_token || connection.refreshToken,
+      userTokenExpiresAt: refreshed.expires_in
+        ? new Date(Date.now() + Number(refreshed.expires_in) * 1000).toISOString()
+        : connection.userTokenExpiresAt,
+    };
+    await writeJsonFile(getGithubConnectionPath(env), next);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveAccessToken(env = process.env, secretOptions = {}) {
+  const connection = await loadGithubConnection(env);
+
+  if (connection?.userToken) {
+    if (!shouldRefreshGithubConnection(connection)) {
+      return connection.userToken;
+    }
+    const refreshed = await refreshConnectionToken(connection, env);
+    if (refreshed?.userToken) {
+      await upsertAgentSecrets(
+        refreshed.userToken,
+        getAgentSecretTarget(env, {
+          agentServerUrl:
+            secretOptions.agentServerUrl || connection.agentServerUrl,
+          sessionApiKey:
+            secretOptions.sessionApiKey || connection.sessionApiKey,
+        }),
+      );
+      return refreshed.userToken;
+    }
   }
 
-  if (connection.installationId) {
+  const envToken = readEnvGithubToken(env);
+  if (envToken && !isGithubUserOAuthToken(envToken)) {
+    return envToken;
+  }
+
+  if (connection?.installationId) {
     const app = await loadGithubApp(env);
     if (app?.pem && app?.id) {
       return mintInstallationToken(app, connection.installationId);
     }
   }
-  return "";
+
+  return envToken;
 }
 
 async function upsertAgentSecrets(token, { agentServerUrl, sessionApiKey }) {
@@ -701,7 +776,12 @@ async function handleStart(req, res, env) {
 
 async function finishOAuth(res, tokenPayload, extra, options) {
   const connection = await saveConnectionFromUserToken(tokenPayload, extra, options.env);
-  await upsertAgentSecrets(connection.userToken, options);
+  const synced = {
+    ...connection,
+    ...getAgentSecretTarget(options.env || process.env, options),
+  };
+  await writeJsonFile(getGithubConnectionPath(options.env), synced);
+  await upsertAgentSecrets(synced.userToken, synced);
   redirect(res, successRedirect(extra.next || "/settings/app", { login: connection.login }));
 }
 
@@ -781,9 +861,10 @@ async function handleCallback(req, res, options) {
           userTokenExpiresAt: null,
           installationId,
           connectedAt: new Date().toISOString(),
+          ...getAgentSecretTarget(env, options),
         };
         await writeJsonFile(getGithubConnectionPath(env), connection);
-        await upsertAgentSecrets(token, options);
+        await upsertAgentSecrets(token, connection);
         redirect(res, successRedirect(next, { login: connection.login }));
         return;
       }

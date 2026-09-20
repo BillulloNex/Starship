@@ -1,16 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildGithubAppInstallUrl,
   buildGithubAppManifest,
   buildGithubAuthorizeUrl,
   GITHUB_OAUTH_API_PREFIX,
   GITHUB_OAUTH_SCOPES,
+  getAgentSecretTarget,
   getCallbackUrl,
+  getGithubConnectionPath,
   getPublicOrigin,
+  isGithubUserOAuthToken,
   mapGithubBranch,
   mapGithubRepo,
   parseGithubOAuthPath,
   publicStatus,
+  readEnvGithubToken,
+  resolveAccessToken,
+  shouldRefreshGithubConnection,
   workspacePathForRepo,
 } from "../../scripts/github-oauth.mjs";
 
@@ -170,5 +179,146 @@ describe("github-oauth.mjs", () => {
         GROKBOT_MCP_OAUTH_REDIRECT_URI: "https://ship.beenex.org/callback",
       }),
     ).toBe("https://ship.beenex.org");
+  });
+
+  it("does not let sandbox GITHUB_TOKEN skip GitHub token refresh", async () => {
+    const helper = await readFile(
+      path.join(process.cwd(), "scripts/github-git-credential.sh"),
+      "utf8",
+    );
+    expect(helper).toContain(
+      "env -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN -u GH_TOKEN",
+    );
+    expect(helper).toContain("credential-token");
+  });
+
+  it("treats GitHub App user tokens as OAuth, not PATs", () => {
+    expect(isGithubUserOAuthToken("ghu_expired")).toBe(true);
+    expect(isGithubUserOAuthToken("gho_oauth")).toBe(true);
+    expect(isGithubUserOAuthToken("ghp_pat")).toBe(false);
+    expect(isGithubUserOAuthToken("github_pat_fine")).toBe(false);
+    expect(readEnvGithubToken({ GITHUB_TOKEN: "ghu_stale" })).toBe("ghu_stale");
+  });
+
+  it("refreshes expired GitHub App connections instead of treating missing expiry as forever-fresh", () => {
+    const now = Date.parse("2026-09-20T03:00:00.000Z");
+    expect(
+      shouldRefreshGithubConnection(
+        {
+          userToken: "ghu_live",
+          refreshToken: "r1",
+          userTokenExpiresAt: "2026-09-20T04:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      shouldRefreshGithubConnection(
+        {
+          userToken: "ghu_expired",
+          refreshToken: "r1",
+          userTokenExpiresAt: "2026-09-20T02:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      shouldRefreshGithubConnection(
+        {
+          userToken: "ghu_unknown_expiry",
+          refreshToken: "r1",
+          userTokenExpiresAt: null,
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("reads the agent-server secret target from env", () => {
+    expect(
+      getAgentSecretTarget({
+        GROKBOT_AGENT_SERVER_URL: "http://127.0.0.1:18000",
+        LOCAL_BACKEND_API_KEY: "session",
+      }),
+    ).toEqual({
+      agentServerUrl: "http://127.0.0.1:18000",
+      sessionApiKey: "session",
+    });
+  });
+});
+
+describe("resolveAccessToken", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("refreshes an expired connection even when sandbox env still has a stale ghu_ token", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "github-oauth-"));
+    const env = {
+      OH_PERSISTENCE_DIR: tmp,
+      GITHUB_OAUTH_CLIENT_ID: "client",
+      GITHUB_OAUTH_CLIENT_SECRET: "secret",
+      GROKBOT_AGENT_SERVER_URL: "http://127.0.0.1:18000",
+      LOCAL_BACKEND_API_KEY: "session-key",
+      GITHUB_TOKEN: "ghu_stale",
+      GITHUB_PERSONAL_ACCESS_TOKEN: "ghu_stale",
+    };
+    await writeFile(
+      getGithubConnectionPath(env),
+      `${JSON.stringify({
+        login: "octocat",
+        userToken: "ghu_stale",
+        refreshToken: "refresh-old",
+        userTokenExpiresAt: "2020-01-01T00:00:00.000Z",
+        agentServerUrl: "http://127.0.0.1:18000",
+        sessionApiKey: "session-key",
+      })}\n`,
+    );
+
+    const secretPuts = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, init) => {
+        const href = String(url);
+        if (href.includes("login/oauth/access_token")) {
+          return new Response(
+            JSON.stringify({
+              access_token: "ghu_fresh",
+              refresh_token: "refresh-new",
+              expires_in: 28800,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (href.includes("/api/settings/secrets")) {
+          secretPuts.push(JSON.parse(String(init?.body ?? "{}")));
+          return new Response("{}", { status: 200 });
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+
+    await expect(resolveAccessToken(env)).resolves.toBe("ghu_fresh");
+    const saved = JSON.parse(
+      await readFile(getGithubConnectionPath(env), "utf8"),
+    );
+    expect(saved.userToken).toBe("ghu_fresh");
+    expect(saved.refreshToken).toBe("refresh-new");
+    expect(secretPuts.map((row) => row.name).sort()).toEqual([
+      "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "GITHUB_TOKEN",
+    ]);
+    expect(secretPuts.every((row) => row.value === "ghu_fresh")).toBe(true);
+  });
+
+  it("falls back to a PAT in env when no GitHub connection exists", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), "github-oauth-"));
+    await expect(
+      resolveAccessToken({
+        OH_PERSISTENCE_DIR: tmp,
+        GITHUB_TOKEN: "ghp_operator_pat",
+      }),
+    ).resolves.toBe("ghp_operator_pat");
   });
 });

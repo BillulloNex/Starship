@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Git credential helper for github.com. Prints an OAuth / GitHub App token so
-# `git clone https://github.com/...` works in the web console with no TTY.
+# Git credential helper for github.com. Resolves a live OAuth / GitHub App
+# token (refreshing if needed) so `git push https://github.com/...` works
+# without embedding secrets in the remote URL.
 set -euo pipefail
 
 ACTION="${1:-}"
@@ -21,19 +22,26 @@ case "$host" in
   *) exit 0 ;;
 esac
 
-token="${GITHUB_TOKEN:-${GITHUB_PERSONAL_ACCESS_TOKEN:-${GH_TOKEN:-}}}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f /opt/agent-canvas/github-oauth.mjs ]; then
+  OAUTH_JS=/opt/agent-canvas/github-oauth.mjs
+elif [ -f "$SCRIPT_DIR/github-oauth.mjs" ]; then
+  OAUTH_JS="$SCRIPT_DIR/github-oauth.mjs"
+else
+  OAUTH_JS=""
+fi
+
+token=""
+if [ -n "$OAUTH_JS" ] && command -v node >/dev/null 2>&1; then
+  # Sandbox GITHUB_TOKEN is often an expired GitHub App user token that would
+  # skip refresh. Resolve from github-connection.json instead.
+  token="$(
+    env -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN -u GH_TOKEN \
+      node "$OAUTH_JS" credential-token 2>/dev/null || true
+  )"
+fi
 if [ -z "$token" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-  if [ -f /opt/agent-canvas/github-oauth.mjs ]; then
-    OAUTH_JS=/opt/agent-canvas/github-oauth.mjs
-  elif [ -f "$SCRIPT_DIR/github-oauth.mjs" ]; then
-    OAUTH_JS="$SCRIPT_DIR/github-oauth.mjs"
-  else
-    OAUTH_JS=""
-  fi
-  if [ -n "$OAUTH_JS" ]; then
-    token="$(node "$OAUTH_JS" credential-token 2>/dev/null || true)"
-  fi
+  token="${GITHUB_TOKEN:-${GITHUB_PERSONAL_ACCESS_TOKEN:-${GH_TOKEN:-}}}"
 fi
 
 if [ -z "$token" ]; then
