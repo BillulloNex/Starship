@@ -12,8 +12,8 @@ const NOTIFICATION_STATES: AgentState[] = [
 /**
  * Hook that plays a notification sound when the agent transitions into a
  * state that requires user attention. The browser tab title itself is
- * managed by `useAppTitle`, which prefixes the title with an emoji that
- * reflects the current agent state.
+ * managed by `useAppTitle`, which prefixes a spinner while running and
+ * a status emoji for paused/error states.
  */
 export function useAgentNotification(curAgentState: AgentState) {
   const { data: settings } = useSettings();

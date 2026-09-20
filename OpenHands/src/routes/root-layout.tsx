@@ -86,9 +86,13 @@ export function ErrorBoundary() {
   );
 }
 
+function AppDocumentTitle() {
+  const appTitle = useAppTitle();
+  return <title>{appTitle}</title>;
+}
+
 export default function MainApp() {
   const location = useLocation();
-  const appTitle = useAppTitle();
   const { data: settings } = useSettings();
   const config = useConfig();
 
@@ -136,7 +140,7 @@ export default function MainApp() {
             !isIdeMode && "lg:min-w-5xl",
           )}
         >
-          <title>{appTitle}</title>
+          <AppDocumentTitle />
           {!isIdeMode ? <Sidebar /> : null}
 
           <div

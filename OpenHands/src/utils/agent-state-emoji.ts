@@ -4,7 +4,8 @@ import { ExecutionStatus } from "#/types/agent-server/core/base/common";
  * Maps a conversation's execution status to a single emoji that visually
  * conveys active or error agent states in the browser tab title.
  *
- *   🟢 green circle — agent is actively running
+ *   🟢 green circle — agent is running (static fallback; the tab title
+ *      uses a braille spinner unless the user prefers reduced motion)
  *   ⚪ gray circle — agent is paused/stopped
  *   🔴 red circle — agent is in an error state
  *
