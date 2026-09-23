@@ -47,6 +47,7 @@ import {
   getGroupPreviewLimit,
   groupConversations,
   GROUP_FOLDERS_PREVIEW_LIMIT,
+  isAutomationConversation,
   MAX_INITIAL_GROUP_DISCOVERY_PAGES,
   MAX_LOAD_ALL_PAGES,
   MAX_PAGES_PER_LOAD_MORE_CLICK,
@@ -373,6 +374,21 @@ export function ConversationPanel({
       selectedAutomationNames,
     ],
   );
+
+  // Automation conversations for the dedicated bottom section — always
+  // derived from the full (unfiltered) list so they're visible regardless
+  // of the sidebar's automation filter toggle.
+  const sidebarAutomationConversations = React.useMemo(
+    () =>
+      sortConversationsByField(
+        conversations.filter((c) => isAutomationConversation(c)),
+        conversationSort,
+      ),
+    [conversations, conversationSort],
+  );
+
+  const [collapsedAutomationsSection, setCollapsedAutomationsSection] =
+    React.useState(false);
 
   const pinnedConversations = React.useMemo(
     () => resolvePinnedConversations(pinnedIds, conversations),
@@ -1294,6 +1310,55 @@ export function ConversationPanel({
               </button>
             </div>
           ))}
+
+        {/* Dedicated "Automations" section — always visible at the bottom
+            regardless of the sidebar automation filter toggle. */}
+        {!compact &&
+          !showInitialSkeleton &&
+          sidebarAutomationConversations.length > 0 && (
+            <div
+              data-testid="sidebar-automations-section"
+              className="mt-2 border-t border-[var(--oh-border)]"
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsedAutomationsSection((prev) => !prev)
+                }
+                className="flex w-full items-center gap-1.5 px-4 py-2 text-left"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                  className={cn(
+                    "size-3 shrink-0 text-[var(--oh-muted)] transition-transform",
+                    collapsedAutomationsSection ? "-rotate-90" : "rotate-0",
+                  )}
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="text-sm font-medium text-[var(--oh-text-secondary)]">
+                  {t(I18nKey.SIDEBAR$AUTOMATIONS)}
+                </span>
+                <span className="ml-auto text-xs tabular-nums text-[var(--oh-muted)]">
+                  {sidebarAutomationConversations.length}
+                </span>
+              </button>
+
+              {!collapsedAutomationsSection && (
+                <div className="space-y-0.5 pb-2">
+                  {sidebarAutomationConversations.map((conversation) =>
+                    renderConversationCard(conversation),
+                  )}
+                </div>
+              )}
+            </div>
+          )}
       </div>
 
       {confirmDeleteModalVisible && (

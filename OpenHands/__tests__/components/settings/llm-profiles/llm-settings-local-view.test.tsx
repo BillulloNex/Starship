@@ -44,7 +44,7 @@ vi.mock("#/routes/llm-settings", async () => {
       const [apiKey] = React.useState(
         String(initialValuesRef.current["llm.api_key"] ?? ""),
       );
-      const [baseUrl] = React.useState(
+      const [baseUrl, setBaseUrl] = React.useState(
         String(initialValuesRef.current["llm.base_url"] ?? ""),
       );
       const [temperature, setTemperature] = React.useState("0.2");
@@ -93,11 +93,18 @@ vi.mock("#/routes/llm-settings", async () => {
             All
           </button>
           {view === "basic" ? (
-            <input
-              data-testid="mock-basic-model-input"
-              value={model}
-              onChange={(event) => setModel(event.currentTarget.value)}
-            />
+            <>
+              <input
+                data-testid="mock-basic-model-input"
+                value={model}
+                onChange={(event) => setModel(event.currentTarget.value)}
+              />
+              <input
+                data-testid="mock-basic-base-url-input"
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.currentTarget.value)}
+              />
+            </>
           ) : null}
           {view === "all" ? (
             <input
@@ -690,6 +697,40 @@ describe("LlmSettingsLocalView", () => {
       const savedLlm = mockSaveMutateAsync.mock.calls[0][0].request.llm;
       expect(savedLlm.model).toBe("litellm_proxy/claude-opus-4-8");
       expect(savedLlm.base_url).toBe("https://llm-proxy.app.all-hands.dev/");
+    });
+
+    it("keeps Cloudflare Account ID base_url when creating a Basic profile", async () => {
+      const user = userEvent.setup();
+      mockSaveMutateAsync.mockResolvedValueOnce({ success: true });
+
+      renderWithProviders(<LlmSettingsLocalView />);
+      await user.click(screen.getByTestId("add-llm-profile"));
+
+      const nameInput = screen.getByTestId("profile-name-input");
+      await user.clear(nameInput);
+      await user.type(nameInput, "cf_kimik3");
+      const modelInput = await screen.findByTestId("mock-basic-model-input");
+      await user.clear(modelInput);
+      await user.type(modelInput, "cloudflare/moonshotai/kimi-k3");
+      const baseUrlInput = await screen.findByTestId(
+        "mock-basic-base-url-input",
+      );
+      await user.clear(baseUrlInput);
+      await user.type(
+        baseUrlInput,
+        "https://api.cloudflare.com/client/v4/accounts/acct-1/ai/v1",
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("save-profile-btn")).not.toBeDisabled();
+      });
+      await user.click(screen.getByTestId("save-profile-btn"));
+
+      await waitFor(() => expect(mockSaveMutateAsync).toHaveBeenCalled());
+      const savedLlm = mockSaveMutateAsync.mock.calls[0][0].request.llm;
+      expect(savedLlm.model).toBe("cloudflare/moonshotai/kimi-k3");
+      expect(savedLlm.base_url).toBe(
+        "https://api.cloudflare.com/client/v4/accounts/acct-1/ai/v1",
+      );
     });
 
     it("drops hidden base_url when the Basic view model changes", async () => {

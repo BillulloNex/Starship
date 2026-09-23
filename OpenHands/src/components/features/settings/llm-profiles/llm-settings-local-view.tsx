@@ -45,6 +45,10 @@ import {
 import { BackNavButton } from "#/components/shared/buttons/back-nav-button";
 import { Typography } from "#/ui/typography";
 import { useSettingsSectionHeader } from "#/contexts/settings-section-header-context";
+import {
+  isCloudflareModel,
+  isCloudflareWorkersAiBaseUrl,
+} from "#/constants/cloudflare-workers-ai";
 
 type ViewMode = "list" | "create" | "edit";
 
@@ -279,11 +283,18 @@ export function LlmSettingsLocalView() {
       llmConfig.auth_type = LLM_AUTH_TYPE_API_KEY;
       llmConfig.subscription_vendor = null;
 
-      // The Basic tab has no base_url field. Preserve an existing hidden value
-      // when the model did not actually change; if the user chooses a new model,
-      // drop the old base URL so provider defaults can apply to that model.
+      // The Basic tab hides generic base_url, except Cloudflare Account ID
+      // which is stored as llm.base_url. Keep that URL when switching to or
+      // creating a Cloudflare model; drop a stale hidden URL otherwise.
       if (didChangeModelInBasic) {
-        delete llmConfig.base_url;
+        const nextModel = String(llmConfig.model ?? "");
+        const nextBaseUrl = String(llmConfig.base_url ?? "");
+        if (
+          !isCloudflareModel(nextModel) &&
+          !isCloudflareWorkersAiBaseUrl(nextBaseUrl)
+        ) {
+          delete llmConfig.base_url;
+        }
       }
 
       // API key handling: an empty value means "no change" (the UX doesn't
