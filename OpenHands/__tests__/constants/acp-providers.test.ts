@@ -126,6 +126,18 @@ describe("ACP provider registry", () => {
         expect(provider.description_key).toBeTruthy();
         continue;
       }
+      if (provider.key === "codex") {
+        expect(provider.display_name).toBe("Codex");
+        expect(provider.default_command).toEqual([
+          "npx",
+          "-y",
+          "@agentclientprotocol/codex-acp@1.13.1",
+        ]);
+        expect(provider.default_model).toBe("gpt-6-sol");
+        expect(provider.icon).toBeTruthy();
+        expect(provider.description_key).toBeTruthy();
+        continue;
+      }
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
       const expectedCommand =

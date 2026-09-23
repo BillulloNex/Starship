@@ -185,9 +185,7 @@ describe("buildStartConversationRequest", () => {
       // Python agent-server can resolve bundled resources (scripts/, references/).
       const source = skill.source as string;
       expect(source).toMatch(/^\//);
-      expect(source).toMatch(
-        new RegExp(`/${skill.name as string}/SKILL\\.md$`),
-      );
+      expect(source.endsWith(`/${skill.name as string}/SKILL.md`)).toBe(true);
       expect(skill).toHaveProperty("is_agentskills_format", true);
       // trigger is either null (always-active) or { type, keywords }
       if (skill.trigger !== null) {
@@ -1578,7 +1576,7 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(payload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/codex-acp@1.1.7",
+      "@agentclientprotocol/codex-acp@1.13.1",
     ]);
   });
 

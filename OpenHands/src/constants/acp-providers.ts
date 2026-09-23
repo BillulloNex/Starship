@@ -263,6 +263,11 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   if (key === "codex") {
     // The upstream SDK registry (codex-acp@1.1.7) only ships GPT-5.x models.
     // Override with the full GPT-6 family (released Sep 2026) + legacy models.
+    default_command = [
+      "npx",
+      "-y",
+      "@agentclientprotocol/codex-acp@1.13.1",
+    ];
     available_models = [
       { id: "gpt-6-astra", label: "GPT-6 Astra" },
       { id: "gpt-6-sol", label: "GPT-6 Sol" },
@@ -637,6 +642,14 @@ export function resolveAcpProviderKey(
     normalizedCommand.includes("opencode-acp-auth-wrapper.sh")
   ) {
     return "opencode";
+  }
+
+  if (
+    normalizedCommand === "codex-acp" ||
+    normalizedCommand.includes("@agentclientprotocol/codex-acp") ||
+    normalizedCommand.includes("@zed-industries/codex-acp")
+  ) {
+    return "codex";
   }
 
   const match = ACP_PROVIDERS.find(

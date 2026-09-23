@@ -525,6 +525,61 @@ def _init_antigravity_acp():
         print(f"[grokbot-sitecustomize] Antigravity ACP patch skipped: {e}", file=sys.stderr, flush=True)
 
 
+def _init_codex_acp():
+    """Ensure OpenHands SDK uses latest @agentclientprotocol/codex-acp with GPT-6 support."""
+    try:
+        import openhands.sdk.settings.acp_providers as acp_providers_mod
+        from openhands.sdk.settings.acp_providers import (
+            ACPModelOption,
+            ACP_PROVIDERS,
+        )
+        from types import MappingProxyType
+        import dataclasses
+
+        if "codex" in ACP_PROVIDERS:
+            codex_models = (
+                ACPModelOption(id="gpt-6-astra", label="GPT-6 Astra"),
+                ACPModelOption(id="gpt-6-sol", label="GPT-6 Sol"),
+                ACPModelOption(id="gpt-6-luna", label="GPT-6 Luna"),
+                ACPModelOption(id="gpt-5.6", label="GPT-5.6"),
+                ACPModelOption(id="gpt-5.6-sol", label="GPT-5.6 Sol"),
+                ACPModelOption(id="gpt-5.6-terra", label="GPT-5.6 Terra"),
+                ACPModelOption(id="gpt-5.6-luna", label="GPT-5.6 Luna"),
+                ACPModelOption(id="gpt-5.5", label="GPT-5.5"),
+                ACPModelOption(id="gpt-5.4", label="GPT-5.4"),
+                ACPModelOption(id="gpt-5.4-mini", label="GPT-5.4 Mini"),
+            )
+            new_dict = dict(acp_providers_mod.ACP_PROVIDERS)
+            orig_codex = new_dict["codex"]
+            updated_cmd = ("npx", "-y", "@agentclientprotocol/codex-acp@1.13.1")
+
+            if dataclasses.is_dataclass(orig_codex):
+                new_dict["codex"] = dataclasses.replace(
+                    orig_codex,
+                    default_command=updated_cmd,
+                    available_models=codex_models,
+                    default_model="gpt-6-sol",
+                )
+            elif hasattr(orig_codex, "model_copy"):
+                new_dict["codex"] = orig_codex.model_copy(
+                    update={
+                        "default_command": updated_cmd,
+                        "available_models": codex_models,
+                        "default_model": "gpt-6-sol",
+                    }
+                )
+            else:
+                setattr(orig_codex, "default_command", updated_cmd)
+                setattr(orig_codex, "available_models", codex_models)
+                setattr(orig_codex, "default_model", "gpt-6-sol")
+                new_dict["codex"] = orig_codex
+
+            acp_providers_mod.ACP_PROVIDERS = MappingProxyType(new_dict)
+            print("[grokbot-sitecustomize] Codex ACP updated to @agentclientprotocol/codex-acp@1.13.1 (GPT-6 enabled)", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"[grokbot-sitecustomize] Codex ACP patch skipped: {e}", file=sys.stderr, flush=True)
+
+
 def _init_cloudflare_ai_gateway():
     """Send cf-aig-gateway-id on Workers AI / AI Gateway LiteLLM calls."""
     try:
@@ -611,6 +666,7 @@ _init_llmobs()
 _init_posthog_logs()
 _init_cloudflare_ai_gateway()
 _init_antigravity_acp()
+_init_codex_acp()
 _init_acp_background_warmup()
 _init_mcp_oauth_public_callback()
 _init_automation_shared_venv()
