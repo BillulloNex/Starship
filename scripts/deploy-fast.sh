@@ -53,7 +53,7 @@ DEPLOY_MARKER="$(git rev-parse --short HEAD)+fast-$(date +%s)"
 
 echo "🚀 Syncing UI and Python code into running container..."
 
-TMP_ARCHIVE=$(mktemp /tmp/deploy-fast.XXXXXX.tar.gz)
+TMP_ARCHIVE=$(mktemp /tmp/deploy-fast.XXXXXX)
 mkdir -p /tmp/deploy-staging/scripts_flat
 cp -a OpenHands/build /tmp/deploy-staging/frontend-new
 cp -a OpenHands/tools /tmp/deploy-staging/tools
@@ -69,26 +69,26 @@ cat "$TMP_ARCHIVE" | ssh -o StrictHostKeyChecking=no "root@${TARGET_HOST}" "
   fi
   if [ -z \"\$CONTAINER_ID\" ]; then exit 1; fi
 
-  docker exec '\${CONTAINER_ID}' rm -rf /tmp/deploy-staging
-  docker exec '\${CONTAINER_ID}' mkdir -p /tmp/deploy-staging
-  docker exec -i '\${CONTAINER_ID}' tar -xzf - -C /tmp/deploy-staging
+  docker exec "\$CONTAINER_ID" rm -rf /tmp/deploy-staging
+  docker exec "\$CONTAINER_ID" mkdir -p /tmp/deploy-staging
+  docker exec -i "\$CONTAINER_ID" tar -xzf - -C /tmp/deploy-staging
 
-  docker exec '\${CONTAINER_ID}' sh -c '
+  docker exec "\$CONTAINER_ID" sh -c '
     rm -rf /opt/agent-canvas/frontend-backup
     cp -a /opt/agent-canvas/frontend /opt/agent-canvas/frontend-backup 2>/dev/null || true
     mv /opt/agent-canvas/frontend /opt/agent-canvas/frontend-old
     mv /tmp/deploy-staging/frontend-new /opt/agent-canvas/frontend
     rm -rf /opt/agent-canvas/frontend-old
-    echo \"${DEPLOY_MARKER}\" > /opt/agent-canvas/frontend/.deploy-sha
+    echo "${DEPLOY_MARKER}" > /opt/agent-canvas/frontend/.deploy-sha
   '
 
-  docker exec '\${CONTAINER_ID}' sh -c '
+  docker exec "\$CONTAINER_ID" sh -c '
     cp -a /tmp/deploy-staging/tools/* /opt/agent-canvas/tools/ 2>/dev/null || true
     cp -a /tmp/deploy-staging/scripts_flat/* /opt/agent-canvas/ 2>/dev/null || true
   '
 
-  echo \"🔄 Bouncing container to restart Python workers...\"
-  docker restart '\${CONTAINER_ID}' > /dev/null
+  echo "🔄 Bouncing container to restart Python workers..."
+  docker restart "\$CONTAINER_ID" > /dev/null
 "
 
 rm "$TMP_ARCHIVE"
