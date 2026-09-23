@@ -131,7 +131,7 @@ export function ChatMessage({
         includeStandard
         includeHeadings
         allowHtml={type !== "user"}
-        components={chatBubbleMarkdownComponents}
+        {...(type === "user" ? { components: chatBubbleMarkdownComponents } : {})}
       >
         {message}
       </MarkdownRenderer>
