@@ -24,6 +24,8 @@ jobs:
               - 'OpenHands/docker/entrypoint.sh'
               - 'patches/**'
               - '.github/workflows/**'
+              - '**/*.py'
+              - 'OpenHands/tools/**'
 
   deploy-fast:
     name: Fast Mode (Hot Swap)

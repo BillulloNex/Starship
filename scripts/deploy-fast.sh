@@ -11,7 +11,10 @@ TARGET_HOST="${STARSHIP_HOST:-100.77.63.10}"
 if [ "${1:-}" = "--rollback" ]; then
   echo "⏪ Rolling back to previous frontend version..."
   ssh -o StrictHostKeyChecking=no "root@${TARGET_HOST}" "
-    CONTAINER_ID=\$(docker ps -q -f name=starship)
+    CONTAINER_ID=\$(docker ps -q -f name=b13aardv73k5fyl01a80ggzc || true)
+    if [ -z \"\$CONTAINER_ID\" ]; then
+      CONTAINER_ID=\$(docker ps -q -f name=starship || true)
+    fi
     if [ -z \"\$CONTAINER_ID\" ]; then exit 1; fi
     docker exec \"\$CONTAINER_ID\" sh -c '
       rm -rf /opt/agent-canvas/frontend-old
@@ -60,7 +63,10 @@ cp -a scripts/* /tmp/deploy-staging/scripts_flat/ 2>/dev/null || true
 tar -czf "$TMP_ARCHIVE" -C /tmp/deploy-staging .
 
 cat "$TMP_ARCHIVE" | ssh -o StrictHostKeyChecking=no "root@${TARGET_HOST}" "
-  CONTAINER_ID=\$(docker ps -q -f name=starship)
+  CONTAINER_ID=\$(docker ps -q -f name=b13aardv73k5fyl01a80ggzc || true)
+  if [ -z \"\$CONTAINER_ID\" ]; then
+    CONTAINER_ID=\$(docker ps -q -f name=starship || true)
+  fi
   if [ -z \"\$CONTAINER_ID\" ]; then exit 1; fi
 
   docker exec '\${CONTAINER_ID}' rm -rf /tmp/deploy-staging
