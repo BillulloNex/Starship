@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Cursor ACP adapter for Starship.
  *
@@ -37,12 +36,24 @@ export function resolveCursorAcpMode(raw = process.env.CURSOR_ACP_MODE) {
   return "print";
 }
 
-export const DEFAULT_CURSOR_ACP_PRINT_IDLE_MS = 300000; // 5 minutes
+export const DEFAULT_CURSOR_ACP_PRINT_IDLE_MS = 0; // Disabled by default (prevents timeout on long builds)
 export const DEFAULT_CURSOR_ACP_PRINT_MAX_MS = 1800000; // 30 minutes
-export const MIN_CURSOR_ACP_PRINT_IDLE_MS = 30000; // 30 seconds
+export const MIN_CURSOR_ACP_PRINT_IDLE_MS = 30000; // 30 seconds if enabled
 
 export function resolvePrintIdleMs(raw = process.env.CURSOR_ACP_PRINT_IDLE_MS) {
+  if (
+    raw === undefined ||
+    raw === "" ||
+    raw === "0" ||
+    raw === "false" ||
+    raw === "disabled"
+  ) {
+    return DEFAULT_CURSOR_ACP_PRINT_IDLE_MS;
+  }
   const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed <= 0) {
+    return 0;
+  }
   if (Number.isFinite(parsed) && parsed >= MIN_CURSOR_ACP_PRINT_IDLE_MS) {
     return Math.floor(parsed);
   }
@@ -54,10 +65,12 @@ export function resolvePrintMaxMs(
   idleMs = resolvePrintIdleMs(),
 ) {
   const parsed = Number(raw);
-  if (Number.isFinite(parsed) && parsed >= idleMs) {
-    return Math.floor(parsed);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    if (idleMs <= 0 || parsed >= idleMs) {
+      return Math.floor(parsed);
+    }
   }
-  return Math.max(DEFAULT_CURSOR_ACP_PRINT_MAX_MS, idleMs);
+  return Math.max(DEFAULT_CURSOR_ACP_PRINT_MAX_MS, idleMs > 0 ? idleMs : 0);
 }
 
 export function sanitizeErrorSnippet(raw, maxLen = 300) {
@@ -82,9 +95,9 @@ export function formatPrintTimeoutError({
   stderrSnippet,
 }) {
   const elapsedSec = (elapsedMs / 1000).toFixed(1);
-  const idleSec = Math.round(idleMs / 1000);
-  const maxSec = Math.round(maxMs / 1000);
-  let msg = `agent -p timed out (${reason}): elapsed=${elapsedSec}s, idleLimit=${idleSec}s, maxLimit=${maxSec}s, stdoutBytes=${stdoutBytes}, stderrBytes=${stderrBytes}`;
+  const idleSec = idleMs > 0 ? `${Math.round(idleMs / 1000)}s` : "disabled";
+  const maxSec = maxMs > 0 ? `${Math.round(maxMs / 1000)}s` : "disabled";
+  let msg = `agent -p timed out (${reason}): elapsed=${elapsedSec}s, idleLimit=${idleSec}, maxLimit=${maxSec}, stdoutBytes=${stdoutBytes}, stderrBytes=${stderrBytes}`;
   if (stderrSnippet) {
     msg += ` | stderr: ${stderrSnippet}`;
   }
@@ -104,10 +117,10 @@ export function evaluatePrintTimeout({
   // Stream-json usually emits a system/init line quickly, then may sit in
   // prefill. Treat a process with zero stdout/stderr as still running until
   // the max ceiling so we do not idle-kill a silent start.
-  if (elapsedMs >= maxMs) {
+  if (maxMs > 0 && elapsedMs >= maxMs) {
     return { timedOut: true, reason: "max", elapsedMs, idleElapsedMs };
   }
-  if (hadActivity && idleElapsedMs >= idleMs) {
+  if (idleMs > 0 && hadActivity && idleElapsedMs >= idleMs) {
     return { timedOut: true, reason: "idle", elapsedMs, idleElapsedMs };
   }
   return { timedOut: false, reason: null, elapsedMs, idleElapsedMs };
@@ -123,6 +136,8 @@ let sessionCwd = "/tmp";
 let currentModel = null;
 let currentMode = "agent";
 let cachedConfigOptions = null;
+let activeCursorSessionId = null;
+const sessionCursorMap = new Map();
 
 export function formatCursorModelId(baseId, params = []) {
   const serialized = params
@@ -409,6 +424,8 @@ async function handleNewSession(id, params) {
   sessionId = crypto.randomUUID();
   sessionCwd = params?.cwd || "/tmp";
   currentMode = params?.modeId || "agent";
+  activeCursorSessionId = null;
+  sessionCursorMap.set(sessionId, null);
   debug(`New session: ${sessionId}, cwd: ${sessionCwd}`);
 
   const configOptions = await fetchModelsFromCursorAPI();
@@ -472,8 +489,10 @@ async function handlePrompt(id, params) {
       userText += block.text;
     }
   }
+  const resumeSessionId =
+    sessionCursorMap.get(sid) || (sid === sessionId ? activeCursorSessionId : null);
   debug(
-    `Prompt (session=${sid}, model=${currentModel || "default"}): ${userText.slice(0, 80)}…`,
+    `Prompt (session=${sid}, resumeCursorSession=${resumeSessionId || "none"}, model=${currentModel || "default"}): ${userText.slice(0, 80)}…`,
   );
 
   sendNotification("session/update", {
@@ -494,13 +513,58 @@ async function handlePrompt(id, params) {
     },
   });
 
+  const recordCursorSession = (cursorSid) => {
+    if (cursorSid) {
+      activeCursorSessionId = cursorSid;
+      if (sid) sessionCursorMap.set(sid, cursorSid);
+    }
+  };
+
   try {
-    const result = await callAgentPrint(userText, sessionCwd, (update) => {
-      sendNotification("session/update", {
-        sessionId: sid,
-        update,
+    let result;
+    try {
+      result = await callAgentPrint({
+        text: userText,
+        cwd: sessionCwd,
+        onUpdate: (update) => {
+          sendNotification("session/update", {
+            sessionId: sid,
+            update,
+          });
+        },
+        resumeSessionId,
+        onSessionId: recordCursorSession,
       });
-    });
+    } catch (err) {
+      if (resumeSessionId) {
+        debug(
+          `agent -p with resumeSessionId=${resumeSessionId} failed: ${err.message}. Retrying without resume...`,
+        );
+        sessionCursorMap.delete(sid);
+        if (activeCursorSessionId === resumeSessionId) {
+          activeCursorSessionId = null;
+        }
+        result = await callAgentPrint({
+          text: userText,
+          cwd: sessionCwd,
+          onUpdate: (update) => {
+            sendNotification("session/update", {
+              sessionId: sid,
+              update,
+            });
+          },
+          resumeSessionId: null,
+          onSessionId: recordCursorSession,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    if (result.sessionId) {
+      recordCursorSession(result.sessionId);
+    }
+
     if (!result.emittedAssistant && result.resultText) {
       sendNotification("session/update", {
         sessionId: sid,
@@ -524,14 +588,40 @@ async function handlePrompt(id, params) {
   }
 }
 
-function callAgentPrint(text, cwd, onUpdate = () => {}) {
+export function callAgentPrint(
+  textOrOptions,
+  cwdArg,
+  onUpdateArg = () => {},
+  resumeSessionIdArg = null,
+  onSessionIdArg = () => {},
+) {
+  let text = "";
+  let cwd = "/tmp";
+  let onUpdate = () => {};
+  let resumeSessionId = null;
+  let onSessionId = () => {};
+
+  if (textOrOptions && typeof textOrOptions === "object") {
+    text = textOrOptions.text || "";
+    cwd = textOrOptions.cwd || sessionCwd;
+    onUpdate = textOrOptions.onUpdate || onUpdate;
+    resumeSessionId = textOrOptions.resumeSessionId || null;
+    onSessionId = textOrOptions.onSessionId || onSessionId;
+  } else {
+    text = String(textOrOptions || "");
+    cwd = cwdArg || sessionCwd;
+    onUpdate = onUpdateArg || onUpdate;
+    resumeSessionId = resumeSessionIdArg || null;
+    onSessionId = onSessionIdArg || onSessionId;
+  }
+
   return new Promise((resolve, reject) => {
     const idleMs = resolvePrintIdleMs();
     const maxMs = resolvePrintMaxMs(undefined, idleMs);
-    const args = [...cursorPrintAgentArgs(currentModel), text];
+    const args = [...cursorPrintAgentArgs(currentModel, resumeSessionId), text];
 
     debug(
-      `Spawning: ${AGENT_BIN} ${args.slice(0, 8).join(" ")}… (idleLimit=${Math.round(idleMs / 1000)}s, maxLimit=${Math.round(maxMs / 1000)}s)`,
+      `Spawning: ${AGENT_BIN} ${args.slice(0, 10).join(" ")}… (idleLimit=${idleMs > 0 ? `${Math.round(idleMs / 1000)}s` : "disabled"}, maxLimit=${Math.round(maxMs / 1000)}s)`,
     );
 
     const proc = child_process.spawn(AGENT_BIN, args, {
@@ -561,6 +651,9 @@ function callAgentPrint(text, cwd, onUpdate = () => {}) {
       lastActivityAt = Date.now();
       stdoutBytes += Buffer.byteLength(line, "utf8") + 1;
       const { updates } = mapCursorStreamJsonLine(line, streamState);
+      if (streamState.sessionId && onSessionId) {
+        onSessionId(streamState.sessionId);
+      }
       for (const update of updates) {
         onUpdate(update);
       }
@@ -634,6 +727,7 @@ function callAgentPrint(text, cwd, onUpdate = () => {}) {
           stderrChars: stderr.length,
           emittedAssistant: streamState.emittedAssistant,
           sawSuccessResult: streamState.sawSuccessResult,
+          sessionId: streamState.sessionId,
         })}`,
       );
       if (code !== 0) {
@@ -652,6 +746,7 @@ function callAgentPrint(text, cwd, onUpdate = () => {}) {
       resolve({
         emittedAssistant: streamState.emittedAssistant,
         resultText: streamState.resultText || "",
+        sessionId: streamState.sessionId,
       });
     });
 
@@ -692,7 +787,11 @@ async function handlePrintModeMessage(msg) {
       sendResult(id, {});
       break;
     case "session/end":
+      if (sessionId) {
+        sessionCursorMap.delete(sessionId);
+      }
       sessionId = null;
+      activeCursorSessionId = null;
       sendResult(id, {});
       break;
     case "notifications/initialized":

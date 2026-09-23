@@ -276,7 +276,7 @@ describe("resolveAccessToken", () => {
       })}\n`,
     );
 
-    const secretPuts = [];
+    const secretPuts: Array<{ name: string; value: string }> = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url, init) => {

@@ -177,6 +177,7 @@ export const useCreateConversation = (options?: {
         // Await the LLM-profile list rather than reading the maybe-unresolved
         // `useLlmProfiles()` result: a send fired before that query loads (or
         // after it errors) must still validate the ref, not launch blind.
+        const targetRef = resolvedAgentProfile.llm_profile_ref;
         let llmProfileExists = false;
         try {
           const llm = await queryClient.ensureQueryData({
@@ -188,7 +189,7 @@ export const useCreateConversation = (options?: {
             retry: false,
           });
           llmProfileExists = llm.profiles.some(
-            (profile) => profile.name === resolvedAgentProfile.llm_profile_ref,
+            (profile) => profile.name === targetRef,
           );
         } catch {
           // List unavailable → can't validate → fall back to agent_settings.

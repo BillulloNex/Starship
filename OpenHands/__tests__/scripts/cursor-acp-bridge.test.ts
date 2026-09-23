@@ -296,20 +296,22 @@ describe("cursor model catalog used by ACP print-mode", () => {
 describe("cursor ACP print timeout & dual-timer configuration", () => {
   it("resolves default idle and max timeout values", () => {
     expect(resolvePrintIdleMs(undefined)).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
-    expect(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS).toBe(300000); // 5 minutes
-    expect(resolvePrintMaxMs(undefined, 300000)).toBe(DEFAULT_CURSOR_ACP_PRINT_MAX_MS);
+    expect(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS).toBe(0); // Disabled by default
+    expect(resolvePrintMaxMs(undefined, 0)).toBe(DEFAULT_CURSOR_ACP_PRINT_MAX_MS);
     expect(DEFAULT_CURSOR_ACP_PRINT_MAX_MS).toBe(1800000); // 30 minutes
   });
 
   it("parses custom numeric strings from env", () => {
     expect(resolvePrintIdleMs("180000")).toBe(180000);
     expect(resolvePrintMaxMs("900000", 180000)).toBe(900000);
+    expect(resolvePrintIdleMs("0")).toBe(0);
+    expect(resolvePrintIdleMs("disabled")).toBe(0);
   });
 
-  it("enforces minimum floor for idle timeout", () => {
+  it("enforces minimum floor for idle timeout when positive", () => {
     expect(resolvePrintIdleMs("1000")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
-    expect(resolvePrintIdleMs("0")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
-    expect(resolvePrintIdleMs("-5000")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
+    expect(resolvePrintIdleMs("0")).toBe(0);
+    expect(resolvePrintIdleMs("-5000")).toBe(0);
     expect(resolvePrintIdleMs("not-a-number")).toBe(DEFAULT_CURSOR_ACP_PRINT_IDLE_MS);
     expect(resolvePrintIdleMs(String(MIN_CURSOR_ACP_PRINT_IDLE_MS))).toBe(30000);
   });
@@ -319,6 +321,7 @@ describe("cursor ACP print timeout & dual-timer configuration", () => {
     expect(resolvePrintMaxMs("200000", idleMs)).toBe(DEFAULT_CURSOR_ACP_PRINT_MAX_MS);
     const hugeIdle = 2000000;
     expect(resolvePrintMaxMs("1000", hugeIdle)).toBe(hugeIdle);
+    expect(resolvePrintMaxMs("900000", 0)).toBe(900000);
   });
 
   it("sanitizes error snippets and truncates to limit", () => {
@@ -363,6 +366,22 @@ describe("cursor ACP print timeout & dual-timer configuration", () => {
 
     expect(msg).toContain("agent -p timed out (max)");
     expect(msg).not.toContain("stderr:");
+  });
+
+  it("formats timeout error messages with disabled idleLimit when idleMs <= 0", () => {
+    const msg = formatPrintTimeoutError({
+      reason: "max",
+      elapsedMs: 1800500,
+      idleMs: 0,
+      maxMs: 1800000,
+      stdoutBytes: 120,
+      stderrBytes: 0,
+      stderrSnippet: "",
+    });
+
+    expect(msg).toContain("agent -p timed out (max)");
+    expect(msg).toContain("idleLimit=disabled");
+    expect(msg).toContain("maxLimit=1800s");
   });
 
   describe("evaluatePrintTimeout timer logic", () => {
@@ -487,6 +506,23 @@ describe("cursor ACP print timeout & dual-timer configuration", () => {
       });
       expect(result.timedOut).toBe(false);
     });
+
+    it("never idle-timeouts when idleMs is 0 (disabled)", () => {
+      const startedAt = 100000;
+      const lastActivityAt = 100000;
+      const now = 1000000; // 900s elapsed and idle
+
+      const result = evaluatePrintTimeout({
+        startedAt,
+        lastActivityAt,
+        now,
+        idleMs: 0,
+        maxMs,
+        hadActivity: true,
+      });
+      expect(result.timedOut).toBe(false);
+      expect(result.reason).toBeNull();
+    });
   });
 });
 
@@ -499,6 +535,23 @@ describe("cursor stream-json to ACP mapper", () => {
       "--output-format",
       "stream-json",
       "--stream-partial-output",
+      "--model",
+      "grok-4.6[fast=true]",
+    ]);
+  });
+
+  it("includes --resume <sessionId> when resumeSessionId is provided", () => {
+    expect(
+      cursorPrintAgentArgs("grok-4.6[fast=true]", "sess-fixture-123"),
+    ).toEqual([
+      "-p",
+      "--trust",
+      "-f",
+      "--output-format",
+      "stream-json",
+      "--stream-partial-output",
+      "--resume",
+      "sess-fixture-123",
       "--model",
       "grok-4.6[fast=true]",
     ]);
@@ -545,6 +598,7 @@ describe("cursor stream-json to ACP mapper", () => {
     expect(state.sawSuccessResult).toBe(true);
     expect(state.isError).toBe(false);
     expect(state.resultText).toBe("I'll read README.mdOK");
+    expect(state.sessionId).toBe("sess-fixture");
 
     expect(updates[3]).toMatchObject({
       sessionUpdate: "tool_call",

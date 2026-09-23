@@ -36,10 +36,11 @@ export function createCursorStreamJsonState() {
     isError: false,
     errorMessage: null,
     resultText: "",
+    sessionId: null,
   };
 }
 
-export function cursorPrintAgentArgs(model) {
+export function cursorPrintAgentArgs(model, resumeSessionId) {
   const args = [
     "-p",
     "--trust",
@@ -48,6 +49,9 @@ export function cursorPrintAgentArgs(model) {
     "stream-json",
     "--stream-partial-output",
   ];
+  if (resumeSessionId) {
+    args.push("--resume", String(resumeSessionId));
+  }
   if (model) args.push("--model", model);
   return args;
 }
@@ -159,6 +163,10 @@ function thinkingText(event) {
 export function mapCursorStreamJsonEvent(event, state) {
   const updates = [];
   if (!event || typeof event !== "object") return { updates };
+
+  if (state && typeof event.session_id === "string" && event.session_id) {
+    state.sessionId = event.session_id;
+  }
 
   const type = event.type;
   if (type === "system" || type === "user") return { updates };
