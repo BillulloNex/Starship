@@ -260,6 +260,24 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
     default_model = "opencode/big-pickle";
   }
 
+  if (key === "codex") {
+    // The upstream SDK registry (codex-acp@1.1.7) only ships GPT-5.x models.
+    // Override with the full GPT-6 family (released Sep 2026) + legacy models.
+    available_models = [
+      { id: "gpt-6-astra", label: "GPT-6 Astra" },
+      { id: "gpt-6-sol", label: "GPT-6 Sol" },
+      { id: "gpt-6-luna", label: "GPT-6 Luna" },
+      { id: "gpt-5.6", label: "GPT-5.6" },
+      { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+      { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+      { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+      { id: "gpt-5.5", label: "GPT-5.5" },
+      { id: "gpt-5.4", label: "GPT-5.4" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+    ];
+    default_model = "gpt-6-sol";
+  }
+
   if (
     key === "claude-code" &&
     default_command.length > 0 &&
