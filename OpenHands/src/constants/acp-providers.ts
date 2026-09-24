@@ -280,7 +280,7 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
       { id: "gpt-5.4", label: "GPT-5.4" },
       { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
     ];
-    default_model = "gpt-6-sol";
+    default_model = "gpt-5.6-sol";
   }
 
   if (

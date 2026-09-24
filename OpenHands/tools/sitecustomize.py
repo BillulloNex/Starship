@@ -558,20 +558,20 @@ def _init_codex_acp():
                     orig_codex,
                     default_command=updated_cmd,
                     available_models=codex_models,
-                    default_model="gpt-6-sol",
+                    default_model="gpt-5.6-sol",
                 )
             elif hasattr(orig_codex, "model_copy"):
                 new_dict["codex"] = orig_codex.model_copy(
                     update={
                         "default_command": updated_cmd,
                         "available_models": codex_models,
-                        "default_model": "gpt-6-sol",
+                        "default_model": "gpt-5.6-sol",
                     }
                 )
             else:
                 setattr(orig_codex, "default_command", updated_cmd)
                 setattr(orig_codex, "available_models", codex_models)
-                setattr(orig_codex, "default_model", "gpt-6-sol")
+                setattr(orig_codex, "default_model", "gpt-5.6-sol")
                 new_dict["codex"] = orig_codex
 
             acp_providers_mod.ACP_PROVIDERS = MappingProxyType(new_dict)
