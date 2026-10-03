@@ -119,7 +119,11 @@ jobs:
 
       - name: Trigger Coolify Deploy via API
         run: |
-          curl -sf -X POST             "${{ secrets.COOLIFY_API_URL }}/api/v1/deploy"             -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"             -H "Content-Type: application/json"             -d '{"uuid": "b13aardv73k5fyl01a80ggzc", "force": false}'
+          curl -sf -X POST \
+            "${{ secrets.COOLIFY_API_URL }}/api/v1/deploy" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"uuid": "dcqx8f8urhiaphkoeeievd23", "force": false}'
 
       - name: Report Deployment to Datadog
         if: success()
