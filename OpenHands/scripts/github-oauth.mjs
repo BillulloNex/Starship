@@ -970,12 +970,20 @@ async function handleEnsureWorkspace(req, res, env) {
   const payload = await readJsonBody(req);
   const fullName = String(payload.full_name ?? payload.repository ?? "").trim();
   const branch = String(payload.branch ?? "").trim();
-  if (!fullName.includes("/")) {
+  const cloneUrl = String(payload.clone_url ?? "").trim();
+
+  // When a custom clone_url is provided (e.g. GitFlare), the name doesn't need
+  // to be in owner/repo format — a bare repo name is fine for path derivation.
+  if (!cloneUrl && !fullName.includes("/")) {
     writeJson(res, 400, { error: "full_name must be owner/repo" });
     return;
   }
+  if (!fullName) {
+    writeJson(res, 400, { error: "full_name is required" });
+    return;
+  }
   const dest = workspacePathForRepo(fullName, env);
-  const token = await resolveAccessToken(env);
+  const token = await resolveAccessToken(env).catch(() => null);
   const gitEnv = token
     ? { GITHUB_TOKEN: token, GIT_TERMINAL_PROMPT: "0" }
     : { GIT_TERMINAL_PROMPT: "0" };
@@ -994,7 +1002,9 @@ async function handleEnsureWorkspace(req, res, env) {
   }
   const args = ["clone", "--depth", "1"];
   if (branch) args.push("--branch", branch, "--single-branch");
-  args.push(`https://github.com/${fullName}.git`, dest);
+  // Use custom clone_url when provided (GitFlare, etc.), otherwise GitHub.
+  const repoUrl = cloneUrl || `https://github.com/${fullName}.git`;
+  args.push(repoUrl, dest);
   await runGit(args, { env: gitEnv });
   writeJson(res, 200, { path: dest, cloned: true, full_name: fullName });
 }

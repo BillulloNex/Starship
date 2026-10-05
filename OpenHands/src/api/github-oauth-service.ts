@@ -134,6 +134,7 @@ class GitHubOAuthService {
   static async ensureWorkspace(
     fullName: string,
     branch?: string,
+    cloneUrl?: string,
   ): Promise<GithubWorkspace> {
     const response = await fetch(githubUrl("/ensure-workspace"), {
       method: "POST",
@@ -144,6 +145,7 @@ class GitHubOAuthService {
       body: JSON.stringify({
         full_name: fullName,
         branch: branch || undefined,
+        clone_url: cloneUrl || undefined,
       }),
     });
     return readJson<GithubWorkspace>(response);

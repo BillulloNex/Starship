@@ -35,6 +35,7 @@ import { OpenLauncherButton } from "./open-launcher-button";
 import { OpenWorkspaceDialog } from "./open-workspace-dialog";
 import { OpenRepositoryDialog } from "./open-repository-dialog";
 import { OpenGitFlareDialog } from "./open-gitflare-dialog";
+import GitFlareService from "#/api/gitflare-service";
 import { HomeGitControlBarPreview } from "./home-git-control-bar-preview";
 import { useOpencodeAcpPrewarm } from "#/hooks/use-opencode-acp-prewarm";
 import GitHubOAuthService from "#/api/github-oauth-service";
@@ -413,11 +414,18 @@ export function HomeChatLauncher() {
                 TOAST_OPTIONS,
               );
               try {
-                // Use ensureWorkspace which can clone any git URL.
-                // The full_name matches the clone path pattern.
+                // Build authenticated clone URL for GitFlare.
+                // GitFlare uses HTTP Basic Auth where password = API key.
+                const apiKey = GitFlareService.getApiKey();
+                const cloneUrlObj = new URL(cloneUrl);
+                cloneUrlObj.username = "gitflare";
+                cloneUrlObj.password = apiKey;
+                const authCloneUrl = cloneUrlObj.toString();
+
                 const workspace = await GitHubOAuthService.ensureWorkspace(
                   repoName,
                   defaultBranch,
+                  authCloneUrl,
                 );
                 toast.dismiss(toastId);
                 const name =
