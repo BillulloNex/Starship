@@ -34,6 +34,7 @@ import { HomeHeaderTitle } from "./home-header/home-header-title";
 import { OpenLauncherButton } from "./open-launcher-button";
 import { OpenWorkspaceDialog } from "./open-workspace-dialog";
 import { OpenRepositoryDialog } from "./open-repository-dialog";
+import { OpenGitFlareDialog } from "./open-gitflare-dialog";
 import { HomeGitControlBarPreview } from "./home-git-control-bar-preview";
 import { useOpencodeAcpPrewarm } from "#/hooks/use-opencode-acp-prewarm";
 import GitHubOAuthService from "#/api/github-oauth-service";
@@ -46,6 +47,7 @@ export function HomeChatLauncher() {
 
   const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
   const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
+  const [isGitFlareDialogOpen, setIsGitFlareDialogOpen] = useState(false);
   const [pendingWorkspace, setPendingWorkspace] =
     useState<LocalWorkspace | null>(null);
   const [pendingRepository, setPendingRepository] =
@@ -311,6 +313,11 @@ export function HomeChatLauncher() {
                 onClick={() => setIsRepoDialogOpen(true)}
                 disabled={isCreating}
               />
+              <OpenLauncherButton
+                kind="gitflare"
+                onClick={() => setIsGitFlareDialogOpen(true)}
+                disabled={isCreating}
+              />
             </>
           )}
           <PluginPickerTrigger
@@ -378,6 +385,67 @@ export function HomeChatLauncher() {
             setPendingProvider(provider ?? repository.git_provider);
             setWorkspaceMode("local_repo");
           })();
+        }}
+      />
+      <OpenGitFlareDialog
+        isOpen={isGitFlareDialogOpen}
+        onClose={() => setIsGitFlareDialogOpen(false)}
+        onConfirm={({ repoName, cloneUrl, defaultBranch }) => {
+          // Build a GitRepository-shaped object so the rest of the flow
+          // (preview bar, handleSubmit) works uniformly.
+          const gitFlareRepo: GitRepository = {
+            id: `gitflare-${repoName}`,
+            full_name: repoName,
+            git_provider: "github" as const, // treated as git-compatible
+            is_public: true,
+          };
+          const branch: Branch = {
+            name: defaultBranch,
+            commit_sha: "",
+            protected: false,
+          };
+
+          if (isLocal) {
+            // In local mode, clone the GitFlare repo into a workspace.
+            void (async () => {
+              const toastId = toast.loading(
+                t(I18nKey.SETTINGS$GITHUB_PREPARING_WORKSPACE),
+                TOAST_OPTIONS,
+              );
+              try {
+                // Use ensureWorkspace which can clone any git URL.
+                // The full_name matches the clone path pattern.
+                const workspace = await GitHubOAuthService.ensureWorkspace(
+                  repoName,
+                  defaultBranch,
+                );
+                toast.dismiss(toastId);
+                const name =
+                  workspace.path.replace(/\/+$/, "").split("/").pop() ||
+                  repoName;
+                setPendingWorkspace({
+                  id: workspace.path,
+                  name,
+                  path: workspace.path,
+                });
+              } catch {
+                toast.dismiss(toastId);
+                // Fallback: set up as remote repo without local clone
+                setPendingWorkspace(null);
+              }
+              setPendingRepository(gitFlareRepo);
+              setPendingBranch(branch);
+              setPendingProvider(null);
+              setWorkspaceMode("local_repo");
+            })();
+          } else {
+            // Cloud mode: pass the repo info for remote sandbox
+            setPendingWorkspace(null);
+            setPendingRepository(gitFlareRepo);
+            setPendingBranch(branch);
+            setPendingProvider(null);
+            setWorkspaceMode("local_repo");
+          }
         }}
       />
 

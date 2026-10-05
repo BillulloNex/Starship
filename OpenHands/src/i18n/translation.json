@@ -25669,6 +25669,21 @@
     "uk": "Відкрити репозиторій",
     "ca": "Obre el repositori"
   },
+  "COMMON$OPEN_GITFLARE_REPOSITORY": {
+    "en": "GitFlare Repo"
+  },
+  "COMMON$GITFLARE_SELECT_REPO": {
+    "en": "Select a GitFlare repository"
+  },
+  "COMMON$GITFLARE_NO_REPOS": {
+    "en": "No GitFlare repositories found"
+  },
+  "COMMON$GITFLARE_LOADING_REPOS": {
+    "en": "Loading GitFlare repositories…"
+  },
+  "COMMON$GITFLARE_ERROR_LOADING": {
+    "en": "Failed to load GitFlare repositories"
+  },
   "COMMON$PULL": {
     "en": "Pull",
     "ja": "プル",
