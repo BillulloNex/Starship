@@ -112,7 +112,8 @@ export function HomeChatLauncher() {
       query: hasAttachments ? undefined : trimmed || undefined,
       entryPoint: "home_chat_launcher",
     };
-    if (isLocal && pendingWorkspace) {
+    if (pendingWorkspace) {
+      // Workspace was pre-created (local repos or GitFlare clones)
       variables = {
         ...variables,
         workingDir: pendingWorkspace.path,
@@ -406,54 +407,46 @@ export function HomeChatLauncher() {
             protected: false,
           };
 
-          if (isLocal) {
-            // In local mode, clone the GitFlare repo into a workspace.
-            void (async () => {
-              const toastId = toast.loading(
-                t(I18nKey.SETTINGS$GITHUB_PREPARING_WORKSPACE),
-                TOAST_OPTIONS,
-              );
-              try {
-                // Build authenticated clone URL for GitFlare.
-                // GitFlare uses HTTP Basic Auth where password = API key.
-                const apiKey = GitFlareService.getApiKey();
-                const cloneUrlObj = new URL(cloneUrl);
-                cloneUrlObj.username = "gitflare";
-                cloneUrlObj.password = apiKey;
-                const authCloneUrl = cloneUrlObj.toString();
+          // Always call ensureWorkspace for GitFlare repos — the repo must
+          // be cloned with GitFlare auth regardless of local/cloud mode.
+          void (async () => {
+            const toastId = toast.loading(
+              t(I18nKey.SETTINGS$GITHUB_PREPARING_WORKSPACE),
+              TOAST_OPTIONS,
+            );
+            try {
+              // Build authenticated clone URL for GitFlare.
+              // GitFlare uses HTTP Basic Auth where password = API key.
+              const apiKey = GitFlareService.getApiKey();
+              const cloneUrlObj = new URL(cloneUrl);
+              cloneUrlObj.username = "gitflare";
+              cloneUrlObj.password = apiKey;
+              const authCloneUrl = cloneUrlObj.toString();
 
-                const workspace = await GitHubOAuthService.ensureWorkspace(
-                  repoName,
-                  defaultBranch,
-                  authCloneUrl,
-                );
-                toast.dismiss(toastId);
-                const name =
-                  workspace.path.replace(/\/+$/, "").split("/").pop() ||
-                  repoName;
-                setPendingWorkspace({
-                  id: workspace.path,
-                  name,
-                  path: workspace.path,
-                });
-              } catch {
-                toast.dismiss(toastId);
-                // Fallback: set up as remote repo without local clone
-                setPendingWorkspace(null);
-              }
-              setPendingRepository(gitFlareRepo);
-              setPendingBranch(branch);
-              setPendingProvider(null);
-              setWorkspaceMode("local_repo");
-            })();
-          } else {
-            // Cloud mode: pass the repo info for remote sandbox
-            setPendingWorkspace(null);
+              const workspace = await GitHubOAuthService.ensureWorkspace(
+                repoName,
+                defaultBranch,
+                authCloneUrl,
+              );
+              toast.dismiss(toastId);
+              const name =
+                workspace.path.replace(/\/+$/, "").split("/").pop() ||
+                repoName;
+              setPendingWorkspace({
+                id: workspace.path,
+                name,
+                path: workspace.path,
+              });
+            } catch {
+              toast.dismiss(toastId);
+              // Fallback: set up as remote repo without local clone
+              setPendingWorkspace(null);
+            }
             setPendingRepository(gitFlareRepo);
             setPendingBranch(branch);
             setPendingProvider(null);
             setWorkspaceMode("local_repo");
-          }
+          })();
         }}
       />
 
