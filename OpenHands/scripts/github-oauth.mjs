@@ -1002,21 +1002,33 @@ async function handleEnsureWorkspace(req, res, env) {
   }
   // Clone: try with branch first, fall back to branchless clone for empty
   // repos or repos where the specified branch doesn't exist yet.
+  // GitFlare (Cloudflare Artifacts) doesn't support shallow clones, so
+  // only use --depth 1 for GitHub repos.
   const repoUrl = cloneUrl || `https://github.com/${fullName}.git`;
+  const shallow = cloneUrl ? [] : ["--depth", "1"];
   let cloned = false;
   if (branch) {
     try {
       await runGit(
-        ["clone", "--depth", "1", "--branch", branch, "--single-branch", repoUrl, dest],
+        ["clone", ...shallow, "--branch", branch, "--single-branch", repoUrl, dest],
         { env: gitEnv },
       );
       cloned = true;
     } catch {
-      // Branch doesn't exist — try without --branch (gets default branch or empty repo)
+      // Branch doesn't exist or shallow not supported — try without --branch
     }
   }
   if (!cloned) {
-    await runGit(["clone", "--depth", "1", repoUrl, dest], { env: gitEnv });
+    try {
+      await runGit(["clone", ...shallow, repoUrl, dest], { env: gitEnv });
+    } catch {
+      // Shallow might have failed — try full clone as last resort
+      if (shallow.length > 0) {
+        await runGit(["clone", repoUrl, dest], { env: gitEnv });
+      } else {
+        throw new Error("Failed to clone repository");
+      }
+    }
   }
   // Check if the repo is truly empty (no commits at all)
   try {
