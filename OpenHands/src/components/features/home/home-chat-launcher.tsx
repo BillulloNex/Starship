@@ -437,10 +437,12 @@ export function HomeChatLauncher() {
                 name,
                 path: workspace.path,
               });
-            } catch {
+            } catch (err: unknown) {
               toast.dismiss(toastId);
-              // Fallback: set up as remote repo without local clone
-              setPendingWorkspace(null);
+              const msg =
+                err instanceof Error ? err.message : "Failed to clone repository";
+              toast.error(msg, TOAST_OPTIONS);
+              return; // Don't create a conversation with no workspace
             }
             setPendingRepository(gitFlareRepo);
             setPendingBranch(branch);

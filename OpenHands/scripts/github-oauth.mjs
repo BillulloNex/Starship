@@ -1000,12 +1000,37 @@ async function handleEnsureWorkspace(req, res, env) {
     writeJson(res, 200, { path: dest, cloned: false, full_name: fullName });
     return;
   }
-  const args = ["clone", "--depth", "1"];
-  if (branch) args.push("--branch", branch, "--single-branch");
-  // Use custom clone_url when provided (GitFlare, etc.), otherwise GitHub.
+  // Clone: try with branch first, fall back to branchless clone for empty
+  // repos or repos where the specified branch doesn't exist yet.
   const repoUrl = cloneUrl || `https://github.com/${fullName}.git`;
-  args.push(repoUrl, dest);
-  await runGit(args, { env: gitEnv });
+  let cloned = false;
+  if (branch) {
+    try {
+      await runGit(
+        ["clone", "--depth", "1", "--branch", branch, "--single-branch", repoUrl, dest],
+        { env: gitEnv },
+      );
+      cloned = true;
+    } catch {
+      // Branch doesn't exist — try without --branch (gets default branch or empty repo)
+    }
+  }
+  if (!cloned) {
+    await runGit(["clone", "--depth", "1", repoUrl, dest], { env: gitEnv });
+  }
+  // Check if the repo is truly empty (no commits at all)
+  try {
+    await runGit(["-C", dest, "rev-parse", "HEAD"], { env: gitEnv });
+  } catch {
+    // Empty repo — clean up and return error
+    const { rmSync } = await import("fs");
+    try { rmSync(dest, { recursive: true, force: true }); } catch {}
+    writeJson(res, 422, {
+      error: "Repository is empty — push some code first",
+      full_name: fullName,
+    });
+    return;
+  }
   writeJson(res, 200, { path: dest, cloned: true, full_name: fullName });
 }
 
