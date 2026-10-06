@@ -7,5 +7,5 @@ export function paragraph({
 }: React.ClassAttributes<HTMLParagraphElement> &
   React.HTMLAttributes<HTMLParagraphElement> &
   ExtraProps) {
-  return <p className="py-1.5 leading-6 first:pt-0 last:pb-0">{children}</p>;
+  return <p className="mb-4 leading-6 first:mt-0 last:mb-0">{children}</p>;
 }
