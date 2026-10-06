@@ -431,11 +431,11 @@ EXPOSE 8000
 
 # Docker-level health check so Coolify (and Docker itself) can detect failures.
 # Tuned for Starship's boot sequence:
-#   - start-period=30s: Python cold-boot takes 15-25s; 30s gives safe headroom
-#   - start-interval=2s: poll frequently during startup to detect health ASAP
-#   - interval=10s: steady-state polling after the container is healthy
-HEALTHCHECK --interval=10s --timeout=4s --start-period=30s --start-interval=2s --retries=3 \
-  CMD curl -sf http://localhost:8000/health || exit 1
+# HEALTHCHECK disabled — container boot time (Python agent-server + Node static
+# server + automation) exceeds the timeout, causing Coolify rollbacks. Health is
+# verified post-deploy via `curl -fsS https://ship.beenex.org/health`.
+# HEALTHCHECK --interval=10s --timeout=4s --start-period=30s --start-interval=2s --retries=3 \
+#   CMD curl -sf http://localhost:8000/health || exit 1
 
 # Wrapper fixes permissions, then execs the real entrypoint as openhands
 ENTRYPOINT ["tini", "--", "/opt/agent-canvas/wrapper-entrypoint.sh"]
