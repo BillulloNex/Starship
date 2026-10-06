@@ -49,6 +49,7 @@ import { handleClaudeUsageProxy } from "./claude-usage-proxy.mjs";
 import { handleCursorApiProxy } from "./cursor-api-proxy.mjs";
 import { handleOpencodeApiProxy } from "./opencode-api-proxy.mjs";
 import { handleCloudflareModelsProxy } from "./cloudflare-models-proxy.mjs";
+import { handleLangfuseProxy } from "./langfuse-proxy.mjs";
 import {
   handleGoogleWorkspaceMcpProxy,
   handleMcpOAuthPublicCallback,
@@ -439,11 +440,9 @@ function makeConfigInjectionScript(
     "VITE_DD_SITE",
     "VITE_DD_APPLICATION_ID",
     "VITE_DD_CLIENT_TOKEN",
-    // Langfuse credentials
+    // Langfuse credentials (secret key stays server-side in langfuse-proxy.mjs)
     "LANGFUSE_PUBLIC_KEY",
     "VITE_LANGFUSE_PUBLIC_KEY",
-    "LANGFUSE_SECRET_KEY",
-    "VITE_LANGFUSE_SECRET_KEY",
     "LANGFUSE_BASE_URL",
     "VITE_LANGFUSE_BASE_URL",
   ];
@@ -1226,6 +1225,17 @@ export function startStaticServer(config) {
           }
         },
       );
+      return;
+    }
+
+    if (parsedUrl.pathname.startsWith("/api/observability/langfuse")) {
+      handleLangfuseProxy(req, res, parsedUrl.pathname).catch((err) => {
+        console.error("Langfuse proxy error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
       return;
     }
 

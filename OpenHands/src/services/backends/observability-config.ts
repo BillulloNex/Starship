@@ -72,9 +72,9 @@ export const RAINDROP_BASE_URL = getConfig(
 );
 
 // ─── Langfuse ─────────────────────────────────────────────────────────────
+// NOTE: Secret key is NOT exposed client-side. It lives only in the backend
+// proxy (scripts/langfuse-proxy.mjs) which handles server-side auth.
 export const LANGFUSE_PUBLIC_KEY =
   getConfig("LANGFUSE_PUBLIC_KEY") || getConfig("VITE_LANGFUSE_PUBLIC_KEY");
-export const LANGFUSE_SECRET_KEY =
-  getConfig("LANGFUSE_SECRET_KEY") || getConfig("VITE_LANGFUSE_SECRET_KEY");
 export const LANGFUSE_BASE_URL =
   getConfig("LANGFUSE_BASE_URL") || getConfig("VITE_LANGFUSE_BASE_URL");

@@ -3,15 +3,17 @@ import { displayWarningToast } from "#/utils/custom-toast-handlers";
 
 import {
   LANGFUSE_PUBLIC_KEY,
-  LANGFUSE_SECRET_KEY,
   LANGFUSE_BASE_URL,
 } from "./backends/observability-config";
 
 // Keys resolve in order: window.__OBSERVABILITY_CONFIG__ (runtime) -> import.meta.env (build-time).
 // When unset, browser-side tracing disables itself; the server-side OTEL path
 // (docker/entrypoint.sh) still traces all models.
+//
+// NOTE: The secret key is NOT available client-side. All OTLP spans are sent
+// via the same-origin backend proxy at /api/observability/langfuse/otel which
+// handles auth server-side. This eliminates CORS issues and keeps secrets safe.
 const publicKey = LANGFUSE_PUBLIC_KEY || undefined;
-const secretKey = LANGFUSE_SECRET_KEY || undefined;
 const baseUrl = LANGFUSE_BASE_URL || undefined;
 
 let langfuseInstance: Langfuse | null = null;
@@ -52,7 +54,6 @@ export function getLangfuseClient(): Langfuse | null {
     try {
       langfuseInstance = new Langfuse({
         publicKey,
-        secretKey,
         baseUrl,
         flushAt: 1, // Flush telemetry fast for real-time responsiveness
       });
@@ -156,11 +157,7 @@ async function sendOtlpSpans(
     attributes: OtlpAttribute[];
   }>,
 ): Promise<boolean> {
-  const host = getLangfuseBaseUrl();
-  if (!host || !publicKey) return false;
-
-  const authVal = secretKey ? `${publicKey}:${secretKey}` : `${publicKey}:`;
-  const basicAuth = btoa(authVal);
+  if (!isLangfuseEnabled()) return false;
 
   const body = {
     resourceSpans: [
@@ -199,14 +196,13 @@ async function sendOtlpSpans(
   };
 
   try {
+    // Send to same-origin backend proxy — no CORS, no client-side secrets.
+    // The proxy at /api/observability/langfuse/otel forwards to Langfuse
+    // with proper server-side Basic Auth.
     // eslint-disable-next-line local/no-direct-agent-server-fetch
-    const res = await fetch(`${host}/api/public/otel/v1/traces`, {
+    const res = await fetch("/api/observability/langfuse/otel", {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "Content-Type": "application/json",
-        "x-langfuse-ingestion-version": "4",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     return res.ok;
@@ -414,35 +410,6 @@ export function recordStatsGeneration({
   ]).catch((err) => {
     warnLangfuseFailure("sendOtlpSpans (recordStatsGeneration)", err);
   });
-
-  // Legacy client fallback (if dual write is enabled on server)
-  try {
-    const client = getLangfuseClient();
-    if (client) {
-      const legacyTrace = client.trace({
-        id: `${conversationId}-stats-${generationId || Date.now()}`,
-        sessionId: conversationId,
-        name: "Agent Stats Update",
-      });
-      legacyTrace.generation({
-        name: "LLM Generation",
-        model: modelName,
-        input: input ? [{ role: "user", content: input }] : undefined,
-        output: output ? [{ role: "assistant", content: output }] : undefined,
-        usage:
-          usageAvailable === false
-            ? undefined
-            : {
-                promptTokens,
-                completionTokens,
-                totalTokens: promptTokens + completionTokens,
-              },
-      });
-      client.flushAsync().catch(() => {});
-    }
-  } catch {
-    // Non-fatal legacy attempt
-  }
 }
 
 // ---------------------------------------------------------------------------
