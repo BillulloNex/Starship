@@ -4,8 +4,9 @@ This file is the index of durable rules for any agent (human or AI) working in t
 
 ## Agent Permissions & Direct Pushes (MANDATORY)
 
-- **Close finished work by bumping, committing, and pushing.** When requested implementation is done (code + tests + lint/typecheck as required), bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`), commit the work, and push to GitHub — including `main`. That is the default end of the task. Do not stop at "say if you want this committed."
-- Agents are fully authorized to push directly to `main`. Creating a PR is optional, not a substitute for shipping when the work belongs on `main`.
+- **Close finished work by bumping, committing, and pushing through GitFlare.** When requested implementation is done (code + tests + lint/typecheck as required), bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`), commit the work, and push through the GitFlare merge queue. That is the default end of the task. Do not stop at "say if you want this committed."
+- **GitFlare is the primary source of version control and CI/CD.** All deployments flow through GitFlare's merge queue → CI → Coolify. See "Deployment Workflow" below.
+- **GitHub is a backup mirror only.** After pushing to GitFlare, also push to GitHub (`git push origin main`) to keep the mirror in sync. GitHub does NOT trigger deployments.
 - This close-the-work rule is the repo default and supersedes generic "ask before commit/push" habits.
 - **Every push must include a version bump.** See Grokbot Versioning.
 
@@ -15,7 +16,7 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 
 - **Single source of truth:** `VERSION` at repo root.
 - **Mirrored in code:** `OpenHands/src/constants/grokbot-version.ts` (`GROKBOT_VERSION`) — must stay in sync with `VERSION`. The sidebar badge next to the logo reads from this constant.
-- **Every commit pushed to GitHub MUST bump the version.** CI (`version-guard.yml`) fails if `VERSION` is unchanged vs `main` or is not a valid semver increment, or if the TS file is out of sync.
+- **Every commit pushed MUST bump the version.** GitFlare CI validates this during the merge queue.
 - **How to bump:**
   ```bash
   node scripts/bump-version.mjs patch  # (fixes, small tweaks, config changes)
@@ -39,30 +40,83 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 - `scripts/deploy-frontend.sh` builds the Vite SPA and deploys it to Cloudflare Pages (legacy fallback only).
 - `OpenHands/config/defaults.json` holds version pins; `OpenHands/package.json` is the upstream npm version — do not confuse with Grokbot's `VERSION`.
 
-## Deployment Workflow (CRITICAL — Dual-Mode)
+## Deployment Workflow (CRITICAL — GitFlare Primary)
 
 Starship uses a **unified deployment**: the Docker container serves both the frontend
 (via `scripts/static-server.mjs` on port 8000) and the backend (agent-server on 18000,
 automation on 18001). The static server injects the session API key, proxies API calls,
 and handles WebSockets — all on a single origin.
 
-There are **two deployment modes**. Agents MUST choose the correct one:
+**GitFlare** (`git.beenex.company`) is the primary CI/CD pipeline. GitHub is a mirror only.
 
-### Normal Mode (Full CI/CD — 90-120s)
+### GitFlare Merge Queue (Primary — All Deployments)
 
-**Use when**: Dockerfile, Python, entrypoint, `package-lock.json`, patches, `.py` files,
-CI workflows, system scripts, or npm dependencies have changed.
+All code ships through GitFlare's merge queue:
 
-- **Pushing or merging to `main` runs `.github/workflows/deploy.yml`**, which builds
-  the Docker image on a 4vCPU Blacksmith runner and triggers Coolify deployment.
-- **NEVER call the manual Coolify `deploy` tool after pushing to `main`.**
-- **How to verify deployment:**
-  1. Commit and push to `main`.
-  2. Use `list_deployments` or `deployment(action: "get")` to watch the build.
-  3. Verify health: `curl -fsS https://ship.beenex.org/health`.
-  4. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`.
-- **MANDATORY: Always monitor deployments to completion.** The definition of
-  "deployed" is a `finished` status AND a passing health check.
+```
+1. Commit locally → 2. Create ticket → 3. Push to ticket branch
+→ 4. Mark "review" → 5. CI runs (lint/test/build) → 6. Auto-merge to main → 7. Auto-deploy to Coolify
+```
+
+**Step-by-step for agents:**
+
+```bash
+# 1. Bump version + commit
+node scripts/bump-version.mjs patch
+git add -A && git commit -m "fix: description"
+
+# 2. Create a merge queue ticket
+curl -s -X POST https://git.beenex.company/api/repos/starship/tickets \
+  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "fix: description", "agent_id": "antigravity"}' | python3 -m json.tool
+# → Returns: { "id": "<ticket-id>", "branch": "agent/antigravity/<short-id>", ... }
+
+# 3. Push commits to the assigned branch
+git push gitflare main:agent/antigravity/<short-id>
+
+# 4. Set commit SHA + mark for review
+COMMIT_SHA=$(git rev-parse HEAD)
+curl -s -X PATCH https://git.beenex.company/api/repos/starship/tickets/<ticket-id> \
+  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
+  -H "Content-Type: application/json" \
+  -d "{\"commit_sha\": \"$COMMIT_SHA\"}"
+curl -s -X PATCH https://git.beenex.company/api/repos/starship/tickets/<ticket-id> \
+  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "review"}'
+
+# 5. (Optional) Trigger CI manually if not auto-triggered
+curl -s -X POST https://git.beenex.company/api/repos/starship/ci/trigger \
+  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
+  -H "Content-Type: application/json" \
+  -d '{"branch": "agent/antigravity/<short-id>"}'
+
+# 6. Mirror to GitHub (backup only — does NOT deploy)
+git push origin main
+```
+
+**How to verify deployment:**
+1. Check CI status: `curl -s https://git.beenex.company/api/repos/starship/ci/runs -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417"`
+2. Check ticket status: `curl -s https://git.beenex.company/api/repos/starship/tickets/<ticket-id> -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417"`
+3. Verify health: `curl -fsS https://ship.beenex.org/health`
+4. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`
+
+**MANDATORY: Always monitor deployments to completion.** The definition of
+"deployed" is a CI pass, merge to main, Coolify `finished` status, AND a passing health check.
+
+### GitFlare Credentials
+
+| Key | Value | Purpose |
+|-----|-------|---------|
+| Admin API Key | `gf_7e18ff751ddd4a63a5ab777f9093b417` | Full admin access |
+| Push API Key | `gf_2d61a2e4d93146d685637f55e8b691ac` | Write access |
+| Git Remote | `gitflare` (pre-configured) | `git push gitflare ...` |
+| Dashboard | `https://git.beenex.company/` | Web UI |
+| API | `https://git.beenex.company/api/` | REST API |
+| Starship Repo ID | `9234778a-dcdb-4984-96b1-4e475d742ff8` | D1 record |
+| Coolify App UUID | `b13aardv73k5fyl01a80ggzc` | Starship on Coolify |
+| Deploy Target | `production-lenovo` (`8f6c9b36-...`) | Coolify → Lenovo |
 
 ### Fast Mode (In-Place Frontend Sync — 7-10s)
 
@@ -79,11 +133,6 @@ static assets, or frontend TypeScript in `OpenHands/src/` have changed. Nothing 
   Fast Mode refuses to run and tells you to use Normal Mode instead.
 - **Rollback**: The previous frontend is backed up inside the container. Run
   `./scripts/deploy-fast.sh --rollback` to restore it in under 1 second.
-- **Audit trail**: A `.deploy-sha` marker (`<commit>+fast-<timestamp>`) is written
-  into the container at `/opt/agent-canvas/frontend/.deploy-sha`.
-- **Prerequisite**: `OpenHands/.env.production.local` must exist with Vite telemetry
-  keys (it is gitignored). Without it, the build succeeds but observability keys
-  won't be embedded.
 - **AI agents inside the container cannot use Fast Mode** because it requires SSH
   back to the host. Agents running inside the container must use Normal Mode.
 
@@ -94,15 +143,15 @@ static assets, or frontend TypeScript in `OpenHands/src/` have changed. Nothing 
 | `OpenHands/src/**` (React, CSS, hooks) | Fast Mode | `./scripts/deploy-fast.sh` |
 | `OpenHands/public/**` (images, fonts) | Fast Mode | `./scripts/deploy-fast.sh` |
 | `OpenHands/tailwind.config.*` | Fast Mode | `./scripts/deploy-fast.sh` |
-| `Dockerfile` | Normal Mode | `git push origin main` |
-| `OpenHands/docker/entrypoint.sh` | Normal Mode | `git push origin main` |
-| `wrapper-entrypoint.sh` | Normal Mode | `git push origin main` |
-| Any `.py` file | Normal Mode | `git push origin main` |
-| `OpenHands/package.json` or `package-lock.json` | Normal Mode | `git push origin main` |
-| `patches/**` | Normal Mode | `git push origin main` |
-| `OpenHands/scripts/static-server.mjs` | Normal Mode | `git push origin main` |
-| `.github/workflows/**` | Normal Mode | `git push origin main` |
-| Mixed frontend + backend | Normal Mode | `git push origin main` |
+| `Dockerfile` | Normal Mode (GitFlare) | GitFlare merge queue (see above) |
+| `OpenHands/docker/entrypoint.sh` | Normal Mode (GitFlare) | GitFlare merge queue |
+| `wrapper-entrypoint.sh` | Normal Mode (GitFlare) | GitFlare merge queue |
+| Any `.py` file | Normal Mode (GitFlare) | GitFlare merge queue |
+| `OpenHands/package.json` or `package-lock.json` | Normal Mode (GitFlare) | GitFlare merge queue |
+| `patches/**` | Normal Mode (GitFlare) | GitFlare merge queue |
+| `OpenHands/scripts/static-server.mjs` | Normal Mode (GitFlare) | GitFlare merge queue |
+| `OpenHands/scripts/*.mjs` (proxy modules) | Normal Mode (GitFlare) | GitFlare merge queue |
+| Mixed frontend + backend | Normal Mode (GitFlare) | GitFlare merge queue |
 
 ### Primary URL: `https://ship.beenex.org`
 
