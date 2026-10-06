@@ -4,8 +4,8 @@ This file is the index of durable rules for any agent (human or AI) working in t
 
 ## Agent Permissions & Direct Pushes (MANDATORY)
 
-- **Close finished work by bumping, committing, and pushing through GitFlare.** When requested implementation is done (code + tests + lint/typecheck as required), bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`), commit the work, and push through the GitFlare merge queue. That is the default end of the task. Do not stop at "say if you want this committed."
-- **GitFlare is the primary source of version control and CI/CD.** All deployments flow through GitFlare's merge queue → CI → Coolify. See "Deployment Workflow" below.
+- **Close finished work by bumping, committing, and pushing directly to GitFlare main.** When requested implementation is done (code + tests + lint/typecheck as required), bump the Grokbot version (`node scripts/bump-version.mjs patch|minor|major`), commit the work, and push directly to `gitflare main`. That is the default end of the task. Do not stop at "say if you want this committed."
+- **GitFlare is the primary source of version control and CI/CD.** All deployments flow through direct pushes to GitFlare main → CI → Coolify. See "Deployment Workflow" below.
 - **GitHub is a backup mirror only.** After pushing to GitFlare, also push to GitHub (`git push origin main`) to keep the mirror in sync. GitHub does NOT trigger deployments.
 - This close-the-work rule is the repo default and supersedes generic "ask before commit/push" habits.
 - **Every push must include a version bump.** See Grokbot Versioning.
@@ -16,7 +16,7 @@ Grokbot has its own semver `x.y.z` independent of the upstream OpenHands agent-c
 
 - **Single source of truth:** `VERSION` at repo root.
 - **Mirrored in code:** `OpenHands/src/constants/grokbot-version.ts` (`GROKBOT_VERSION`) — must stay in sync with `VERSION`. The sidebar badge next to the logo reads from this constant.
-- **Every commit pushed MUST bump the version.** GitFlare CI validates this during the merge queue.
+- **Every commit pushed MUST bump the version.** GitFlare CI validates this.
 - **How to bump:**
   ```bash
   node scripts/bump-version.mjs patch  # (fixes, small tweaks, config changes)
@@ -49,13 +49,12 @@ and handles WebSockets — all on a single origin.
 
 **GitFlare** (`git.beenex.company`) is the primary CI/CD pipeline. GitHub is a mirror only.
 
-### GitFlare Merge Queue (Primary — All Deployments)
+### GitFlare Direct Push (Primary — All Deployments)
 
-All code ships through GitFlare's merge queue:
+All code ships by pushing directly to `main` on GitFlare:
 
 ```
-1. Commit locally → 2. Create ticket → 3. Push to ticket branch
-→ 4. Mark "review" → 5. CI runs (lint/test/build) → 6. Auto-merge to main → 7. Auto-deploy to Coolify
+1. Commit locally → 2. Push to gitflare main → 3. CI runs → 4. Auto-deploy to Coolify
 ```
 
 **Step-by-step for agents:**
@@ -65,45 +64,20 @@ All code ships through GitFlare's merge queue:
 node scripts/bump-version.mjs patch
 git add -A && git commit -m "fix: description"
 
-# 2. Create a merge queue ticket
-curl -s -X POST https://git.beenex.company/api/repos/starship/tickets \
-  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "fix: description", "agent_id": "antigravity"}' | python3 -m json.tool
-# → Returns: { "id": "<ticket-id>", "branch": "agent/antigravity/<short-id>", ... }
+# 2. Push directly to gitflare main
+git push gitflare main
 
-# 3. Push commits to the assigned branch
-git push gitflare main:agent/antigravity/<short-id>
-
-# 4. Set commit SHA + mark for review
-COMMIT_SHA=$(git rev-parse HEAD)
-curl -s -X PATCH https://git.beenex.company/api/repos/starship/tickets/<ticket-id> \
-  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
-  -H "Content-Type: application/json" \
-  -d "{\"commit_sha\": \"$COMMIT_SHA\"}"
-curl -s -X PATCH https://git.beenex.company/api/repos/starship/tickets/<ticket-id> \
-  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "review"}'
-
-# 5. (Optional) Trigger CI manually if not auto-triggered
-curl -s -X POST https://git.beenex.company/api/repos/starship/ci/trigger \
-  -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417" \
-  -H "Content-Type: application/json" \
-  -d '{"branch": "agent/antigravity/<short-id>"}'
-
-# 6. Mirror to GitHub (backup only — does NOT deploy)
+# 3. Mirror to GitHub (backup only — does NOT deploy)
 git push origin main
 ```
 
 **How to verify deployment:**
 1. Check CI status: `curl -s https://git.beenex.company/api/repos/starship/ci/runs -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417"`
-2. Check ticket status: `curl -s https://git.beenex.company/api/repos/starship/tickets/<ticket-id> -H "Authorization: Bearer gf_7e18ff751ddd4a63a5ab777f9093b417"`
-3. Verify health: `curl -fsS https://ship.beenex.org/health`
-4. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`
+2. Verify health: `curl -fsS https://ship.beenex.org/health`
+3. Verify automation: `curl -fsS https://ship.beenex.org/api/automation/health`
 
 **MANDATORY: Always monitor deployments to completion.** The definition of
-"deployed" is a CI pass, merge to main, Coolify `finished` status, AND a passing health check.
+"deployed" is a CI pass, Coolify `finished` status, AND a passing health check.
 
 ### GitFlare Credentials
 
@@ -143,15 +117,15 @@ static assets, or frontend TypeScript in `OpenHands/src/` have changed. Nothing 
 | `OpenHands/src/**` (React, CSS, hooks) | Fast Mode | `./scripts/deploy-fast.sh` |
 | `OpenHands/public/**` (images, fonts) | Fast Mode | `./scripts/deploy-fast.sh` |
 | `OpenHands/tailwind.config.*` | Fast Mode | `./scripts/deploy-fast.sh` |
-| `Dockerfile` | Normal Mode (GitFlare) | GitFlare merge queue (see above) |
-| `OpenHands/docker/entrypoint.sh` | Normal Mode (GitFlare) | GitFlare merge queue |
-| `wrapper-entrypoint.sh` | Normal Mode (GitFlare) | GitFlare merge queue |
-| Any `.py` file | Normal Mode (GitFlare) | GitFlare merge queue |
-| `OpenHands/package.json` or `package-lock.json` | Normal Mode (GitFlare) | GitFlare merge queue |
-| `patches/**` | Normal Mode (GitFlare) | GitFlare merge queue |
-| `OpenHands/scripts/static-server.mjs` | Normal Mode (GitFlare) | GitFlare merge queue |
-| `OpenHands/scripts/*.mjs` (proxy modules) | Normal Mode (GitFlare) | GitFlare merge queue |
-| Mixed frontend + backend | Normal Mode (GitFlare) | GitFlare merge queue |
+| `Dockerfile` | Normal Mode (GitFlare) | `git push gitflare main` |
+| `OpenHands/docker/entrypoint.sh` | Normal Mode (GitFlare) | `git push gitflare main` |
+| `wrapper-entrypoint.sh` | Normal Mode (GitFlare) | `git push gitflare main` |
+| Any `.py` file | Normal Mode (GitFlare) | `git push gitflare main` |
+| `OpenHands/package.json` or `package-lock.json` | Normal Mode (GitFlare) | `git push gitflare main` |
+| `patches/**` | Normal Mode (GitFlare) | `git push gitflare main` |
+| `OpenHands/scripts/static-server.mjs` | Normal Mode (GitFlare) | `git push gitflare main` |
+| `OpenHands/scripts/*.mjs` (proxy modules) | Normal Mode (GitFlare) | `git push gitflare main` |
+| Mixed frontend + backend | Normal Mode (GitFlare) | `git push gitflare main` |
 
 ### Primary URL: `https://ship.beenex.org`
 
