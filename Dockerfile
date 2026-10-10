@@ -16,7 +16,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ── Stage 1: Build frontend ──────────────────────────────────────────────────
-FROM node:22-slim AS frontend-build
+FROM node:24-slim AS frontend-build
 
 WORKDIR /build
 
@@ -137,7 +137,7 @@ RUN printf '%s\n' \
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
 # This avoids needing jq/python at container runtime to parse the JSON.
-FROM node:22-slim AS config-gen
+FROM node:24-slim AS config-gen
 COPY OpenHands/config/defaults.json /tmp/
 RUN node -e " \
   const c = JSON.parse(require('fs').readFileSync('/tmp/defaults.json','utf-8')); \
@@ -172,11 +172,10 @@ ENV AGENT_CANVAS_BASE_PATH=${VITE_BASE_PATH}
 
 USER root
 
-# The frontend already supports stdio MCP servers, but JavaScript-based servers
-# need node/npm/npx in the production image so the agent-server can spawn them.
-# Reuse the pinned Node build stage instead of installing from an external APT
-# repository or relying on the agent-server base image to provide Node.js.
-COPY --from=frontend-build /usr/local /usr/local
+# The agent-server base image (1.40.1-python) already ships Node 22 + npm.
+# DO NOT overlay a different Node build via COPY --from — it corrupts npm's
+# internal class hierarchy and causes "Class extends value undefined" crashes
+# in every npx-based MCP server.  Just verify the existing install works.
 RUN node --version && npm --version && npx --version
 
 # Install system deps required by automation and headless Chromium
