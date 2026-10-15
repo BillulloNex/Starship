@@ -104,6 +104,16 @@ function serialize(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
+// Rough average for English text and code; only used when a provider
+// (Cursor ACP) reports no usage, so the estimate misses hidden reasoning,
+// tool calls, and the provider's own system prompt.
+const ESTIMATED_CHARS_PER_TOKEN = 4;
+
+function estimateTokens(value: unknown): number {
+  if (value === undefined || value === null) return 0;
+  return Math.ceil(serialize(value).length / ESTIMATED_CHARS_PER_TOKEN);
+}
+
 interface OtlpAttribute {
   key: string;
   value: Record<string, unknown>;
@@ -390,6 +400,22 @@ export function recordStatsGeneration({
     attributes.push(
       str("langfuse.observation.usage_details", JSON.stringify(usageDetails)),
     );
+  } else {
+    const estimatedInput = estimateTokens(input);
+    const estimatedOutput = estimateTokens(output);
+    if (estimatedInput || estimatedOutput) {
+      attributes.push(
+        str(
+          "langfuse.observation.usage_details",
+          JSON.stringify({
+            input: estimatedInput,
+            output: estimatedOutput,
+            total: estimatedInput + estimatedOutput,
+          }),
+        ),
+        str("langfuse.observation.metadata.usageEstimated", "true"),
+      );
+    }
   }
 
   if (costAvailable !== false && turn.cost > 0) {

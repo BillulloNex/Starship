@@ -178,6 +178,30 @@ describe("langfuse-service v4 OTLP export", () => {
     expect(a).not.toHaveProperty("langfuse.observation.cost_details");
   });
 
+  it("estimates per-turn usage from text when the provider did not report it", () => {
+    const turn = {
+      conversationId: "conv-cursor",
+      modelName: "grok-4.6",
+      accumulatedCost: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      usageAvailable: false,
+      costAvailable: false,
+      input: "x".repeat(40),
+      output: "y".repeat(80),
+    };
+    recordStatsGeneration(turn);
+    recordStatsGeneration(turn);
+
+    for (const a of sentSpans().map(attrs)) {
+      expect(
+        JSON.parse(a["langfuse.observation.usage_details"] as string),
+      ).toEqual({ input: 10, output: 20, total: 30 });
+      expect(a["langfuse.observation.metadata.usageEstimated"]).toBe("true");
+      expect(a).not.toHaveProperty("langfuse.observation.cost_details");
+    }
+  });
+
   it("exports failed tool calls with ERROR level, status_message, and OTLP error status", () => {
     recordMcpToolCall({
       conversationId: "conv-3",
