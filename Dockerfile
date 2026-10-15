@@ -340,6 +340,7 @@ COPY OpenHands/scripts/codex-usage-proxy.mjs /opt/agent-canvas/codex-usage-proxy
 COPY OpenHands/scripts/claude-usage-proxy.mjs /opt/agent-canvas/claude-usage-proxy.mjs
 COPY OpenHands/scripts/cursor-api-proxy.mjs /opt/agent-canvas/cursor-api-proxy.mjs
 COPY OpenHands/scripts/cloudflare-models-proxy.mjs /opt/agent-canvas/cloudflare-models-proxy.mjs
+COPY OpenHands/scripts/langfuse-proxy.mjs /opt/agent-canvas/langfuse-proxy.mjs
 COPY OpenHands/scripts/opencode-api-proxy.mjs /opt/agent-canvas/opencode-api-proxy.mjs
 COPY OpenHands/scripts/telegram-bridge.mjs /opt/agent-canvas/telegram-bridge.mjs
 COPY OpenHands/scripts/preview-proxy.mjs /opt/agent-canvas/preview-proxy.mjs
@@ -376,6 +377,12 @@ COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_mod
 COPY --from=frontend-build /build/node_modules/mrmime /opt/agent-canvas/node_modules/mrmime
 COPY --from=frontend-build /build/node_modules/totalist /opt/agent-canvas/node_modules/totalist
 COPY --from=frontend-build /build/node_modules/ws /opt/agent-canvas/node_modules/ws
+# Fail the build if static-server.mjs imports a local module that was not
+# copied above — a missing one crash-loops the container on boot.
+RUN cd /opt/agent-canvas && \
+    for m in $(grep -oE 'from "\./[^"]+\.mjs"' static-server.mjs | sed -E 's/from "\.\/(.*)"/\1/'); do \
+      [ -f "$m" ] || { echo "static-server.mjs imports missing module: $m" >&2; exit 1; }; \
+    done
 RUN cd /opt/agent-canvas && \
     node -e "import('./workbench-terminal.mjs').then(() => console.log('workbench-terminal ok'))" && \
     python3 -m py_compile workbench-pty-bridge.py
