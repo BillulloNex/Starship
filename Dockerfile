@@ -428,13 +428,14 @@ VOLUME ["/home/openhands/.openhands", "/projects"]
 # Port 8000 is the unified entry point.
 EXPOSE 8000
 
-# Docker-level health check so Coolify (and Docker itself) can detect failures.
-# Tuned for Starship's boot sequence:
-# HEALTHCHECK disabled — container boot time (Python agent-server + Node static
-# server + automation) exceeds the timeout, causing Coolify rollbacks. Health is
-# verified post-deploy via `curl -fsS https://ship.beenex.org/health`.
-# HEALTHCHECK --interval=10s --timeout=4s --start-period=30s --start-interval=2s --retries=3 \
-#   CMD curl -sf http://localhost:8000/health || exit 1
+# No Docker-level health check. Container boot (Python agent-server + Node
+# static server + automation) outran the old probe's timeout and caused Coolify
+# rollbacks. Health is verified post-deploy via Coolify status.
+#
+# Do NOT write the Docker health-check instruction keyword anywhere in this
+# file, not even in a comment: Coolify substring-matches it, sets
+# custom_healthcheck_found, then fails the rolling update because the container
+# has no .State.Health ("map has no entry for key Health").
 
 # Wrapper fixes permissions, then execs the real entrypoint as openhands
 ENTRYPOINT ["tini", "--", "/opt/agent-canvas/wrapper-entrypoint.sh"]
