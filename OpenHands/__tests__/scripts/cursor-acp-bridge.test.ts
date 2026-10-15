@@ -1,9 +1,12 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  buildCursorPrintPrompt,
   buildModelConfigOptions,
+  cursorAgentCapabilities,
   cursorExtensionAutoResult,
   formatCursorModelId,
   isCursorExtensionRequest,
@@ -193,6 +196,92 @@ describe("cursor ACP schema adapter", () => {
         "composer-2.5[fast=true]",
       ],
     );
+  });
+});
+
+const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+describe("cursor print prompt images", () => {
+  it("advertises image prompts", () => {
+    expect(cursorAgentCapabilities().promptCapabilities.image).toBe(true);
+  });
+
+  it("passes headless --image paths after the model", () => {
+    expect(
+      cursorPrintAgentArgs("grok-4.6[fast=true]", "sess-1", [
+        "/tmp/shot.png",
+        "/tmp/other.jpg",
+      ]),
+    ).toEqual([
+      "-p",
+      "--trust",
+      "-f",
+      "--output-format",
+      "stream-json",
+      "--stream-partial-output",
+      "--resume",
+      "sess-1",
+      "--model",
+      "grok-4.6[fast=true]",
+      "--image",
+      "/tmp/shot.png",
+      "--image",
+      "/tmp/other.jpg",
+    ]);
+  });
+
+  it("writes ACP image blocks to files and keeps the user text", async () => {
+    const built = await buildCursorPrintPrompt([
+      { type: "text", text: "fix the error in this screenshot" },
+      { type: "image", mimeType: "image/png", data: TINY_PNG_BASE64 },
+    ]);
+    try {
+      expect(built.text).toBe("fix the error in this screenshot");
+      expect(built.imagePaths).toHaveLength(1);
+      expect(readFileSync(built.imagePaths[0]).subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+    } finally {
+      await built.cleanup();
+    }
+    expect(() => readFileSync(built.imagePaths[0])).toThrow();
+  });
+
+  it("accepts a data URL and an existing file URI", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cursor-acp-image-src-"));
+    const filePath = join(dir, "already.png");
+    writeFileSync(filePath, Buffer.from(TINY_PNG_BASE64, "base64"));
+    const built = await buildCursorPrintPrompt([
+      {
+        type: "image",
+        data: `data:image/png;base64,${TINY_PNG_BASE64}`,
+      },
+      { type: "image", uri: pathToFileURL(filePath).href },
+    ]);
+    try {
+      expect(built.text).toBe("The user attached images.");
+      expect(built.imagePaths).toHaveLength(2);
+      expect(built.imagePaths[1]).toBe(filePath);
+    } finally {
+      await built.cleanup();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the turn when an image is not a supported bitmap", async () => {
+    const built = await buildCursorPrintPrompt([
+      { type: "text", text: "look" },
+      {
+        type: "image",
+        mimeType: "image/svg+xml",
+        data: Buffer.from("<svg/>").toString("base64"),
+      },
+    ]);
+    expect(built.imagePaths).toEqual([]);
+    expect(built.text).toContain("look");
+    expect(built.text).toContain("Image 1 omitted");
+    await built.cleanup();
   });
 });
 

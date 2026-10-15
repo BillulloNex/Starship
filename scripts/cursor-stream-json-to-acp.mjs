@@ -40,7 +40,7 @@ export function createCursorStreamJsonState() {
   };
 }
 
-export function cursorPrintAgentArgs(model, resumeSessionId) {
+export function cursorPrintAgentArgs(model, resumeSessionId, imagePaths = []) {
   const args = [
     "-p",
     "--trust",
@@ -53,6 +53,9 @@ export function cursorPrintAgentArgs(model, resumeSessionId) {
     args.push("--resume", String(resumeSessionId));
   }
   if (model) args.push("--model", model);
+  for (const imagePath of Array.isArray(imagePaths) ? imagePaths : []) {
+    if (imagePath) args.push("--image", String(imagePath));
+  }
   return args;
 }
 

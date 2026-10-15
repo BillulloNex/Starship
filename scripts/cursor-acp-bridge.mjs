@@ -8,7 +8,9 @@
  *
  * Default (`CURSOR_ACP_MODE=print`): ACP JSON-RPC on stdio, execute turns
  * with `agent -p --trust -f --output-format stream-json --stream-partial-output`.
- * Stream-json events are mapped to ACP `session/update` (tools + text).
+ * Image prompt blocks are written to temp files and passed with `--image`,
+ * which headless `agent -p` attaches as selected images. Stream-json events
+ * are mapped to ACP `session/update` (tools + text).
  * Model ads come from Cursor's `/v1/models` catalog in the ACP `{value, name}` shape.
  *
  * Optional (`CURSOR_ACP_MODE=native`): spawn documented `agent acp` and
@@ -18,8 +20,10 @@
 import * as child_process from "node:child_process";
 import * as readline from "node:readline";
 import * as crypto from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createCursorStreamJsonState,
   cursorPrintAgentArgs,
@@ -404,6 +408,158 @@ function sendNotification(method, params) {
   sendRpc({ jsonrpc: "2.0", method, params });
 }
 
+const IMAGE_FILE_EXT = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+
+export function cursorAgentCapabilities() {
+  return {
+    loadSession: false,
+    mcpCapabilities: { http: false, sse: false },
+    promptCapabilities: { image: true },
+  };
+}
+
+export function promptTextFromBlocks(blocks) {
+  let text = "";
+  for (const block of blocks || []) {
+    if (block?.type === "text" && typeof block.text === "string") {
+      text += block.text;
+    }
+  }
+  return text;
+}
+
+function sniffImageMime(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+    return "image/gif";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
+function decodeImageData(block) {
+  let raw = typeof block?.data === "string" ? block.data.trim() : "";
+  if (!raw) return null;
+  const dataUrl = raw.match(/^data:([^;,]+);base64,([\s\S]*)$/i);
+  if (dataUrl) raw = dataUrl[2];
+  raw = raw.replace(/\s/g, "");
+  if (!raw) return null;
+  const bytes = Buffer.from(raw, "base64");
+  return bytes.length > 0 ? bytes : null;
+}
+
+async function loadImageBytes(block) {
+  const inline = decodeImageData(block);
+  if (inline) return { bytes: inline, existingPath: null };
+
+  const uri = typeof block?.uri === "string" ? block.uri : "";
+  if (!uri) return { bytes: null, existingPath: null };
+
+  let filePath = null;
+  if (uri.startsWith("file:")) {
+    try {
+      filePath = fileURLToPath(uri);
+    } catch {
+      return { bytes: null, existingPath: null };
+    }
+  } else if (path.isAbsolute(uri)) {
+    filePath = uri;
+  } else {
+    return { bytes: null, existingPath: null };
+  }
+
+  try {
+    return { bytes: await fs.readFile(filePath), existingPath: filePath };
+  } catch {
+    return { bytes: null, existingPath: null };
+  }
+}
+
+export async function buildCursorPrintPrompt(promptBlocks) {
+  const notes = [];
+  const imagePaths = [];
+  let dir = null;
+  let imageIndex = 0;
+
+  try {
+    for (const block of promptBlocks || []) {
+      if (block?.type !== "image") continue;
+      imageIndex += 1;
+      const loaded = await loadImageBytes(block);
+      const mime = loaded.bytes ? sniffImageMime(loaded.bytes) : null;
+      if (!loaded.bytes || !mime) {
+        notes.push(
+          `[Image ${imageIndex} omitted: Cursor headless prompts accept png, jpeg, gif, and webp.]`,
+        );
+        continue;
+      }
+      if (loaded.existingPath) {
+        imagePaths.push(loaded.existingPath);
+        continue;
+      }
+      if (!dir) {
+        dir = await fs.mkdtemp(path.join(os.tmpdir(), "cursor-acp-images-"));
+      }
+      const filePath = path.join(
+        dir,
+        `image-${imageIndex}.${IMAGE_FILE_EXT[mime]}`,
+      );
+      await fs.writeFile(filePath, loaded.bytes);
+      imagePaths.push(filePath);
+    }
+  } catch (err) {
+    if (dir) await fs.rm(dir, { recursive: true, force: true });
+    throw err;
+  }
+
+  let text = promptTextFromBlocks(promptBlocks);
+  if (notes.length > 0) {
+    text = [text, ...notes].filter((part) => part && part.trim()).join("\n\n");
+  }
+  if (!text.trim() && imagePaths.length > 0) {
+    text =
+      imagePaths.length === 1
+        ? "The user attached an image."
+        : "The user attached images.";
+  }
+
+  return {
+    text,
+    imagePaths,
+    cleanup: async () => {
+      if (dir) await fs.rm(dir, { recursive: true, force: true });
+    },
+  };
+}
+
 function handleInitialize(id) {
   sendResult(id, {
     protocolVersion: 1,
@@ -412,11 +568,7 @@ function handleInitialize(id) {
       title: "Cursor ACP Bridge",
       version: "1.1.0",
     },
-    agentCapabilities: {
-      loadSession: false,
-      mcpCapabilities: { http: false, sse: false },
-      promptCapabilities: {},
-    },
+    agentCapabilities: cursorAgentCapabilities(),
   });
 }
 
@@ -482,17 +634,12 @@ function handleSetMode(id, params) {
 
 async function handlePrompt(id, params) {
   const sid = params?.sessionId || sessionId;
-  const promptBlocks = params?.prompt || [];
-  let userText = "";
-  for (const block of promptBlocks) {
-    if (block?.type === "text" && block.text) {
-      userText += block.text;
-    }
-  }
+  const built = await buildCursorPrintPrompt(params?.prompt || []);
+  const userText = built.text;
   const resumeSessionId =
     sessionCursorMap.get(sid) || (sid === sessionId ? activeCursorSessionId : null);
   debug(
-    `Prompt (session=${sid}, resumeCursorSession=${resumeSessionId || "none"}, model=${currentModel || "default"}): ${userText.slice(0, 80)}…`,
+    `Prompt (session=${sid}, resumeCursorSession=${resumeSessionId || "none"}, model=${currentModel || "default"}, images=${built.imagePaths.length}): ${userText.slice(0, 80)}…`,
   );
 
   sendNotification("session/update", {
@@ -522,9 +669,10 @@ async function handlePrompt(id, params) {
 
   try {
     let result;
-    try {
-      result = await callAgentPrint({
+    const printTurn = (resumeId) =>
+      callAgentPrint({
         text: userText,
+        imagePaths: built.imagePaths,
         cwd: sessionCwd,
         onUpdate: (update) => {
           sendNotification("session/update", {
@@ -532,9 +680,11 @@ async function handlePrompt(id, params) {
             update,
           });
         },
-        resumeSessionId,
+        resumeSessionId: resumeId,
         onSessionId: recordCursorSession,
       });
+    try {
+      result = await printTurn(resumeSessionId);
     } catch (err) {
       if (resumeSessionId) {
         debug(
@@ -544,18 +694,7 @@ async function handlePrompt(id, params) {
         if (activeCursorSessionId === resumeSessionId) {
           activeCursorSessionId = null;
         }
-        result = await callAgentPrint({
-          text: userText,
-          cwd: sessionCwd,
-          onUpdate: (update) => {
-            sendNotification("session/update", {
-              sessionId: sid,
-              update,
-            });
-          },
-          resumeSessionId: null,
-          onSessionId: recordCursorSession,
-        });
+        result = await printTurn(null);
       } else {
         throw err;
       }
@@ -585,6 +724,8 @@ async function handlePrompt(id, params) {
       },
     });
     sendResult(id, { stopReason: "end_turn" });
+  } finally {
+    await built.cleanup();
   }
 }
 
@@ -600,6 +741,7 @@ export function callAgentPrint(
   let onUpdate = () => {};
   let resumeSessionId = null;
   let onSessionId = () => {};
+  let imagePaths = [];
 
   if (textOrOptions && typeof textOrOptions === "object") {
     text = textOrOptions.text || "";
@@ -607,6 +749,9 @@ export function callAgentPrint(
     onUpdate = textOrOptions.onUpdate || onUpdate;
     resumeSessionId = textOrOptions.resumeSessionId || null;
     onSessionId = textOrOptions.onSessionId || onSessionId;
+    imagePaths = Array.isArray(textOrOptions.imagePaths)
+      ? textOrOptions.imagePaths
+      : [];
   } else {
     text = String(textOrOptions || "");
     cwd = cwdArg || sessionCwd;
@@ -618,7 +763,10 @@ export function callAgentPrint(
   return new Promise((resolve, reject) => {
     const idleMs = resolvePrintIdleMs();
     const maxMs = resolvePrintMaxMs(undefined, idleMs);
-    const args = [...cursorPrintAgentArgs(currentModel, resumeSessionId), text];
+    const args = [
+      ...cursorPrintAgentArgs(currentModel, resumeSessionId, imagePaths),
+      text,
+    ];
 
     debug(
       `Spawning: ${AGENT_BIN} ${args.slice(0, 10).join(" ")}… (idleLimit=${idleMs > 0 ? `${Math.round(idleMs / 1000)}s` : "disabled"}, maxLimit=${Math.round(maxMs / 1000)}s)`,
