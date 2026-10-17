@@ -445,6 +445,9 @@ function makeConfigInjectionScript(
     "VITE_LANGFUSE_PUBLIC_KEY",
     "LANGFUSE_BASE_URL",
     "VITE_LANGFUSE_BASE_URL",
+    // GlitchTip error tracking
+    "VITE_GLITCHTIP_DSN",
+    "VITE_GLITCHTIP_ENVIRONMENT",
   ];
   for (const key of obsKeys) {
     if (process.env[key]) obsConfig[key] = process.env[key];

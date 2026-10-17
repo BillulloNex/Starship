@@ -78,3 +78,10 @@ export const LANGFUSE_PUBLIC_KEY =
   getConfig("LANGFUSE_PUBLIC_KEY") || getConfig("VITE_LANGFUSE_PUBLIC_KEY");
 export const LANGFUSE_BASE_URL =
   getConfig("LANGFUSE_BASE_URL") || getConfig("VITE_LANGFUSE_BASE_URL");
+
+// ─── GlitchTip ────────────────────────────────────────────────────────────
+export const GLITCHTIP_DSN = getConfig(
+  "VITE_GLITCHTIP_DSN",
+  "https://f263a1c8ebe0485f965fb1eeff1a9afe@glitchtip.beenex.cloud/4",
+);
+export const GLITCHTIP_ENVIRONMENT = getConfig("VITE_GLITCHTIP_ENVIRONMENT");

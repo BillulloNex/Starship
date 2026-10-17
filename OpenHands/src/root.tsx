@@ -59,6 +59,7 @@ import {
   readPersistedColorTheme,
 } from "#/themes/color-themes";
 import { markPerf, measurePerf } from "#/utils/perf-tracking";
+import { captureError as captureGlitchTipError } from "#/services/glitchtip";
 
 // Marked as soon as this module (the app root) is evaluated — the earliest
 // point in the React tree we control. Paired with "app_interactive" below to
@@ -495,6 +496,10 @@ export function ErrorBoundary() {
   React.useEffect(() => {
     if (isChunkLoadError(error)) {
       reloadOnChunkError();
+    }
+    // Report non-chunk errors to GlitchTip for tracking
+    if (error instanceof Error && !isChunkLoadError(error)) {
+      captureGlitchTipError(error, { source: "react-error-boundary" });
     }
   }, [error]);
 

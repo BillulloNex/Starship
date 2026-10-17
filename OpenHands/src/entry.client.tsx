@@ -21,6 +21,10 @@ import { setupChunkLoadErrorHandler } from "./utils/handle-chunk-load-error";
 // prevent Vite from tree-shaking the backend modules.
 import "./services/observability-fanout";
 
+// GlitchTip error tracking — must initialize before app code to catch
+// bootstrap errors. Uses @sentry/react pointed at our GlitchTip instance.
+import "./services/glitchtip";
+
 setupChunkLoadErrorHandler();
 
 async function prepareApp() {
