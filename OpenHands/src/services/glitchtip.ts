@@ -14,7 +14,7 @@
  * Session Replay and advanced Sentry profiling are also omitted.
  */
 
-import * as Sentry from "@sentry/react";
+import * as Sentry from "@sentry/browser";
 import { GROKBOT_VERSION } from "#/constants/grokbot-version";
 import { isChunkLoadError } from "#/utils/handle-chunk-load-error";
 
@@ -145,5 +145,4 @@ export function addBreadcrumb(
   Sentry.addBreadcrumb({ message, category, data, level: "info" });
 }
 
-/** Re-export Sentry's ErrorBoundary for use in React trees. */
-export const GlitchTipErrorBoundary = Sentry.ErrorBoundary;
+
