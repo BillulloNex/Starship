@@ -53,13 +53,14 @@ if (isEnabled) {
     release: `grokbot@${GROKBOT_VERSION}`,
     environment: GLITCHTIP_ENVIRONMENT,
 
-    // Sample 100% of errors, 1% of performance traces
+    // Sample 100% of errors — no performance tracing (GlitchTip has
+    // limited tracing support and browserTracingIntegration is incompatible
+    // with the Vite/React Router bundle in production).
     sampleRate: 1.0,
-    tracesSampleRate: 0.01,
+    tracesSampleRate: 0,
 
-    // Keep integrations minimal — GlitchTip doesn't support advanced
-    // Sentry features like Session Replay or profiling.
-    integrations: [Sentry.browserTracingIntegration()],
+    // Use only the default integrations (global error handlers, breadcrumbs,
+    // console, HTTP context). Explicitly skip browser tracing.
 
     // Filter out chunk load errors — we handle those with automatic reload
     beforeSend(event) {
