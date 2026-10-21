@@ -275,6 +275,22 @@ RUN set -eux; \
     ln -s "${cursor_agent_dir}/cursor-agent" /usr/local/bin/cursor-agent; \
     agent --version
 
+# Codex ACP adapter. The base image ships codex-acp 1.1.2 (Codex CLI 0.144),
+# whose model list predates GPT-6, and the SDK rewrites every
+# `npx @agentclientprotocol/codex-acp@<any version>` launch to the `codex-acp`
+# binary on PATH — so the version pinned in sitecustomize never ran. Install a
+# newer adapter and point every `codex-acp` on PATH at it.
+ARG CODEX_ACP_VERSION="2.2.2"
+RUN set -eux; \
+    npm install -g --prefix /opt/codex-acp "@agentclientprotocol/codex-acp@${CODEX_ACP_VERSION}"; \
+    for existing in $(which -a codex-acp 2>/dev/null || true); do \
+      ln -sfn /opt/codex-acp/bin/codex-acp "${existing}"; \
+    done; \
+    ln -sfn /opt/codex-acp/bin/codex-acp /usr/local/bin/codex-acp; \
+    for bin in $(which -a codex-acp); do \
+      "${bin}" --version </dev/null | grep -qx "@agentclientprotocol/codex-acp ${CODEX_ACP_VERSION}"; \
+    done
+
 # Install official OpenCode CLI for the OpenCode ACP provider
 ARG OPENCODE_VERSION="1.18.29"
 RUN curl -fsSL https://opencode.ai/install | bash -s -- --version "${OPENCODE_VERSION}" --no-modify-path && \

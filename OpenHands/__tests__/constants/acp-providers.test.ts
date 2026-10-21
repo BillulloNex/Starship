@@ -131,9 +131,9 @@ describe("ACP provider registry", () => {
         expect(provider.default_command).toEqual([
           "npx",
           "-y",
-          "@agentclientprotocol/codex-acp@1.13.1",
+          "@agentclientprotocol/codex-acp@2.2.2",
         ]);
-        expect(provider.default_model).toBe("gpt-6-sol");
+        expect(provider.default_model).toBe("gpt-5.6-sol");
         expect(provider.icon).toBeTruthy();
         expect(provider.description_key).toBeTruthy();
         continue;

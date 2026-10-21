@@ -261,13 +261,11 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   }
 
   if (key === "codex") {
-    // The upstream SDK registry (codex-acp@1.1.7) only ships GPT-5.x models.
+    // The upstream SDK registry (codex-acp@1.1.2) only ships GPT-5.x models.
     // Override with the full GPT-6 family (released Sep 2026) + legacy models.
-    default_command = [
-      "npx",
-      "-y",
-      "@agentclientprotocol/codex-acp@1.13.1",
-    ];
+    // The SDK runs the image's `codex-acp` binary regardless of this pin, so
+    // the Dockerfile installs the same version on PATH.
+    default_command = ["npx", "-y", "@agentclientprotocol/codex-acp@2.2.2"];
     available_models = [
       { id: "gpt-6-astra", label: "GPT-6 Astra" },
       { id: "gpt-6-sol", label: "GPT-6 Sol" },

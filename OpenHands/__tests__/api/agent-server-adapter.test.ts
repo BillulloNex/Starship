@@ -1576,7 +1576,7 @@ describe("buildStartConversationRequest — ACP discriminator", () => {
     expect(payload.agent_settings.acp_command).toEqual([
       "npx",
       "-y",
-      "@agentclientprotocol/codex-acp@1.13.1",
+      "@agentclientprotocol/codex-acp@2.2.2",
     ]);
   });
 

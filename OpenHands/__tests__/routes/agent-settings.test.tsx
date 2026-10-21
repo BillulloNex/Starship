@@ -389,12 +389,12 @@ describe("AgentSettingsScreen", () => {
     await user.clear(commandInput);
     await user.type(
       commandInput,
-      "npx -y @agentclientprotocol/codex-acp@1.13.1",
+      "npx -y @agentclientprotocol/codex-acp@2.2.2",
     );
 
     // The model field now reflects the Codex default, not the stale Claude one.
     expect(screen.getByLabelText("SETTINGS$AGENT_MODEL")).toHaveValue(
-      "GPT-6 Sol",
+      "GPT-5.6 Sol",
     );
 
     await user.click(screen.getByTestId("agent-save-button"));
@@ -406,7 +406,7 @@ describe("AgentSettingsScreen", () => {
       agent_settings_diff?: Record<string, unknown>;
     };
     expect(call.agent_settings_diff?.acp_server).toBe("codex");
-    expect(call.agent_settings_diff?.acp_model).toBe("gpt-6-sol");
+    expect(call.agent_settings_diff?.acp_model).toBe("gpt-5.6-sol");
   });
 
   it("saves an ACP diff when switching to ACP + Claude Code", async () => {

@@ -551,7 +551,7 @@ def _init_codex_acp():
             )
             new_dict = dict(acp_providers_mod.ACP_PROVIDERS)
             orig_codex = new_dict["codex"]
-            updated_cmd = ("npx", "-y", "@agentclientprotocol/codex-acp@1.13.1")
+            updated_cmd = ("npx", "-y", "@agentclientprotocol/codex-acp@2.2.2")
 
             if dataclasses.is_dataclass(orig_codex):
                 new_dict["codex"] = dataclasses.replace(
@@ -575,7 +575,7 @@ def _init_codex_acp():
                 new_dict["codex"] = orig_codex
 
             acp_providers_mod.ACP_PROVIDERS = MappingProxyType(new_dict)
-            print("[grokbot-sitecustomize] Codex ACP updated to @agentclientprotocol/codex-acp@1.13.1 (GPT-6 enabled)", file=sys.stderr, flush=True)
+            print("[grokbot-sitecustomize] Codex ACP updated to @agentclientprotocol/codex-acp@2.2.2 (GPT-6 enabled)", file=sys.stderr, flush=True)
     except Exception as e:
         print(f"[grokbot-sitecustomize] Codex ACP patch skipped: {e}", file=sys.stderr, flush=True)
 
