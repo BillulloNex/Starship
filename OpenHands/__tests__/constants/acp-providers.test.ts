@@ -133,7 +133,7 @@ describe("ACP provider registry", () => {
           "-y",
           "@agentclientprotocol/codex-acp@2.2.2",
         ]);
-        expect(provider.default_model).toBe("gpt-5.6-sol");
+        expect(provider.default_model).toBe("gpt-6-sol");
         expect(provider.icon).toBeTruthy();
         expect(provider.description_key).toBeTruthy();
         continue;
