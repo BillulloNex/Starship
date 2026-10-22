@@ -59,6 +59,7 @@ import {
   GITHUB_OAUTH_API_PREFIX,
   handleGithubOAuthRequest,
 } from "./github-oauth.mjs";
+import { createAppAuth } from "./app-auth.mjs";
 import {
   DEFAULT_BLOCKED_PORTS,
   captureInfrastructurePorts,
@@ -974,6 +975,21 @@ export function startStaticServer(config) {
   // Filled in just below, before the server accepts its first connection.
   let infrastructurePorts = new Set();
 
+  // App-native auth. Inert unless configured (see app-auth.mjs `enabled`), so
+  // local dev and the mock-LLM e2e stack are unaffected.
+  const appAuth =
+    config.appAuth ??
+    createAppAuth({
+      sessionApiKey: config.sessionApiKey || null,
+      basePath,
+      secureCookies: config.appAuthSecureCookies,
+      publicOrigin: config.appAuthPublicOrigin,
+      // Health paths count as public only while a backend really serves them;
+      // otherwise they would fall through to the SPA shell, which carries the
+      // injected session key.
+      isProxied: (pathname) => Boolean(route(pathname)),
+    });
+
   const uninstallDiagnostics = proxy.installDiagnostics();
   const workbenchTerminal = createWorkbenchTerminalHandler({
     sessionApiKey: config.sessionApiKey,
@@ -1043,11 +1059,34 @@ export function startStaticServer(config) {
       return;
     }
 
-    if (workbenchTerminal.handleRequest(req, res)) {
+    const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+
+    // The auth gate. Runs before every path handler, the /api proxy and the
+    // static files, so an unauthenticated visitor never receives the SPA shell
+    // (which carries the injected session key). Preview hosts are matched above
+    // and so bypass it by construction, as they must: they are public apps on
+    // their own origin.
+    try {
+      if (await appAuth.guard(req, res, parsedUrl.pathname)) {
+        return;
+      }
+      // Login, logout, OAuth, invites, tokens and the admin page. After the
+      // gate, so admin routes already carry req.appAuthUser.
+      if (await appAuth.handleRequest(req, res, parsedUrl)) {
+        return;
+      }
+    } catch (err) {
+      console.error("App auth error:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Authentication error" }));
+      }
       return;
     }
 
-    const parsedUrl = new URL(req.url ?? "/", "http://localhost");
+    if (workbenchTerminal.handleRequest(req, res)) {
+      return;
+    }
 
     if (handleMcpOAuthPublicCallback(req, res)) {
       return;
@@ -1320,6 +1359,19 @@ export function startStaticServer(config) {
       }
     }
 
+    // Auth gate for upgrades, after the preview match for the same reason.
+    // There is no `res` here, so a rejection writes a raw 401 and destroys the
+    // socket.
+    try {
+      if (!(await appAuth.authorizeUpgrade(req, socket))) {
+        return;
+      }
+    } catch (err) {
+      console.error("App auth upgrade error:", err);
+      socket.destroy();
+      return;
+    }
+
     if (workbenchTerminal.handleUpgrade(req, socket, head)) {
       return;
     }
@@ -1367,6 +1419,14 @@ export function startStaticServer(config) {
       }
       if (config.lockToCloud) {
         console.log(`  Backend setup locked to Cloud: ${config.lockToCloud}`);
+      }
+      if (appAuth.enabled()) {
+        await appAuth.ready();
+        console.log(
+          `  App auth: ENFORCED (sign-in at /login${appAuth.googleEnabled ? ", Google enabled" : ", password only"})`,
+        );
+      } else {
+        console.log("  App auth: off (set AUTH_BOOTSTRAP_EMAIL to enable)");
       }
       console.log("  * (default) -> static files + SPA fallback");
       const agentServerUrl =

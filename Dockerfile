@@ -345,6 +345,9 @@ COPY OpenHands/scripts/posthog-logs.mjs /opt/agent-canvas/posthog-logs.mjs
 # IDE terminals: WebSocket handler (served by static-server) + stdlib PTY bridge.
 COPY OpenHands/scripts/workbench-terminal.mjs /opt/agent-canvas/workbench-terminal.mjs
 COPY OpenHands/scripts/workbench-pty-bridge.py /opt/agent-canvas/workbench-pty-bridge.py
+# App-native auth: the gate in front of the SPA, plus its transactional email.
+COPY OpenHands/scripts/app-auth.mjs /opt/agent-canvas/app-auth.mjs
+COPY OpenHands/scripts/mailer.mjs /opt/agent-canvas/mailer.mjs
 COPY OpenHands/scripts/google-workspace-oauth.mjs /opt/agent-canvas/google-workspace-oauth.mjs
 COPY OpenHands/scripts/github-oauth.mjs /opt/agent-canvas/github-oauth.mjs
 COPY OpenHands/scripts/github-git-credential.sh /opt/agent-canvas/github-git-credential.sh

@@ -133,6 +133,54 @@ static assets, or frontend TypeScript in `OpenHands/src/` have changed. Nothing 
   aliases but `ship.beenex.org` is the canonical production URL.
 - Run `npm --prefix OpenHands run lint` / `build` before pushing to catch errors early.
 
+## Authentication (app-native, replaces Cloudflare Access)
+
+Starship authenticates its own users in `OpenHands/scripts/app-auth.mjs`, a gate
+mounted in `static-server.mjs` ahead of every route. An unauthenticated visitor
+never receives the SPA shell, which is what carries the injected agent-server
+session key.
+
+**Three ways in:**
+
+1. **Session cookie** — a human signs in at `/login` with Google or an
+   email/password, and gets the `ship_session` cookie (30 days, revocable).
+2. **Bearer token** — `Authorization: Bearer ship_pat_…`, for agents, CI and
+   Playwright. Mint and revoke them at `/admin/team`. **This is how an agent
+   tests production**; Cloudflare Access had no equivalent.
+3. **Loopback + shared key** — in-container callers only, and only when the
+   socket is loopback *and* `X-Session-API-Key` (header, bearer, or the
+   `?session_api_key=` the SDK WebSocket clients use) matches. Both conditions,
+   never either alone.
+
+**Accounts are invite-only.** An admin invites an email at `/admin/team`; a
+Google sign-in by an uninvited address is refused rather than auto-created.
+Passwords are scrypt-hashed. Everything lives in one atomic JSON document at
+`$OH_PERSISTENCE_DIR/agent-canvas/app-auth/app-auth.json` (mode 0600), on the
+durable `/home/openhands/.openhands` mount.
+
+**Environment (Coolify):**
+
+| Variable | Effect |
+|---|---|
+| `AUTH_BOOTSTRAP_EMAIL` | Creates that admin on boot **and turns the gate on**. Unset = gate off. |
+| `AUTH_BOOTSTRAP_PASSWORD` | Optional starting password for the bootstrap admin. Otherwise that admin signs in with Google. |
+| `AUTH_GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in. Falls back to `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET`. |
+| `RESEND_API_KEY`, `AUTH_EMAIL_FROM` | Invite and reset emails. Without them invites still work — the link is shown to the admin instead. |
+| `APP_AUTH_DISABLED=true` | Kill switch: reopens the gate without a redeploy. |
+
+The Google redirect URI `https://ship.beenex.org/api/app-auth/google/callback`
+must be registered on the Google OAuth client, or Google sign-in fails.
+
+**Public paths** (never gated): `/login`, `/logout`, `/api/app-auth/*` except
+the admin endpoints, the MCP and GitHub OAuth callbacks, and `/health`,
+`/alive`, `/ready` — the health paths only while a backend route actually
+serves them, so an unproxied one cannot fall through to the SPA shell.
+
+Preview hostnames (`p{port}.beenex.org`) are matched on Host before the gate and
+stay public, as they were before. Because they share the `beenex.org` site, the
+session cookie is honoured **only on same-origin requests** — a preview app
+cannot ride a signed-in user's cookie.
+
 ## Environment Variables (Coolify as Source of Truth)
 
 - **Coolify is the single source of truth for production configuration and secrets.**
