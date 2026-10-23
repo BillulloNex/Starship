@@ -160,13 +160,14 @@ const BROWSER_V2_CONTENT = `# Browser V2 — Cloudflare Browser Run (Ephemeral S
 Grokbot uses **Cloudflare Browser Run** for headless browser automation via the \`chrome-devtools-mcp\` tool. Each session is ephemeral — no persistent cookies, logins, or profiles.
 
 ## BANNED — Do NOT do these:
-- Running bash commands like \`chromium\`, \`google-chrome\`, \`DISPLAY=:1\`, \`DISPLAY=:99\` in the local sandbox container
+- Running bash commands like \`chromium\`, \`google-chrome\`, \`DISPLAY=:1\`, \`DISPLAY=:99\` in the container (the binary is DISABLED and will error)
 - pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer
-- chromium --headless, chromium --dump-dom (SSO providers detect and block headless browsers)
-- Writing custom Python/Node.js scripts to automate login
+- chromium --headless, chromium --dump-dom — the local binary is a shim that exits with an error
+- Writing custom Python/Node.js scripts to automate browsers
 - Using \`localhost:PORT\` when browsing container apps via Browser Run — use \`pNNNN.beenex.org\`
 
-## HOW BROWSER RUN WORKS:
+## HOW TO BROWSE (MANDATORY):
+You MUST use the chrome-devtools-mcp MCP tools for ALL browsing tasks:
 - Each session spins up a fresh Chromium instance via Cloudflare Browser Run.
 - Sessions are ephemeral and carry no state between runs.
 - The agent controls the browser through MCP tools (\`navigate_page\`, \`take_screenshot\`, \`click\`, \`fill\`, etc.).

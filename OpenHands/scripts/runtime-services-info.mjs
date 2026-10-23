@@ -245,8 +245,10 @@ export function buildRuntimeServicesInfo(options) {
   if (appPreview?.urlTemplate) {
     services.browser_routing_guide = {
       CRITICAL:
-        "READ THIS BEFORE USING ANY BROWSER TOOL. " +
-        "Grokbot uses Cloudflare Browser Run for ephemeral headless Chrome sessions via chrome-devtools-mcp.",
+        "MANDATORY: For ALL browsing, screenshots, and web interaction, you MUST use " +
+        "the chrome-devtools-mcp MCP tools (navigate_page, take_screenshot, click, fill, evaluate_script). " +
+        "The local chromium binary is DISABLED and will error if called. " +
+        "Do NOT run chromium, google-chrome, puppeteer, playwright, or selenium via bash.",
       workflow: {
         routine_browsing:
           "Use chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill, evaluate_script) " +
@@ -258,9 +260,10 @@ export function buildRuntimeServicesInfo(options) {
           "Browser Run sessions auto-close after ~10 minutes of inactivity. " +
           "Perform periodic actions to keep the session alive if needed.",
         prohibitions:
-          "NEVER run chromium/google-chrome bash commands with DISPLAY=:1 in the container. " +
-          "NEVER install puppeteer, selenium, or playwright manually. " +
-          "NEVER run chromium --headless for browsing tasks.",
+          "The local chromium binary is DISABLED (returns exit 1). " +
+          "NEVER run chromium, google-chrome, or any headless browser via bash/shell. " +
+          "NEVER install puppeteer, selenium, or playwright. " +
+          "ALL browsing MUST go through chrome-devtools-mcp MCP tools.",
       },
     };
 

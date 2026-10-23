@@ -32,8 +32,9 @@ Grokbot uses **Cloudflare Browser Run** for headless browser automation via the 
 ---
 
 ## 🚫 BANNED PRACTICES (Do NOT do these)
-- ❌ Do NOT run `pip install playwright`, `pip install selenium`, or `npm install puppeteer` locally.
-- ❌ Do NOT run headless chromium locally (`chromium --headless`) for browsing tasks.
+- ❌ Do NOT run `chromium`, `google-chrome`, or any headless browser via bash — the binary is DISABLED and will error.
+- ❌ Do NOT run `pip install playwright`, `pip install selenium`, or `npm install puppeteer`.
+- ❌ Do NOT write custom Python/Node.js scripts to automate browsers.
 - ❌ Do NOT attempt to persist cookies or sessions across Browser Run invocations.
 - ❌ Do NOT try to bypass CAPTCHAs or MFA with custom scripts.
 - ❌ Do NOT use `localhost:PORT` when browsing container apps via Browser Run — use `pNNNN.beenex.org`.

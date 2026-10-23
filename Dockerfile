@@ -178,11 +178,10 @@ USER root
 # in every npx-based MCP server.  Just verify the existing install works.
 RUN node --version && npm --version && npx --version
 
-# Install system deps required by automation and headless Chromium
-ENV CHROME_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+# Install system deps required by automation and headless Chromium.
+# Chromium is hidden from the agent behind a shim — use Browser Run (MCP) instead.
+# The real binary lives at /usr/bin/chromium-real for VNC/legacy use.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     BROWSER_CHROMIUM_PERSISTENT_CONTEXT_DIR=/home/openhands/.openhands/chrome-profile \
     BROWSER_USER_DATA_DIR=/home/openhands/.openhands/chrome-profile
 
@@ -192,6 +191,13 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
       ln -sf /usr/share/novnc /opt/novnc && \
       rm -rf /var/lib/apt/lists/*; \
     fi
+
+# Hide chromium from the agent: move real binary, install a shim that blocks
+# direct usage and tells the agent to use MCP browser tools instead.
+RUN mv /usr/bin/chromium /usr/bin/chromium-real 2>/dev/null || true && \
+    printf '#!/bin/sh\necho "ERROR: Direct chromium usage is disabled. Use the chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill) instead." >&2\nexit 1\n' > /usr/bin/chromium && \
+    chmod +x /usr/bin/chromium && \
+    ln -sf /usr/bin/chromium /usr/bin/google-chrome 2>/dev/null || true
 
 # Install automation server via pip (version pinned from config/defaults.json).
 # Pin fastmcp<4.0.0: fastmcp 4.0.0 (2026-08-31) requires mcp>=2.0 which
