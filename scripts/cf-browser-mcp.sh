@@ -13,4 +13,6 @@ fi
 exec chrome-devtools-mcp \
   "--wsEndpoint=wss://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/browser-run/devtools/browser?keep_alive=600000" \
   "--wsHeaders={\"Authorization\":\"Bearer ${CF_BROWSER_API_TOKEN}\"}" \
+  "--workspace=/home/openhands/workspace" \
+  "--workspace=/tmp" \
   "$@"
