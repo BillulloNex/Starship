@@ -215,8 +215,8 @@ export function buildRuntimeServicesInfo(options) {
       url_template: appPreview.urlTemplate,
       reserved_ports: appPreview.reservedPorts ?? [],
       note_from_agent:
-        "This URL is for the user's browser, not for you — curling it from " +
-        "the sandbox is not a useful check. Verify with localhost:PORT instead.",
+        "Use `localhost:PORT` from inside the container to verify the server, " +
+        "but use the `pNNNN.beenex.org` public URL when browsing via Browser Run.",
     };
   }
 
@@ -239,40 +239,42 @@ export function buildRuntimeServicesInfo(options) {
     },
   };
 
-  // ── Browser routing guide (browser-v2) ──────────────────────────────────
-  // Dedicated persistent Steel.dev Browser instance where both Agent and Human
-  // share the same live headed Google Chrome instance at surf.beenex.org.
+  // ── Browser routing guide (browser-v2 — Cloudflare Browser Run) ──────────
+  // Ephemeral headless Chrome sessions via chrome-devtools-mcp connected to
+  // the Cloudflare Browser Run API. No persistent cookies or profiles.
   if (appPreview?.urlTemplate) {
     services.browser_routing_guide = {
       CRITICAL:
         "READ THIS BEFORE USING ANY BROWSER TOOL. " +
-        "Grokbot uses the Steel.dev collaborative browser at https://surf.beenex.org.",
+        "Grokbot uses Cloudflare Browser Run for ephemeral headless Chrome sessions via chrome-devtools-mcp.",
       workflow: {
         routine_browsing:
-          "Use browser tools or CDP connecting to https://surf.beenex.org to navigate, click, fill forms, and read content.",
-        auth_and_mfa:
-          "When you encounter login, SSO (Microsoft, Google, Okta), 2FA/MFA, CAPTCHAs, or " +
-          "security challenges, tell the user to complete verification in the 'Interactive' tab " +
-          "in the Browser panel. Once the user completes it, resume immediately on the same tab.",
+          "Use chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill, evaluate_script) " +
+          "to browse the web. Each session is ephemeral — no cookies or logins persist.",
+        container_apps:
+          "To browse apps running inside the container, navigate to the public preview URL " +
+          "`pNNNN.beenex.org` (NOT `localhost:PORT`). Browser Run sessions run outside the container.",
+        idle_timeout:
+          "Browser Run sessions auto-close after ~10 minutes of inactivity. " +
+          "Perform periodic actions to keep the session alive if needed.",
         prohibitions:
           "NEVER run chromium/google-chrome bash commands with DISPLAY=:1 in the container. " +
           "NEVER install puppeteer, selenium, or playwright manually. " +
-          "NEVER run chromium --headless for login pages.",
+          "NEVER run chromium --headless for browsing tasks.",
       },
     };
 
     services.collaborative_browser = {
       description:
-        "Dedicated persistent Steel.dev Browser on surf.beenex.org. The user views and interacts with the live " +
-        "stream via the 'Interactive' tab in the Browser panel. All logins, cookies, " +
-        "and session state persist across conversations.",
-      stream_url: "https://surf.beenex.org/v1/sessions/debug",
-      persistent_profile: "mounted on Steel server",
+        "Cloudflare Browser Run — ephemeral headless Chrome sessions. " +
+        "Screenshots from chrome-devtools-mcp appear in the Snapshot tab of the Browser panel. " +
+        "No persistent cookies or login state across sessions.",
+      session_type: "ephemeral (no persistent profile)",
       procedure: [
-        "1. Navigate to the requested website using browser tools or CDP to https://surf.beenex.org.",
-        "2. If credentials are provided, fill and submit the form.",
-        "3. If MFA, CAPTCHA, or SSO prompt appears, ask the user to complete it in the Interactive tab.",
-        "4. After the user confirms login, continue on the same page seamlessly.",
+        "1. Use navigate_page to go to the requested URL.",
+        "2. Use take_screenshot or take_snapshot to capture the page.",
+        "3. Use click, fill, evaluate_script as needed.",
+        "4. For container apps, use https://pNNNN.beenex.org (NOT localhost:PORT).",
       ],
     };
   }

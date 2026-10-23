@@ -153,7 +153,6 @@ describe("buildStartConversationRequest", () => {
       { name: "terminal", params: {} },
       { name: "file_editor", params: {} },
       { name: "task_tracker", params: {} },
-      { name: "browser_tool_set", params: {} },
       { name: "task_tool_set", params: {} },
     ]);
     expect(payload.agent_settings.agent_context).toMatchObject({

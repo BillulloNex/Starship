@@ -155,28 +155,31 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
-const BROWSER_V2_CONTENT = `# Browser V2 — Collaborative Browser (Steel.dev on surf.beenex.org)
+const BROWSER_V2_CONTENT = `# Browser V2 — Cloudflare Browser Run (Ephemeral Sessions)
 
-Grokbot uses a dedicated persistent Steel.dev browser instance at \`https://surf.beenex.org\` where both the Agent and Human share the exact same headed Google Chrome browser in real time.
+Grokbot uses **Cloudflare Browser Run** for headless browser automation via the \`chrome-devtools-mcp\` tool. Each session is ephemeral — no persistent cookies, logins, or profiles.
 
 ## BANNED — Do NOT do these:
 - Running bash commands like \`chromium\`, \`google-chrome\`, \`DISPLAY=:1\`, \`DISPLAY=:99\` in the local sandbox container
 - pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer
 - chromium --headless, chromium --dump-dom (SSO providers detect and block headless browsers)
 - Writing custom Python/Node.js scripts to automate login
+- Using \`localhost:PORT\` when browsing container apps via Browser Run — use \`pNNNN.beenex.org\`
 
-## HOW COLLABORATIVE BROWSING WORKS:
-- The persistent Chrome instance runs at \`https://surf.beenex.org\` (CDP at \`ws://surf.beenex.org/\`).
-- All cookies, logins, and session states persist permanently across conversations.
-- The user watches and interacts directly with the live browser stream in the **Interactive** browser tab (\`https://surf.beenex.org/v1/sessions/debug\`).
+## HOW BROWSER RUN WORKS:
+- Each session spins up a fresh Chromium instance via Cloudflare Browser Run.
+- Sessions are ephemeral and carry no state between runs.
+- The agent controls the browser through MCP tools (\`navigate_page\`, \`take_screenshot\`, \`click\`, \`fill\`, etc.).
+- Sessions auto-close after ~10 minutes of inactivity. Perform periodic actions to keep alive.
 
-## PROCEDURE FOR AUTH / SSO / MFA:
-1. Navigate to the requested website using browser tools or CDP connecting to \`https://surf.beenex.org\`.
-2. If the user gave credentials, type and submit them.
-3. If an MFA / 2FA prompt, CAPTCHA, or biometric challenge appears:
-   - Inform the user: "I've navigated to the login page. Please complete the verification in the **Interactive** browser tab."
-   - Wait for the user to confirm.
-4. Once the user is logged in, immediately resume your task on the exact same page. No browser restarts needed.
+## PROCEDURE FOR BROWSING:
+1. Use \`navigate_page\` to go to the URL.
+2. Use \`take_screenshot\` or \`take_snapshot\` to capture page state.
+3. Use \`click\`, \`fill\`, \`evaluate_script\` as needed.
+4. For container apps, navigate to \`https://pNNNN.beenex.org\` (NOT \`localhost:PORT\`).
+
+## AUTHENTICATION:
+Sessions are ephemeral — no persistent login state. If a target requires auth, prefer API-based access (tokens, keys). Inform the user that Browser Run cannot persist auth across sessions.
 `;
 
 const AUTH_HANDOFF_CONTENT = [
@@ -207,7 +210,7 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
   {
     name: "browser-v2",
     description:
-      "Unified collaborative browser skill for Grokbot on the dedicated Browser VM. Supports persistent multi-session logins, real-time MFA/SSO human handoff, and remote browser navigation.",
+      "Browser skill using Cloudflare Browser Run for ephemeral headless Chrome sessions via chrome-devtools-mcp. Supports screenshots, navigation, form filling, and page inspection.",
     triggers: [
       "browser",
       "browse",

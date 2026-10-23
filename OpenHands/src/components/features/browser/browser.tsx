@@ -20,7 +20,7 @@ export function BrowserPanel() {
   const hasPage = Boolean(screenshotSrc);
   const resolvedMode = resolveBrowserViewMode(viewMode, screenshotSrc);
 
-  const imgSrc = screenshotSrc?.startsWith("data:image/png;base64,")
+  const imgSrc = screenshotSrc?.startsWith("data:")
     ? screenshotSrc
     : `data:image/png;base64,${screenshotSrc ?? ""}`;
 
@@ -43,13 +43,11 @@ export function BrowserPanel() {
               label: t(I18nKey.PREVIEW$LIVE),
               icon: <MousePointerClick />,
             },
-            /* Legacy Snapshot mode commented out to prevent split-brain with Steel.dev:
             {
               value: "snapshot",
               label: t(I18nKey.PREVIEW$SNAPSHOT),
               icon: <Camera />,
             },
-            */
           ]}
         />
       </div>

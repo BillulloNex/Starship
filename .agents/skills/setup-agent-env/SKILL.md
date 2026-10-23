@@ -64,8 +64,8 @@ Running this skill provisions full access to all 5 operational subsystems:
 - **PostHog**: `POSTHOG_API_KEY`, `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID` (`561056`), `POSTHOG_HOST` (`https://us.i.posthog.com`), `VITE_POSTHOG_AI_ENABLED`
 - **Langwatch & Opik**: `VITE_LANGWATCH_API_KEY`, `VITE_LANGWATCH_BASE_URL`, `VITE_OPIK_API_KEY`, `VITE_RAINDROP_WRITE_KEY`
 
-### 2. Live Browser Automation & Streaming
-- **Steel.dev Browser**: `VITE_BROWSER_VM_URL` (`https://surf.beenex.org/v1/sessions/debug?interactive=true&showControls=true&theme=dark`)
+### 2. Browser Run (Cloudflare) & Streaming
+- **Browser Run**: `CF_ACCOUNT_ID`, `CF_BROWSER_API_TOKEN`, `VITE_BROWSER_VM_URL`
 - **Public App Previews**: `PREVIEW_HOST_PATTERN` (`{app}.beenex.space,p{port}.beenex.space,{app}.beenex.org,p{port}.beenex.org`)
 
 ### 3. Telegram Bridge & Remote Agent Channel

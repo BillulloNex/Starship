@@ -90,6 +90,16 @@ export CHROME_USER_DATA_DIR="${CHROME_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
 export PUPPETEER_USER_DATA_DIR="${PUPPETEER_USER_DATA_DIR:-${CHROME_PROFILE_DIR}}"
 log "Browser session persistence: $CHROME_PROFILE_DIR"
 
+# ── Browser Run credentials for chrome-devtools-mcp ──────────────────
+if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_BROWSER_API_TOKEN:-}" ]; then
+  cat > /tmp/cf-browser-env <<EOF
+export CF_ACCOUNT_ID="${CF_ACCOUNT_ID}"
+export CF_BROWSER_API_TOKEN="${CF_BROWSER_API_TOKEN}"
+EOF
+  chmod 600 /tmp/cf-browser-env
+  log "Browser Run credentials written to /tmp/cf-browser-env"
+fi
+
 # GitHub HTTPS clones in the web console have no TTY. Use the Starship
 # credential helper so `git clone https://github.com/...` can read the
 # Connect GitHub token (or GITHUB_TOKEN) instead of prompting.

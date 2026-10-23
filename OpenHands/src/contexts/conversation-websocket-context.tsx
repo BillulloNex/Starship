@@ -26,6 +26,7 @@ import {
   isMessageEvent,
   isUserMessageEvent,
   isActionEvent,
+  isObservationEvent,
   isConversationStateUpdateEvent,
   isFullStateConversationStateUpdateEvent,
   isAgentStatusConversationStateUpdateEvent,
@@ -933,6 +934,49 @@ export function ConversationWebSocketProvider({
                 ? screenshotData
                 : `data:image/png;base64,${screenshotData}`;
               useBrowserStore.getState().setScreenshotSrc(screenshotSrc);
+            }
+          }
+
+          // Handle MCPToolObservation events from chrome-devtools-mcp —
+          // extract screenshot images so they appear in the Browser panel.
+          if (
+            isObservationEvent(event) &&
+            event.observation.kind === "MCPToolObservation"
+          ) {
+            const obs = event.observation as {
+              tool_name: string;
+              content: Array<{ type: string; image_urls?: string[] }>;
+            };
+            if (
+              obs.tool_name.includes("screenshot") ||
+              obs.tool_name.includes("navigate")
+            ) {
+              const imgItem = obs.content.find(
+                (c) =>
+                  c.type === "image" &&
+                  Array.isArray(c.image_urls) &&
+                  c.image_urls.length > 0,
+              );
+              if (imgItem?.image_urls?.[0]) {
+                const src = imgItem.image_urls[0];
+                if (src.startsWith("data:")) {
+                  useBrowserStore.getState().setScreenshotSrc(src);
+                }
+              }
+            }
+          }
+
+          // Handle MCP navigate_page actions — update the browser URL bar
+          if (
+            isActionEvent(event) &&
+            event.action.kind === "MCPToolAction" &&
+            event.tool_name === "navigate_page"
+          ) {
+            const { url } = (
+              event.action as { data: Record<string, unknown> }
+            ).data;
+            if (typeof url === "string") {
+              useBrowserStore.getState().setUrl(url);
             }
           }
 

@@ -386,6 +386,8 @@ COPY scripts/cursor-stream-json-to-acp.mjs /opt/agent-canvas/cursor-stream-json-
 COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-prewarm.sh /opt/agent-canvas/opencode-acp-prewarm.sh
+COPY scripts/cf-browser-mcp.sh /usr/local/bin/cf-browser-mcp
+RUN chmod +x /usr/local/bin/cf-browser-mcp
 RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser && \
     chmod +x /opt/agent-canvas/cursor-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/cursor-acp-auth-wrapper.sh /usr/local/bin/cursor-acp && \
     chmod +x /opt/agent-canvas/opencode-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/opencode-acp-auth-wrapper.sh /usr/local/bin/opencode-acp && \
