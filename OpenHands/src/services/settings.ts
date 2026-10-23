@@ -24,7 +24,12 @@ export const DEFAULT_SETTINGS: Settings = {
   search_api_key: "",
   is_new_user: true,
   disabled_skills: [],
-  mcp_config: {},
+  mcp_config: {
+    "cloudflare-browser-run": {
+      command: "/usr/local/bin/cf-browser-mcp",
+      args: [],
+    },
+  },
   max_budget_per_task: null,
   email: "",
   email_verified: true,
@@ -48,7 +53,12 @@ export const DEFAULT_SETTINGS: Settings = {
       enable_iterative_refinement: false,
     },
     enable_sub_agents: false,
-    mcp_config: {},
+    mcp_config: {
+      "cloudflare-browser-run": {
+        command: "/usr/local/bin/cf-browser-mcp",
+        args: [],
+      },
+    },
   },
   conversation_settings_schema: null,
   conversation_settings: {

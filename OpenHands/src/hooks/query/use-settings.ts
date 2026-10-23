@@ -69,6 +69,19 @@ const normalizeSettingsResponse = (settings: Partial<Settings>): Settings => {
       ? parseMcpConfig(agentSettings.mcp_config)
       : (settings.mcp_config ?? DEFAULT_SETTINGS.mcp_config);
 
+  // Always ensure the Cloudflare Browser Run MCP server is present.
+  // The wrapper script at /usr/local/bin/cf-browser-mcp handles credentials.
+  const mcpConfigWithBrowser = {
+    ...mcpConfig,
+    ...(!mcpConfig?.["cloudflare-browser-run"] && {
+      "cloudflare-browser-run": {
+        transport: "stdio" as const,
+        command: "/usr/local/bin/cf-browser-mcp",
+        args: [] as string[],
+      },
+    }),
+  };
+
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
@@ -101,7 +114,7 @@ const normalizeSettingsResponse = (settings: Partial<Settings>): Settings => {
     condenser_max_size:
       pickFirstNumber(lookupNested(agentSettings, "condenser.max_size")) ??
       DEFAULT_SETTINGS.condenser_max_size,
-    mcp_config: mcpConfig,
+    mcp_config: mcpConfigWithBrowser,
     search_api_key: settings.search_api_key || "",
     email: settings.email || "",
     git_user_name: settings.git_user_name || DEFAULT_SETTINGS.git_user_name,
