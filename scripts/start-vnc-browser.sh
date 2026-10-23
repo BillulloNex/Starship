@@ -49,8 +49,10 @@ start() {
     websockify --web "$NOVNC_DIR" $WEBSOCKIFY_PORT localhost:$VNC_PORT > "$LOGS_DIR/websockify.log" 2>&1 &
     echo $! > "$PIDS_DIR/websockify.pid"
 
-    # Start Chromium (use chromium-real to bypass the agent shim)
-    chromium-real --no-sandbox --window-size=1280,720 --user-data-dir="$PROFILE_DIR" ${URL:+"$URL"} > "$LOGS_DIR/chromium.log" 2>&1 &
+    # Start Chromium (use the real binary, bypassing the agent shim)
+    CHROMIUM_BIN="/usr/lib/chromium/chromium-real"
+    [ -x "$CHROMIUM_BIN" ] || CHROMIUM_BIN="/usr/bin/chromium-real"
+    "$CHROMIUM_BIN" --no-sandbox --window-size=1280,720 --user-data-dir="$PROFILE_DIR" ${URL:+"$URL"} > "$LOGS_DIR/chromium.log" 2>&1 &
     echo $! > "$PIDS_DIR/chromium.pid"
 }
 
@@ -92,8 +94,10 @@ open_url() {
         echo "Error: VNC stack is not running." >&2
         exit 1
     fi
-    # Use chromium-real to open url in existing session (bypass agent shim)
-    chromium-real --no-sandbox --user-data-dir="$PROFILE_DIR" "$target_url" > /dev/null 2>&1 &
+    # Use the real chromium binary to open url (bypass agent shim)
+    CHROMIUM_BIN="/usr/lib/chromium/chromium-real"
+    [ -x "$CHROMIUM_BIN" ] || CHROMIUM_BIN="/usr/bin/chromium-real"
+    "$CHROMIUM_BIN" --no-sandbox --user-data-dir="$PROFILE_DIR" "$target_url" > /dev/null 2>&1 &
 }
 
 case "$COMMAND" in

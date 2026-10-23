@@ -10,7 +10,7 @@ if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${CF_BROWSER_API_TOKEN:-}" ]; then
   echo "ERROR: CF_ACCOUNT_ID and CF_BROWSER_API_TOKEN not available. Check entrypoint." >&2
   exit 1
 fi
-exec npx -y chrome-devtools-mcp@latest \
+exec chrome-devtools-mcp \
   "--wsEndpoint=wss://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/browser-run/devtools/browser?keep_alive=600000" \
   "--wsHeaders={\"Authorization\":\"Bearer ${CF_BROWSER_API_TOKEN}\"}" \
   "$@"

@@ -194,15 +194,25 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
 
 # Hide chromium from the agent: move real binary, install a shim that blocks
 # direct usage and tells the agent to use MCP browser tools instead.
+# On Debian, /usr/bin/chromium is a wrapper that calls /usr/lib/chromium/chromium
+# (the actual ELF binary). We must shim BOTH to prevent bypass.
 # Also block playwright/puppeteer from downloading their own chromium.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 \
     PLAYWRIGHT_BROWSERS_PATH=/dev/null
-RUN mv /usr/bin/chromium /usr/bin/chromium-real 2>/dev/null || true && \
-    printf '#!/bin/sh\necho "ERROR: Direct chromium usage is disabled. Use the chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill) instead." >&2\nexit 1\n' > /usr/bin/chromium && \
-    chmod +x /usr/bin/chromium && \
+RUN SHIM='#!/bin/sh\necho "ERROR: Direct chromium usage is disabled. Use the chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill) instead." >&2\nexit 1' && \
+    mv /usr/bin/chromium /usr/bin/chromium-real 2>/dev/null || true && \
+    printf "$SHIM" > /usr/bin/chromium && chmod +x /usr/bin/chromium && \
     ln -sf /usr/bin/chromium /usr/bin/google-chrome 2>/dev/null || true && \
-    ln -sf /usr/bin/chromium /usr/bin/chromium-browser 2>/dev/null || true
+    ln -sf /usr/bin/chromium /usr/bin/chromium-browser 2>/dev/null || true && \
+    if [ -f /usr/lib/chromium/chromium ]; then \
+      mv /usr/lib/chromium/chromium /usr/lib/chromium/chromium-real && \
+      printf "$SHIM" > /usr/lib/chromium/chromium && chmod +x /usr/lib/chromium/chromium; \
+    fi
+
+# Pre-install chrome-devtools-mcp so the MCP server starts instantly
+# (avoids npx download timeout at conversation start).
+RUN npm install -g chrome-devtools-mcp@latest
 
 # Install automation server via pip (version pinned from config/defaults.json).
 # Pin fastmcp<4.0.0: fastmcp 4.0.0 (2026-08-31) requires mcp>=2.0 which
