@@ -7,6 +7,7 @@ import {
   buildCursorPrintPrompt,
   buildModelConfigOptions,
   cursorAgentCapabilities,
+  acpPromptResult,
   cursorExtensionAutoResult,
   formatCursorModelId,
   isCursorExtensionRequest,
@@ -28,6 +29,7 @@ import {
 import {
   createCursorStreamJsonState,
   cursorPrintAgentArgs,
+  acpUsageFromCursorEvent,
   mapCursorStreamJsonEvent,
   mapCursorStreamJsonLine,
   truncateAcpPayload,
@@ -716,6 +718,34 @@ describe("cursor stream-json to ACP mapper", () => {
       toolCallId: "toolu_fn_1",
       status: "completed",
     });
+  });
+
+  it("keeps Cursor result usage for the ACP prompt response", () => {
+    const state = createCursorStreamJsonState();
+    const event = {
+      type: "result",
+      subtype: "success",
+      result: "done",
+      usage: {
+        inputTokens: 5749,
+        outputTokens: 25,
+        cacheReadTokens: 9728,
+        cacheWriteTokens: 0,
+      },
+    };
+    expect(mapCursorStreamJsonEvent(event, state).updates).toEqual([]);
+    expect(state.usage).toEqual({
+      inputTokens: 5749,
+      outputTokens: 25,
+      cachedReadTokens: 9728,
+      totalTokens: 15502,
+    });
+    expect(acpUsageFromCursorEvent({ usage: { inputTokens: 0 } })).toBeNull();
+    expect(acpPromptResult({ usage: state.usage })).toEqual({
+      stopReason: "end_turn",
+      usage: state.usage,
+    });
+    expect(acpPromptResult({})).toEqual({ stopReason: "end_turn" });
   });
 
   it("emits legacy complete assistant messages when no partial timestamps exist", () => {

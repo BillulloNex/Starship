@@ -40,6 +40,13 @@ export function resolveCursorAcpMode(raw = process.env.CURSOR_ACP_MODE) {
   return "print";
 }
 
+/** ACP session/prompt result. `usage` is the billed token total for this turn. */
+export function acpPromptResult(printResult) {
+  const result = { stopReason: "end_turn" };
+  if (printResult?.usage) result.usage = printResult.usage;
+  return result;
+}
+
 export const DEFAULT_CURSOR_ACP_PRINT_IDLE_MS = 0; // Disabled by default (prevents timeout on long builds)
 export const DEFAULT_CURSOR_ACP_PRINT_MAX_MS = 1800000; // 30 minutes
 export const MIN_CURSOR_ACP_PRINT_IDLE_MS = 30000; // 30 seconds if enabled
@@ -713,7 +720,7 @@ async function handlePrompt(id, params) {
         },
       });
     }
-    sendResult(id, { stopReason: "end_turn" });
+    sendResult(id, acpPromptResult(result));
   } catch (err) {
     debug(`Error calling agent -p: ${err.message}`);
     sendNotification("session/update", {
@@ -895,6 +902,7 @@ export function callAgentPrint(
         emittedAssistant: streamState.emittedAssistant,
         resultText: streamState.resultText || "",
         sessionId: streamState.sessionId,
+        usage: streamState.usage,
       });
     });
 

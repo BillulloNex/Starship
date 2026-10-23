@@ -95,6 +95,7 @@ const makeStatsEvent = (
   responseId: string,
   promptTokens = 0,
   completionTokens = 0,
+  extra: { cacheReadTokens?: number; cacheWriteTokens?: number } = {},
 ) => ({
   id,
   timestamp: new Date().toISOString(),
@@ -111,8 +112,8 @@ const makeStatsEvent = (
           model: "grok-4.6[effort=high,fast=true]",
           prompt_tokens: promptTokens,
           completion_tokens: completionTokens,
-          cache_read_tokens: 0,
-          cache_write_tokens: 0,
+          cache_read_tokens: extra.cacheReadTokens ?? 0,
+          cache_write_tokens: extra.cacheWriteTokens ?? 0,
           reasoning_tokens: 0,
           context_window: 0,
           per_turn_token: 0,
@@ -626,12 +627,73 @@ describe("ConversationWebSocketProvider — conversation-scoped event store", ()
       expect(fanoutGeneration).toHaveBeenCalledWith(
         expect.objectContaining({
           conversationId: "conv-cursor",
-          generationId: AGENT_REPLY_ID,
+          generationId: "cursor-stats-1",
           executionProvider: "cursor",
           usageAvailable: false,
           costAvailable: false,
           input: "User message",
           output: "Hi!",
+        }),
+      );
+    });
+
+    it("logs Cursor's reported token totals instead of the visible-text estimate", async () => {
+      await renderCursorProvider();
+
+      deliver(createUserMessageEvent("cursor-user-real"));
+      deliver(makeAgentReply());
+      expect(fanoutGeneration).not.toHaveBeenCalled();
+
+      deliver(
+        makeStatsEvent("cursor-stats-real", "cursor-session", 5749, 25, {
+          cacheReadTokens: 9728,
+        }),
+      );
+
+      expect(fanoutGeneration).toHaveBeenCalledTimes(1);
+      expect(fanoutGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv-cursor",
+          executionProvider: "cursor",
+          usageAvailable: true,
+          costAvailable: true,
+          promptTokens: 5749,
+          completionTokens: 25,
+          cacheReadTokens: 9728,
+          input: "User message",
+          output: "Hi!",
+        }),
+      );
+    });
+
+    it("logs a later stats increase for the same Cursor session", async () => {
+      await renderCursorProvider();
+
+      deliver(createUserMessageEvent("cursor-user-grow"));
+      deliver(makeAgentReply());
+      deliver(makeStatsEvent("cursor-stats-grow-1", "cursor-session", 1000, 20));
+      deliver(createUserMessageEvent("cursor-user-grow-2"));
+      deliver({
+        ...makeAgentReply(),
+        id: "evt-agent-reply-2",
+        llm_message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Done." }],
+        },
+      });
+      deliver(
+        makeStatsEvent("cursor-stats-grow-2", "cursor-session", 8000, 400, {
+          cacheReadTokens: 12000,
+        }),
+      );
+
+      expect(fanoutGeneration).toHaveBeenCalledTimes(2);
+      expect(fanoutGeneration).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          usageAvailable: true,
+          promptTokens: 8000,
+          completionTokens: 400,
+          cacheReadTokens: 12000,
         }),
       );
     });

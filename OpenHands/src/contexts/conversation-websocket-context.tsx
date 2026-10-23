@@ -232,11 +232,11 @@ export function ConversationWebSocketProvider({
   const lastStatsMapRef = useRef<
     Record<string, import("#/services/observability-fanout").GenerationData>
   >({});
-  // Stats are cumulative and may be replayed more than once. ACP response ids
-  // give us a stable per-turn key so PostHog receives one generation per turn.
+  // Exact replays of the same accumulated snapshot share an id. A later
+  // snapshot with a higher total gets a new id so each increase is logged.
   const emittedGenerationIdsRef = useRef<Set<string>>(new Set());
-  // Cursor/ACP turns often never send a stats event. Once we emit for the
-  // current user turn, ignore later placeholder stats so PostHog gets one row.
+  // Cursor turns that never report usage get one character estimate. Real
+  // usage snapshots are not blocked by this latch.
   const currentTurnEmittedRef = useRef(false);
 
   const acpExecutionProvider = resolveAcpExecutionProvider(conversation);
@@ -260,7 +260,11 @@ export function ConversationWebSocketProvider({
   );
 
   const trackAssistantOutput = useCallback(
-    (assistantText: string | undefined, generationId?: string) => {
+    (
+      assistantText: string | undefined,
+      generationId?: string,
+      options?: { allowEstimate?: boolean },
+    ) => {
       if (!assistantText) return;
       lastAssistantOutputRef.current = assistantText;
       // If stats arrived before the final output, dispatch the completed
@@ -279,10 +283,12 @@ export function ConversationWebSocketProvider({
         return;
       }
 
-      // ACP providers (Cursor especially) commonly complete a turn without a
-      // live stats event. Still record the generation so PostHog AI obs is
-      // populated from the visible prompt/reply.
+      // A live assistant chunk can arrive before the prompt result's usage
+      // is copied into stats. Estimating then would lock in the visible
+      // text and hide the billed total. FinishAction and history replay
+      // opt in, because nothing further is coming.
       if (
+        !options?.allowEstimate ||
         !isAcpConversationActive ||
         !conversationId ||
         currentTurnEmittedRef.current
@@ -507,10 +513,14 @@ export function ConversationWebSocketProvider({
           consumeMatchingPendingMessage(conversationId, userText);
         }
         if (isMessageEvent(event) && event.llm_message.role === "assistant") {
-          trackAssistantOutput(extractMessageEventText(event), event.id);
+          trackAssistantOutput(extractMessageEventText(event), event.id, {
+            allowEstimate: true,
+          });
         }
         if (isActionEvent(event) && event.action.kind === "FinishAction") {
-          trackAssistantOutput(event.action.message, event.id);
+          trackAssistantOutput(event.action.message, event.id, {
+            allowEstimate: true,
+          });
         }
       }
     }
@@ -792,7 +802,9 @@ export function ConversationWebSocketProvider({
           // ACP agents, including Cursor, publish their final response as a
           // FinishAction rather than an assistant MessageEvent.
           if (isActionEvent(event) && event.action.kind === "FinishAction") {
-            trackAssistantOutput(event.action.message, event.id);
+            trackAssistantOutput(event.action.message, event.id, {
+              allowEstimate: true,
+            });
           }
 
           if (
@@ -847,36 +859,43 @@ export function ConversationWebSocketProvider({
                   const hasReportedUsage =
                     !!tokenUsage &&
                     (tokenUsage.prompt_tokens > 0 ||
-                      tokenUsage.completion_tokens > 0);
+                      tokenUsage.completion_tokens > 0 ||
+                      tokenUsage.cache_read_tokens > 0 ||
+                      tokenUsage.cache_write_tokens > 0 ||
+                      tokenUsage.reasoning_tokens > 0);
                   const lastLatency = metrics.response_latencies?.at(-1);
-                  // ACP servers (Cursor especially) currently omit both
-                  // `usage_update` and prompt-response usage. Their live
-                  // WebSocket stats event also omits `response_latencies`
-                  // even though the persisted conversation snapshot later
-                  // includes them. Accept the zero-token placeholder here;
-                  // skip if this turn already emitted from the assistant
-                  // reply so PostHog does not get a second empty row.
+                  // ACP turns that still report zeros fall back to a character
+                  // estimate. One estimate per user turn; a later snapshot
+                  // with real tokens is logged as well.
                   const isCompletedAcpTurnWithoutUsage =
                     isAcpConversationActive &&
                     !!tokenUsage &&
                     !hasReportedUsage;
 
                   if (
-                    (hasReportedUsage || isCompletedAcpTurnWithoutUsage) &&
-                    !currentTurnEmittedRef.current
+                    hasReportedUsage ||
+                    (isCompletedAcpTurnWithoutUsage &&
+                      !currentTurnEmittedRef.current)
                   ) {
                     const modelName =
                       metrics.model_name || tokenUsage.model || "unknown";
+                    const generationId = hasReportedUsage
+                      ? [
+                          tokenUsage.response_id ||
+                            lastLatency?.response_id ||
+                            event.id,
+                          tokenUsage.prompt_tokens,
+                          tokenUsage.completion_tokens,
+                          tokenUsage.cache_read_tokens,
+                          tokenUsage.cache_write_tokens,
+                          tokenUsage.reasoning_tokens,
+                        ].join(":")
+                      : event.id;
                     const genData = {
                       conversationId,
-                      generationId:
-                        (isCompletedAcpTurnWithoutUsage
-                          ? event.id
-                          : lastLatency?.response_id) ||
-                        tokenUsage.response_id ||
-                        undefined,
+                      generationId,
                       modelName,
-                      executionProvider: isCompletedAcpTurnWithoutUsage
+                      executionProvider: isAcpConversationActive
                         ? acpExecutionProvider
                         : undefined,
                       accumulatedCost: metrics.accumulated_cost,

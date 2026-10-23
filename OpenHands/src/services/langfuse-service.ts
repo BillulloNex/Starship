@@ -368,6 +368,17 @@ export function recordStatsGeneration({
     reasoningTokens: reasoningTokens ?? 0,
   });
 
+  // Replayed stats events repeat the same accumulated totals. The delta is
+  // then zero; exporting it would add an empty generation beside the real one.
+  const hasUsageDelta =
+    turn.promptTokens > 0 ||
+    turn.completionTokens > 0 ||
+    turn.cacheReadTokens > 0 ||
+    turn.cacheWriteTokens > 0 ||
+    turn.reasoningTokens > 0 ||
+    turn.cost > 0;
+  if (usageAvailable !== false && !hasUsageDelta) return;
+
   const attributes: OtlpAttribute[] = [
     ...traceContextAttributes(conversationId),
     str("langfuse.observation.type", "generation"),
@@ -383,10 +394,17 @@ export function recordStatsGeneration({
   }
 
   if (usageAvailable !== false) {
+    // Cache tokens are reported beside input, not inside it (Cursor and
+    // Claude ACP). The headline total has to include them or a long cached
+    // turn looks like a few thousand tokens.
     const usageDetails: Record<string, number> = {
       input: turn.promptTokens,
       output: turn.completionTokens,
-      total: turn.promptTokens + turn.completionTokens,
+      total:
+        turn.promptTokens +
+        turn.completionTokens +
+        turn.cacheReadTokens +
+        turn.cacheWriteTokens,
     };
     if (turn.cacheReadTokens) {
       usageDetails.cache_read_input_tokens = turn.cacheReadTokens;

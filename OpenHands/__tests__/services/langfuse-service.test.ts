@@ -70,7 +70,7 @@ describe("langfuse-service v4 OTLP export", () => {
     ).toEqual({
       input: 100,
       output: 40,
-      total: 140,
+      total: 150,
       cache_read_input_tokens: 10,
     });
     expect(
@@ -129,6 +129,21 @@ describe("langfuse-service v4 OTLP export", () => {
     expect(
       JSON.parse(second["langfuse.observation.cost_details"] as string).total,
     ).toBeCloseTo(0.02);
+  });
+
+  it("skips a replayed stats snapshot that adds no tokens", () => {
+    const snapshot = {
+      conversationId: "conv-replay",
+      modelName: "m",
+      accumulatedCost: 0.01,
+      promptTokens: 100,
+      completionTokens: 10,
+      cacheReadTokens: 40,
+    };
+    recordStatsGeneration(snapshot);
+    recordStatsGeneration(snapshot);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("tracks deltas independently per model and resets on counter rollback", () => {

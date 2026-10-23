@@ -37,7 +37,69 @@ export function createCursorStreamJsonState() {
     errorMessage: null,
     resultText: "",
     sessionId: null,
+    usage: null,
   };
+}
+
+function positiveTokenCount(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  return Math.round(count);
+}
+
+/**
+ * Cursor's terminal `result` event carries the billed tokens for that
+ * invocation. ACP `PromptResponse.usage` is what the agent server adds
+ * into conversation stats (and from there into Langfuse).
+ */
+export function acpUsageFromCursorEvent(event) {
+  const raw = event?.usage;
+  if (!raw || typeof raw !== "object") return null;
+  const inputTokens = positiveTokenCount(raw.inputTokens ?? raw.input_tokens);
+  const outputTokens = positiveTokenCount(
+    raw.outputTokens ?? raw.output_tokens,
+  );
+  const cachedReadTokens = positiveTokenCount(
+    raw.cacheReadTokens ??
+      raw.cachedReadTokens ??
+      raw.cache_read_input_tokens ??
+      raw.cached_read_tokens,
+  );
+  const cachedWriteTokens = positiveTokenCount(
+    raw.cacheWriteTokens ??
+      raw.cachedWriteTokens ??
+      raw.cache_creation_input_tokens ??
+      raw.cached_write_tokens,
+  );
+  const thoughtTokens = positiveTokenCount(
+    raw.thoughtTokens ??
+      raw.reasoningTokens ??
+      raw.thought_tokens ??
+      raw.reasoning_tokens,
+  );
+  if (
+    !inputTokens &&
+    !outputTokens &&
+    !cachedReadTokens &&
+    !cachedWriteTokens &&
+    !thoughtTokens
+  ) {
+    return null;
+  }
+  const usage = {
+    inputTokens,
+    outputTokens,
+    totalTokens:
+      inputTokens +
+      outputTokens +
+      cachedReadTokens +
+      cachedWriteTokens +
+      thoughtTokens,
+  };
+  if (cachedReadTokens) usage.cachedReadTokens = cachedReadTokens;
+  if (cachedWriteTokens) usage.cachedWriteTokens = cachedWriteTokens;
+  if (thoughtTokens) usage.thoughtTokens = thoughtTokens;
+  return usage;
 }
 
 export function cursorPrintAgentArgs(model, resumeSessionId, imagePaths = []) {
@@ -231,6 +293,8 @@ export function mapCursorStreamJsonEvent(event, state) {
   if (type === "result") {
     const text = typeof event.result === "string" ? event.result : "";
     state.resultText = text;
+    const usage = acpUsageFromCursorEvent(event);
+    if (usage) state.usage = usage;
     if (event.is_error === true || event.subtype === "error") {
       state.isError = true;
       state.errorMessage = text || "Unknown error from agent -p";
