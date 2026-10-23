@@ -98,6 +98,16 @@ export CF_BROWSER_API_TOKEN="${CF_BROWSER_API_TOKEN}"
 EOF
   chmod 600 /tmp/cf-browser-env
   log "Browser Run credentials written to /tmp/cf-browser-env"
+
+  # Cursor's print-mode bridge launches `agent -p`, which discovers MCPs from
+  # Cursor's own user config rather than the ACP session's mcpServers list.
+  if node /opt/agent-canvas/ensure-cursor-browser-mcp.mjs; then
+    if command -v agent >/dev/null 2>&1; then
+      timeout 15 agent mcp enable cf-browser-run || log_error "Could not approve Cursor browser MCP"
+    fi
+  else
+    log_error "Could not configure Cursor browser MCP"
+  fi
 fi
 
 # GitHub HTTPS clones in the web console have no TTY. Use the Starship

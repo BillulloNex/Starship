@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   disabled_skills: [],
   mcp_config: {
     "cloudflare-browser-run": {
+      transport: "stdio",
       command: "/usr/local/bin/cf-browser-mcp",
       args: [],
     },
@@ -55,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enable_sub_agents: false,
     mcp_config: {
       "cloudflare-browser-run": {
+        transport: "stdio",
         command: "/usr/local/bin/cf-browser-mcp",
         args: [],
       },
