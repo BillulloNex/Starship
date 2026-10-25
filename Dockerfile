@@ -258,6 +258,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     chmod -R a+rX /opt/openhands-shared-sdk-venv
 ENV AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
 
+# When an in-flight ACP prompt is superseded by a newer message, do not mark
+# the cancelled message as delivered. Replay it on the next run so external
+# agents (Cursor, Codex, Antigravity) never drop user turns (incident 2026-10-24).
+# Runs after the shared SDK venv is built so both SDK copies get patched.
+COPY patches/fix-acp-superseded-prompt-replay.py /tmp/fix-acp-superseded-prompt-replay.py
+RUN python3 /tmp/fix-acp-superseded-prompt-replay.py && rm /tmp/fix-acp-superseded-prompt-replay.py
+
 # ── Observability (Datadog APM + Langfuse HTTP OTLP + GlitchTip/Sentry) ────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
