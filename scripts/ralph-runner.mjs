@@ -15,7 +15,9 @@ import path from 'path';
 import { execSync, spawn } from 'child_process';
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
-try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -267,6 +269,10 @@ async function main() {
     const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
     if (elapsedMinutes >= maxDuration) {
       log(`🛑 Max duration reached (${elapsedMinutes.toFixed(1)}m >= ${maxDuration}m). Stopping loop.`, colors.red);
+      Sentry?.captureMessage("Ralph loop max duration reached", {
+        level: "warning",
+        extra: { elapsedMinutes: elapsedMinutes.toFixed(1), maxDuration, iteration, cumulativeCostUsd: cumulativeCostUsd.toFixed(2) },
+      });
       break;
     }
 
@@ -297,6 +303,10 @@ async function main() {
     // Check consecutive failure limit
     if (lastFailedStoryId === pendingStory.id && consecutiveFailures >= (budgetCfg.maxConsecutiveFailures || 2)) {
       log(`🛑 Circuit breaker: Story ${pendingStory.id} failed ${consecutiveFailures} times consecutively. Halting.`, colors.red);
+      Sentry?.captureMessage(`Ralph circuit breaker: story ${pendingStory.id} failed ${consecutiveFailures}x`, {
+        level: "error",
+        extra: { storyId: pendingStory.id, storyTitle: pendingStory.title, consecutiveFailures, iteration },
+      });
       break;
     }
 
@@ -312,12 +322,24 @@ async function main() {
     const runResult = await runCommandAsync(command, [], REPO_ROOT);
     cumulativeTurns += 1;
 
+    // Report child non-zero exits
+    if (runResult.code !== 0) {
+      Sentry?.captureMessage(`Ralph agent child exited non-zero: ${runResult.code}`, {
+        level: "warning",
+        extra: { tool, iteration, code: runResult.code, stderrSnippet: (runResult.stderr || "").slice(0, 500) },
+      });
+    }
+
     // Estimate cost & check rate limits
     const iterationCost = estimateCostFromOutput(runResult.stdout + runResult.stderr);
     cumulativeCostUsd += iterationCost;
 
     if (isRateLimit(runResult.stdout + runResult.stderr)) {
       log(`⚠️ Rate limit or quota warning detected. Gracefully exiting to protect subscription.`, colors.yellow);
+      Sentry?.captureMessage("LLM 429 / rate-limit — Ralph loop halted", {
+        level: "warning",
+        extra: { iteration, cumulativeTurns, cumulativeCostUsd: cumulativeCostUsd.toFixed(2), tool, mode },
+      });
       fs.appendFileSync(
         PROGRESS_FILE,
         `\n## Rate Limit Encountered at ${new Date().toISOString()}\n- Pausing loop gracefully.\n`

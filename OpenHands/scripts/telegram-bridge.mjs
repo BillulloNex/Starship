@@ -4,6 +4,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
+
 const TELEGRAM_MESSAGE_LIMIT = 3900;
 const TERMINAL_STATUSES = new Set([
   "idle",
@@ -354,6 +358,10 @@ export function createTelegramUpdateHandler({
     }
 
     const link = conversationLink(publicUrl, conversationId);
+    Sentry?.captureMessage("Telegram conversation stuck running > 30min", {
+      level: "warning",
+      extra: { conversationId },
+    });
     return [
       "The agent is still working. Use /status to check it later.",
       ...(link ? [link] : []),

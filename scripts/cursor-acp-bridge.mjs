@@ -25,7 +25,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
-try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createCursorStreamJsonState,
@@ -861,6 +863,10 @@ export function callAgentPrint(
             },
           )}`,
         );
+        Sentry?.captureMessage(`Cursor agent -p timed out (${timeoutStatus.reason})`, {
+          level: "error",
+          extra: { reason: timeoutStatus.reason, elapsedMs: timeoutStatus.elapsedMs, idleMs, maxMs, stdoutBytes },
+        });
         proc.kill("SIGTERM");
         reject(new Error(errMessage));
       }
@@ -892,12 +898,20 @@ export function callAgentPrint(
         debug(
           `agent -p exited with code ${code}. stderr: ${stderr.slice(0, 200)}`,
         );
+        Sentry?.captureMessage(`Cursor agent -p non-zero exit: ${code}`, {
+          level: "error",
+          extra: { code, stderrSnippet: stderr.slice(0, 500) },
+        });
         reject(
           new Error(`agent -p failed (exit ${code}): ${stderr.slice(0, 200)}`),
         );
         return;
       }
       if (streamState.isError) {
+        Sentry?.captureMessage("ACP tool-call error returned to model", {
+          level: "warning",
+          extra: { errorMessage: (streamState.errorMessage || "").slice(0, 500), sessionId: streamState.sessionId },
+        });
         reject(new Error(streamState.errorMessage || "Unknown error from agent -p"));
         return;
       }
@@ -1009,10 +1023,17 @@ function startNativeMode() {
 
   child.on("error", (err) => {
     debug(`Failed to spawn ${AGENT_BIN}: ${err.message}`);
+    Sentry?.captureMessage(`Cursor agent acp spawn failed: ${err.message}`, { level: "error" });
     process.exit(1);
   });
   child.on("exit", (code, signal) => {
     debug(`agent acp exited code=${code} signal=${signal || ""}`);
+    if (code !== 0) {
+      Sentry?.captureMessage(`Cursor agent acp child exited: code=${code} signal=${signal || ""}`, {
+        level: "error",
+        extra: { code, signal },
+      });
+    }
     process.exit(code ?? 1);
   });
   child.stderr.on("data", (chunk) => {

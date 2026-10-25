@@ -13,7 +13,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
-try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
 
 const CONFIG = {
   project: process.env.SHIP_JIRA_PROJECT || "SHIP",
@@ -243,6 +245,10 @@ async function waitForConversation(id) {
     }
     await sleep(10_000);
   }
+  Sentry?.captureMessage("Conversation stuck running > timeout", {
+    level: "error",
+    extra: { conversationId: id, timeoutMs: CONFIG.conversationTimeoutMs, orchestrator: "ship-jira" },
+  });
   throw new Error(`Conversation ${id} exceeded timeout`);
 }
 
@@ -284,6 +290,10 @@ async function waitForDeploy(creds, sha) {
     }
     await sleep(15_000);
   }
+  Sentry?.captureMessage("Deployment exceeded timeout", {
+    level: "error",
+    extra: { sha, timeoutMs: CONFIG.deployTimeoutMs, orchestrator: "ship-jira" },
+  });
   throw new Error(`Deployment for ${sha} exceeded timeout`);
 }
 

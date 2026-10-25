@@ -12,7 +12,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
-try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
 
 const CONFIG = {
   repo: process.env.SHIP_REPO_DIR || process.env.AUTO_CLONE_TARGET || "/projects/Grokbot",
@@ -122,6 +124,10 @@ async function waitForConversation(id) {
     }
     await sleep(10_000);
   }
+  Sentry?.captureMessage("Conversation stuck running > timeout", {
+    level: "error",
+    extra: { conversationId: id, timeoutMs: CONFIG.conversationTimeoutMs, orchestrator: "ship-log-monitor" },
+  });
   throw new Error(`Conversation ${id} exceeded timeout`);
 }
 

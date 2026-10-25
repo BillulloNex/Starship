@@ -11,6 +11,10 @@ import path from "node:path";
 import process from "node:process";
 import { DEFAULT_BLOCKED_PORTS, isPreviewablePort, listListeningPorts } from "./preview-proxy.mjs";
 
+let _Sentry = null;
+try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+const Sentry = _Sentry;
+
 export const DEFAULT_REGISTRY_PATH =
   process.env.GROKBOT_APPS_REGISTRY_PATH ||
   (existsSync("/projects")
@@ -506,6 +510,14 @@ export async function startApp(name, registryPath = DEFAULT_REGISTRY_PATH) {
       PORT: String(app.port),
       HOST: "0.0.0.0",
     },
+  });
+  child.on("exit", (code) => {
+    if (code !== 0 && code !== null) {
+      Sentry?.captureMessage(`User app "${app.name}" crashed: exit code ${code}`, {
+        level: "warning",
+        extra: { name: app.name, port: app.port, code },
+      });
+    }
   });
   child.unref();
 
