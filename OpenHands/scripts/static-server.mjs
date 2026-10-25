@@ -34,6 +34,9 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import sirv from "sirv";
 
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+import "./glitchtip-server.mjs";
+
 import {
   applyCorsHeaders,
   createProxyHandlers,
@@ -471,7 +474,14 @@ function makeConfigInjectionScript(
 
   if (parts.length === 0) return "";
 
-  return `<script>(function(){${parts.join("")}}());</script>`;
+  // Pre-init error buffer: capture errors that fire before Sentry loads.
+  // The frontend glitchtip.ts replays these after Sentry.init().
+  const preInitBuffer =
+    `window.__SENTRY_BUFFER__=[];` +
+    `window.addEventListener("error",function(e){window.__SENTRY_BUFFER__.push(e)});` +
+    `window.addEventListener("unhandledrejection",function(e){window.__SENTRY_BUFFER__.push(e)});`;
+
+  return `<script>(function(){${preInitBuffer}${parts.join("")}}());</script>`;
 }
 
 /**
@@ -1276,6 +1286,53 @@ export function startStaticServer(config) {
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // ── GlitchTip same-origin tunnel ─────────────────────────────────────
+    // Bypasses ad-blockers by proxying Sentry envelopes through same-origin.
+    // Hardcoded upstream — NEVER use DSN host from envelope as destination.
+    if (parsedUrl.pathname === "/api/glitchtip-tunnel" && req.method === "POST") {
+      const GLITCHTIP_UPSTREAM = "https://glitchtip.beenex.cloud";
+      const ALLOWED_PROJECT_IDS = new Set(
+        (process.env.GLITCHTIP_PROJECT_IDS || "4,5,6,7,8").split(",").map(s => s.trim()),
+      );
+      const MAX_BODY = 256 * 1024; // 256KB
+
+      let body = Buffer.alloc(0);
+      let aborted = false;
+      req.on("data", (chunk) => {
+        body = Buffer.concat([body, chunk]);
+        if (body.length > MAX_BODY) {
+          aborted = true;
+          req.destroy();
+          if (!res.headersSent) res.writeHead(413).end();
+        }
+      });
+      req.on("end", () => {
+        if (aborted) return;
+        try {
+          const nlIdx = body.indexOf(10); // newline
+          if (nlIdx < 0) { res.writeHead(400).end(); return; }
+          const firstLine = body.toString("utf8", 0, nlIdx);
+          const envelope = JSON.parse(firstLine);
+          const dsnUrl = new URL(envelope.dsn);
+          const projectId = dsnUrl.pathname.replace(/^\//, "");
+          if (!ALLOWED_PROJECT_IDS.has(projectId)) {
+            res.writeHead(403).end();
+            return;
+          }
+          fetch(`${GLITCHTIP_UPSTREAM}/api/${projectId}/envelope/`, {
+            method: "POST",
+            body,
+            headers: { "Content-Type": "application/x-sentry-envelope" },
+          })
+            .then((r) => res.writeHead(r.status).end())
+            .catch(() => res.writeHead(502).end());
+        } catch {
+          res.writeHead(400).end();
         }
       });
       return;

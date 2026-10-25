@@ -56,6 +56,35 @@ set -uo pipefail
 log() { printf '[agent-canvas] %s\n' "$*"; }
 log_error() { printf '[agent-canvas] ERROR: %s\n' "$*" >&2; }
 
+# ── GlitchTip boot marker (durable unclean-shutdown detection) ───────────────
+# On boot: if a stale marker exists, the previous run died without cleanup.
+# Report it, then write a new marker. On clean exit: remove marker.
+GLITCHTIP_BOOT_MARKER="${HOME}/.openhands/glitchtip-boot-marker"
+_check_boot_marker() {
+  if [ -f "$GLITCHTIP_BOOT_MARKER" ]; then
+    local prev_boot
+    prev_boot="$(cat "$GLITCHTIP_BOOT_MARKER" 2>/dev/null || echo "unknown")"
+    log_error "Previous run died uncleanly (boot_id=$prev_boot). Possible OOM or crash."
+    # If GlitchTip Node DSN is set, report via a one-shot node call
+    if [ -n "${GLITCHTIP_NODE_DSN:-}" ]; then
+      node -e "
+        import('@sentry/node').then(Sentry => {
+          Sentry.init({ dsn: process.env.GLITCHTIP_NODE_DSN, sampleRate: 1.0, tracesSampleRate: 0 });
+          Sentry.captureMessage('Container crashed or OOM-killed on previous run (boot_id=${prev_boot})', 'fatal');
+          Sentry.close(2000).then(() => process.exit(0));
+        }).catch(() => process.exit(0));
+      " 2>/dev/null || true
+    fi
+  fi
+  # Write new marker
+  mkdir -p "$(dirname "$GLITCHTIP_BOOT_MARKER")"
+  printf '%s' "$(date -u +%Y%m%d%H%M%S)-$$" > "$GLITCHTIP_BOOT_MARKER"
+}
+_remove_boot_marker() {
+  rm -f "$GLITCHTIP_BOOT_MARKER" 2>/dev/null || true
+}
+_check_boot_marker
+
 # ── Load centralized defaults (generated from config/defaults.json at build) ─
 # shellcheck source=/dev/null
 if [ -f /opt/agent-canvas/defaults.env ]; then
@@ -225,6 +254,19 @@ if [ -z "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ] && [ -n "$LANGFUSE_PK" ] && [ -n "$
   log "Langfuse OTEL telemetry configured (HTTP/protobuf) → ${LANGFUSE_HOST}"
 fi
 
+# ── GlitchTip error tracking ─────────────────────────────────────────────────
+# When GLITCHTIP_DSN or VITE_GLITCHTIP_DSN is set (via Coolify env), enable
+# server-side error reporting to GlitchTip for Node.js and Python services.
+# Individual per-service DSNs (GLITCHTIP_NODE_DSN, GLITCHTIP_PYTHON_DSN) take
+# precedence if set.
+if [ -n "${GLITCHTIP_DSN:-}" ] || [ -n "${VITE_GLITCHTIP_DSN:-}" ]; then
+  export GLITCHTIP_DSN="${GLITCHTIP_DSN:-${VITE_GLITCHTIP_DSN:-}}"
+  export GLITCHTIP_NODE_DSN="${GLITCHTIP_NODE_DSN:-${GLITCHTIP_DSN}}"
+  export GLITCHTIP_PYTHON_DSN="${GLITCHTIP_PYTHON_DSN:-${GLITCHTIP_DSN}}"
+  export GLITCHTIP_ENVIRONMENT="${GLITCHTIP_ENVIRONMENT:-production}"
+  log "GlitchTip error tracking configured (env=${GLITCHTIP_ENVIRONMENT})"
+fi
+
 # ── Datadog APM + LLM Observability ──────────────────────────────────────────
 # When DD_API_KEY is set (via Coolify env), enable Datadog tracing on the
 # Python services. When DD_LLMOBS_AGENTLESS_ENABLED is true, LLM traces are sent
@@ -288,6 +330,7 @@ PIDS=()
 
 cleanup() {
   log "Shutting down..."
+  _remove_boot_marker
   for pid in "${PIDS[@]}"; do
     kill "$pid" 2>/dev/null || true
   done

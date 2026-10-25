@@ -672,6 +672,172 @@ _init_mcp_oauth_public_callback()
 _init_automation_shared_venv()
 
 
+def _init_glitchtip():
+    """Initialize GlitchTip (Sentry-compatible) error tracking for Python services.
+
+    Three guards prevent leaking into sandbox/tool processes:
+      1. Opt-in: only when GLITCHTIP_PYTHON_DSN is set
+      2. Process name: only known agent-server/automation processes
+      3. No double-init in child processes
+    """
+    dsn = os.environ.get("GLITCHTIP_PYTHON_DSN", "").strip()
+    if not dsn:
+        # Fallback to generic DSN — same project, differentiated by service tag
+        dsn = os.environ.get("GLITCHTIP_DSN", "").strip()
+    if not dsn:
+        return
+
+    # Guard 2: Skip sandbox processes, pip, tools, user apps
+    argv0 = os.path.basename(sys.argv[0]) if sys.argv else ""
+    ALLOWED_PROCESSES = {
+        "grokbot_agent_server.py", "openhands-agent-server",
+        "automation", "uvicorn", "gunicorn",
+    }
+    if not any(allowed in argv0 for allowed in ALLOWED_PROCESSES):
+        return
+
+    # Guard 3: Don't double-init in child processes
+    if os.environ.get("_GLITCHTIP_INITIALIZED") == "1":
+        return
+    os.environ["_GLITCHTIP_INITIALIZED"] = "1"
+
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.logging import LoggingIntegration
+        import re
+
+        # Version detection
+        version = "unknown"
+        for vpath in ("/opt/agent-canvas/VERSION",):
+            try:
+                with open(vpath) as f:
+                    version = f.read().strip()
+                break
+            except Exception:
+                pass
+
+        # Service name detection
+        server_name = argv0.replace(".py", "")
+        service = "automation" if "automat" in argv0 else "agent-server"
+
+        # Secret patterns (same as Node.js scrubber)
+        SECRET_PATTERNS = [
+            re.compile(r"sk-or-v1-[a-f0-9]+", re.I),
+            re.compile(r"sk-ant-[a-zA-Z0-9_-]+", re.I),
+            re.compile(r"ship_pat_[a-zA-Z0-9]+", re.I),
+            re.compile(r"gf_[a-f0-9]{20,}", re.I),
+            re.compile(r"Bearer\s+[^\s\"']+", re.I),
+            re.compile(r"session_api_key=[^\s&\"']+", re.I),
+            re.compile(r"AIza[a-zA-Z0-9_-]{35}", re.I),
+            re.compile(r"DD_API_KEY=\S+", re.I),
+        ]
+        SCRUB_HEADERS = {
+            "authorization", "x-session-api-key", "cookie",
+            "set-cookie", "x-api-key",
+        }
+
+        def _scrub_str(s):
+            if not isinstance(s, str):
+                return s
+            for p in SECRET_PATTERNS:
+                s = p.sub("[REDACTED]", s)
+            return s
+
+        def before_send(event, hint):
+            # Scrub request headers
+            if event.get("request", {}).get("headers"):
+                for h in list(event["request"]["headers"].keys()):
+                    if h.lower() in SCRUB_HEADERS:
+                        event["request"]["headers"][h] = "[REDACTED]"
+            # Scrub query string
+            if event.get("request", {}).get("query_string"):
+                qs = event["request"]["query_string"]
+                qs = re.sub(r"session_api_key=[^&]+", "session_api_key=[REDACTED]", qs)
+                qs = re.sub(r"token=[^&]+", "token=[REDACTED]", qs)
+                event["request"]["query_string"] = qs
+            # Scrub exception values
+            for exc in event.get("exception", {}).get("values", []):
+                if exc.get("value"):
+                    exc["value"] = _scrub_str(exc["value"])
+                # Scrub stack frame locals (should be off, but belt-and-suspenders)
+                for frame in exc.get("stacktrace", {}).get("frames", []):
+                    if frame.get("vars"):
+                        for key, val in frame["vars"].items():
+                            if isinstance(val, str):
+                                frame["vars"][key] = _scrub_str(val)
+            # Scrub breadcrumbs
+            for bc in event.get("breadcrumbs", {}).get("values", []):
+                if bc.get("message"):
+                    bc["message"] = _scrub_str(bc["message"])
+            # Scrub message
+            if event.get("message"):
+                event["message"] = _scrub_str(event["message"])
+            return event
+
+        sentry_sdk.init(
+            dsn=dsn,
+            release=f"grokbot-python@{version}",
+            environment=os.environ.get("GLITCHTIP_ENVIRONMENT",
+                                       os.environ.get("NODE_ENV", "production")),
+            server_name=server_name,
+            sample_rate=1.0,
+            traces_sample_rate=0,
+            send_default_pii=False,
+            include_local_variables=False,  # Prevents secret leakage
+            before_send=before_send,
+            integrations=[
+                LoggingIntegration(level=None, event_level="ERROR"),
+            ],
+            ignore_errors=[
+                "KeyboardInterrupt",
+                "SystemExit",
+            ],
+        )
+
+        # Set service context
+        sentry_sdk.set_tag("service", service)
+        sentry_sdk.set_tag("process", server_name)
+
+        # Threading excepthook
+        import threading
+        _orig_excepthook = sys.excepthook
+        def _sentry_excepthook(exc_type, exc_value, exc_tb):
+            sentry_sdk.capture_exception((exc_type, exc_value, exc_tb))
+            _orig_excepthook(exc_type, exc_value, exc_tb)
+        sys.excepthook = _sentry_excepthook
+        threading.excepthook = lambda args: sentry_sdk.capture_exception(args.exc_value)
+
+        # Asyncio exception handler
+        import asyncio
+        def _asyncio_handler(loop, context):
+            exc = context.get("exception")
+            if exc:
+                sentry_sdk.capture_exception(exc)
+        try:
+            asyncio.get_event_loop().set_exception_handler(_asyncio_handler)
+        except RuntimeError:
+            pass
+
+        # Flush on exit
+        import atexit
+        atexit.register(sentry_sdk.flush, timeout=2)
+
+        print(
+            f"[grokbot-sitecustomize] GlitchTip init OK — "
+            f"release=grokbot-python@{version}, service={service}, "
+            f"process={server_name}",
+            file=sys.stderr, flush=True,
+        )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] GlitchTip init FAILED: {e}",
+            file=sys.stderr, flush=True,
+        )
+
+
+_init_glitchtip()
+
+
 def _background_sync():
     import time
     for _ in range(10):

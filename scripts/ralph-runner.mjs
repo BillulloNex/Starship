@@ -13,6 +13,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync, spawn } from 'child_process';
+
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

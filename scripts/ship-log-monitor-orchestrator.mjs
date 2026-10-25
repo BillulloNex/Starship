@@ -11,6 +11,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+
 const CONFIG = {
   repo: process.env.SHIP_REPO_DIR || process.env.AUTO_CLONE_TARGET || "/projects/Grokbot",
   agentUrl: process.env.SHIP_AGENT_URL || "http://127.0.0.1:18000",

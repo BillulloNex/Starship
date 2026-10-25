@@ -12,6 +12,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
+
 const CONFIG = {
   project: process.env.SHIP_JIRA_PROJECT || "SHIP",
   pollMs: Number(process.env.SHIP_JIRA_POLL_MS || 120_000),

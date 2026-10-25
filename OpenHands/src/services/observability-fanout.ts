@@ -101,7 +101,7 @@ export function fanoutGeneration(data: GenerationData): void {
     try {
       backend.recordGeneration(data);
     } catch (err) {
-      console.warn(
+      console.error(
         `[observability:${backend.name}] recordGeneration error:`,
         err,
       );
@@ -116,7 +116,7 @@ export function fanoutToolCall(data: ToolCallData): void {
     try {
       backend.recordToolCall(data);
     } catch (err) {
-      console.warn(
+      console.error(
         `[observability:${backend.name}] recordToolCall error:`,
         err,
       );

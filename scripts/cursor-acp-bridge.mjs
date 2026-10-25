@@ -23,6 +23,9 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+try { await import("./glitchtip-server.mjs"); } catch { /* optional */ }
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createCursorStreamJsonState,

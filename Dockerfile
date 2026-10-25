@@ -25,6 +25,10 @@ COPY OpenHands/package.json OpenHands/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
+# Install @sentry/node for server-side error tracking (separate from browser SDK).
+# This runs in the build stage so node_modules are available for COPY to final.
+RUN npm install --no-save @sentry/node@11
+
 # Patch Browser MCP catalog entry to use persistent chrome-profile directory.
 # Without this, @browsermcp/mcp uses a temp profile that dies with the container.
 RUN node -e " \
@@ -254,16 +258,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     chmod -R a+rX /opt/openhands-shared-sdk-venv
 ENV AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
 
-# ── Observability (Datadog APM + Langfuse HTTP OTLP) ───────────────────────────
+# ── Observability (Datadog APM + Langfuse HTTP OTLP + GlitchTip/Sentry) ────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null \
-    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http"; \
+    uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null \
+    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]"; \
     if [ -d /agent-server/.venv ]; then \
-      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null || true; \
     fi; \
     if [ -d /openhands/.venv ]; then \
-      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" 2>/dev/null || true; \
+      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null || true; \
     fi
 
 # Install Bun and Antigravity CLI (agy)
@@ -381,6 +385,9 @@ COPY OpenHands/scripts/claude-usage-proxy.mjs /opt/agent-canvas/claude-usage-pro
 COPY OpenHands/scripts/cursor-api-proxy.mjs /opt/agent-canvas/cursor-api-proxy.mjs
 COPY OpenHands/scripts/cloudflare-models-proxy.mjs /opt/agent-canvas/cloudflare-models-proxy.mjs
 COPY OpenHands/scripts/langfuse-proxy.mjs /opt/agent-canvas/langfuse-proxy.mjs
+# GlitchTip server-side error tracking (scrubber + SDK init)
+COPY OpenHands/scripts/glitchtip-scrub.mjs /opt/agent-canvas/glitchtip-scrub.mjs
+COPY OpenHands/scripts/glitchtip-server.mjs /opt/agent-canvas/glitchtip-server.mjs
 COPY OpenHands/scripts/opencode-api-proxy.mjs /opt/agent-canvas/opencode-api-proxy.mjs
 COPY OpenHands/scripts/telegram-bridge.mjs /opt/agent-canvas/telegram-bridge.mjs
 COPY OpenHands/scripts/preview-proxy.mjs /opt/agent-canvas/preview-proxy.mjs
@@ -420,6 +427,9 @@ COPY --from=frontend-build /build/node_modules/@polka /opt/agent-canvas/node_mod
 COPY --from=frontend-build /build/node_modules/mrmime /opt/agent-canvas/node_modules/mrmime
 COPY --from=frontend-build /build/node_modules/totalist /opt/agent-canvas/node_modules/totalist
 COPY --from=frontend-build /build/node_modules/ws /opt/agent-canvas/node_modules/ws
+# @sentry/node for server-side GlitchTip error tracking
+COPY --from=frontend-build /build/node_modules/@sentry /opt/agent-canvas/node_modules/@sentry
+COPY --from=frontend-build /build/node_modules/@opentelemetry /opt/agent-canvas/node_modules/@opentelemetry
 # Fail the build if static-server.mjs imports a local module that was not
 # copied above — a missing one crash-loops the container on boot.
 RUN cd /opt/agent-canvas && \

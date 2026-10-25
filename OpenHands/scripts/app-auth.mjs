@@ -77,6 +77,7 @@ const PUBLIC_EXACT_PATHS = new Set([
   "/api/github/oauth/callback",
   "/api/github/oauth/setup",
   "/api/github/webhook",
+  "/api/glitchtip-tunnel",
   LOGIN_PATH,
   LOGOUT_PATH,
 ]);

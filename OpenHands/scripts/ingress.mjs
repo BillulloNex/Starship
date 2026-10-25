@@ -24,6 +24,10 @@
 import { createServer } from "node:http";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+
+// GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+import "./glitchtip-server.mjs";
+
 import { createWorkbenchTerminalHandler } from "./workbench-terminal.mjs";
 
 import {

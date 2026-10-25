@@ -76,8 +76,12 @@ export const useWebSocket = <T = string>(
       const canReconnect = allowedToReconnectRef.current.has(ws);
       setIsConnected(false);
       // If the connection closes with an error code, treat it as an error
-      if (event.code !== 1000) {
-        // 1000 is normal closure
+      if (event.code !== 1000 && event.code !== 1001) {
+        // 1000 = normal closure, 1001 = going away (page unload)
+        // Log abnormal closes so GlitchTip's captureConsoleIntegration catches them
+        console.error(
+          `[WebSocket] Abnormal close: code=${event.code} reason="${event.reason || "unknown"}" url=${url}`,
+        );
         setError(
           new Error(
             `WebSocket closed with code ${event.code}: ${event.reason || "Connection closed unexpectedly"}`,
@@ -114,6 +118,7 @@ export const useWebSocket = <T = string>(
     };
 
     ws.onerror = (event) => {
+      console.error("[WebSocket] Connection error", { url });
       setIsConnected(false);
       optionsRef.current?.onError?.(event);
     };
