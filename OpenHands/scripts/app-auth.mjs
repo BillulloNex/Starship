@@ -911,6 +911,8 @@ export function createAppAuth(options = {}) {
   function isPublicPath(pathname) {
     if (PUBLIC_HEALTH_PATHS.has(pathname)) return isProxied(pathname);
     if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
+    // GlitchTip webhook uses secret-in-path (no HMAC signing available)
+    if (pathname.startsWith("/api/automation/glitchtip-webhook/")) return true;
     if (pathname === APP_AUTH_API_PREFIX) return false;
     if (pathname.startsWith(`${APP_AUTH_API_PREFIX}/`)) {
       return !ADMIN_API_PATHS.has(pathname);

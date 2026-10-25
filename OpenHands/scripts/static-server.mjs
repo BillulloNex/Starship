@@ -1338,6 +1338,112 @@ export function startStaticServer(config) {
       return;
     }
 
+    // ── GlitchTip Auto-Fix Webhook (Phase 7) ──────────────────────────────
+    // Receives GlitchTip/Sentry webhook alerts and creates Jira tickets.
+    // Auth: secret-in-path (GlitchTip doesn't support HMAC signing).
+    // Path is already public in app-auth.mjs (prefix match).
+    const GLITCHTIP_WEBHOOK_PREFIX = "/api/automation/glitchtip-webhook/";
+    if (parsedUrl.pathname.startsWith(GLITCHTIP_WEBHOOK_PREFIX) && req.method === "POST") {
+      const WEBHOOK_SECRET = process.env.GLITCHTIP_WEBHOOK_SECRET || "";
+      const pathSecret = parsedUrl.pathname.slice(GLITCHTIP_WEBHOOK_PREFIX.length);
+
+      // Constant-time comparison to prevent timing attacks
+      const secretValid = WEBHOOK_SECRET.length > 0
+        && pathSecret.length === WEBHOOK_SECRET.length
+        && (await import("node:crypto")).then((c) => c.timingSafeEqual(
+          Buffer.from(pathSecret, "utf8"),
+          Buffer.from(WEBHOOK_SECRET, "utf8"),
+        )).catch(() => false);
+
+      if (!await secretValid) {
+        res.writeHead(403).end("Forbidden");
+        return;
+      }
+
+      let body = Buffer.alloc(0);
+      req.on("data", (chunk) => { body = Buffer.concat([body, chunk]); });
+      req.on("end", async () => {
+        try {
+          const payload = JSON.parse(body.toString("utf8"));
+
+          // Self-loop prevention: skip events from auto-fix commits
+          const tags = payload?.event?.tags || payload?.data?.event?.tags || {};
+          const tagList = Array.isArray(tags) ? tags : Object.entries(tags).map(([k, v]) => ({ key: k, value: v }));
+          const isAutoFix = tagList.some((t) => (t.key || t[0]) === "source" && (t.value || t[1]) === "auto-fix");
+          const isTest = tagList.some((t) => (t.key || t[0]) === "test" && String(t.value || t[1]) === "true");
+          if (isAutoFix || isTest) {
+            res.writeHead(200).end(JSON.stringify({ skipped: true, reason: isAutoFix ? "auto-fix" : "test" }));
+            return;
+          }
+
+          // Extract error info from GlitchTip/Sentry webhook payload
+          const event = payload?.event || payload?.data?.event || payload;
+          const title = event?.title || event?.message?.formatted || event?.message || "GlitchTip Error";
+          const issueUrl = payload?.url || "";
+          const level = event?.level || "error";
+          const service = tagList.find((t) => (t.key || t[0]) === "service");
+          const serviceTag = service ? (service.value || service[1]) : "unknown";
+
+          // Create Jira ticket
+          const jiraUrl = process.env.JIRA_URL;
+          const jiraUser = process.env.JIRA_USERNAME;
+          const jiraToken = process.env.JIRA_API_TOKEN;
+          const jiraProject = process.env.SHIP_JIRA_PROJECT || "SHIP";
+
+          if (!jiraUrl || !jiraUser || !jiraToken) {
+            console.error("[glitchtip-webhook] Jira credentials not configured");
+            res.writeHead(500).end(JSON.stringify({ error: "Jira not configured" }));
+            return;
+          }
+
+          const description = [
+            `*GlitchTip Alert* — ${level.toUpperCase()}`,
+            `*Service:* ${serviceTag}`,
+            issueUrl ? `*Link:* ${issueUrl}` : "",
+            "",
+            `{code}`,
+            JSON.stringify(event, null, 2).slice(0, 2000),
+            `{code}`,
+          ].filter(Boolean).join("\n");
+
+          const jiraResp = await fetch(`${jiraUrl}/rest/api/3/issue`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${Buffer.from(`${jiraUser}:${jiraToken}`).toString("base64")}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fields: {
+                project: { key: jiraProject },
+                summary: `[GlitchTip] [${serviceTag}] ${title}`.slice(0, 250),
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [{ type: "paragraph", content: [{ type: "text", text: description.slice(0, 3000) }] }],
+                },
+                issuetype: { name: "Bug" },
+                labels: ["glitchtip", "auto-reported", serviceTag],
+              },
+            }),
+          });
+
+          if (jiraResp.ok) {
+            const result = await jiraResp.json();
+            console.log(`[glitchtip-webhook] Created Jira ticket: ${result.key}`);
+            res.writeHead(201).end(JSON.stringify({ jiraKey: result.key }));
+          } else {
+            const errText = await jiraResp.text().catch(() => "");
+            console.error(`[glitchtip-webhook] Jira API error ${jiraResp.status}: ${errText.slice(0, 200)}`);
+            res.writeHead(502).end(JSON.stringify({ error: "Jira API error", status: jiraResp.status }));
+          }
+        } catch (err) {
+          console.error(`[glitchtip-webhook] ${err.message}`);
+          res.writeHead(400).end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
     const backend = route(req.url ?? "/");
     if (backend) {
       if (
