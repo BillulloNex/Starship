@@ -648,10 +648,17 @@ export function createAppAuth(options = {}) {
       "";
     if (explicit) return explicit.replace(/\/+$/, "");
     const host = String(req?.headers?.host ?? "").trim();
-    const proto =
-      String(req?.headers?.["x-forwarded-proto"] ?? "")
-        .split(",")[0]
-        .trim() || (secureCookies ? "https" : "http");
+    // With secure cookies on, the session and OAuth-nonce cookies only travel
+    // over https, so the origin we hand to Google (and therefore the callback
+    // it redirects to) must be https too. The upstream proxy has been seen
+    // forwarding `x-forwarded-proto: http` for TLS requests; honouring that
+    // produced an http callback, the Secure nonce cookie stayed home, and
+    // every Google sign-in failed in browsers that do not auto-upgrade to
+    // https. Only an explicitly insecure deployment follows the header.
+    const forwardedProto = String(req?.headers?.["x-forwarded-proto"] ?? "")
+      .split(",")[0]
+      .trim();
+    const proto = secureCookies ? "https" : forwardedProto || "http";
     if (host) return `${proto}://${host}`;
     return "https://ship.beenex.org";
   }

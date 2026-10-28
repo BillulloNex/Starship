@@ -50,6 +50,7 @@ describe("app-auth.mjs", () => {
   async function startGatedServer(
     envOverrides: Record<string, string> = {},
     routes: Record<string, string> = {},
+    secureCookies = false,
   ) {
     const dir = makeTempDir();
     const stateDir = makeTempDir();
@@ -64,7 +65,7 @@ describe("app-auth.mjs", () => {
       sessionApiKey: SESSION_KEY,
       storePath: path.join(stateDir, "app-auth.json"),
       secretPath: path.join(stateDir, "secret.txt"),
-      secureCookies: false,
+      secureCookies,
       basePath: "/",
       isProxied: (pathname: string) =>
         Object.keys(routes).some((prefix) => pathname.startsWith(prefix)),
@@ -193,6 +194,42 @@ describe("app-auth.mjs", () => {
       ]) {
         expect(appAuth.isPublicPath(pathname), pathname).toBe(false);
       }
+    });
+  });
+
+  describe("Google sign-in origin", () => {
+    const googleEnv = {
+      AUTH_GOOGLE_CLIENT_ID: "client-id",
+      AUTH_GOOGLE_CLIENT_SECRET: "client-secret",
+    };
+
+    function redirectUriOf(response: Response) {
+      const location = response.headers.get("location") ?? "";
+      return new URL(location).searchParams.get("redirect_uri");
+    }
+
+    it("hands Google an https callback even when the proxy says http", async () => {
+      const { base } = await startGatedServer(googleEnv, {}, true);
+      // fetch() owns the Host header, so assert on the scheme and path.
+      const response = await get(base, "/api/app-auth/google/start", {
+        "x-forwarded-proto": "http",
+      });
+      expect(response.status).toBe(302);
+      const redirectUri = new URL(redirectUriOf(response) ?? "");
+      expect(redirectUri.protocol).toBe("https:");
+      expect(redirectUri.pathname).toBe("/api/app-auth/google/callback");
+      expect(response.headers.get("set-cookie")).toMatch(/Secure/);
+    });
+
+    it("follows the forwarded protocol only for insecure-cookie deployments", async () => {
+      const { base } = await startGatedServer(googleEnv, {}, false);
+      const response = await get(base, "/api/app-auth/google/start", {
+        "x-forwarded-proto": "http",
+      });
+      expect(response.status).toBe(302);
+      const redirectUri = new URL(redirectUriOf(response) ?? "");
+      expect(redirectUri.protocol).toBe("http:");
+      expect(redirectUri.pathname).toBe("/api/app-auth/google/callback");
     });
   });
 
