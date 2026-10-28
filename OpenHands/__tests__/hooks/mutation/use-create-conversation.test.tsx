@@ -130,6 +130,8 @@ describe("useCreateConversation", () => {
     removeStoredConversationMetadata("conv-ref-stamp");
     removeStoredConversationMetadata("conv-kimi");
     removeStoredConversationMetadata("conv-ref-align");
+    removeStoredConversationMetadata("conv-named-align");
+    removeStoredConversationMetadata("conv-named-explicit");
   });
 
   it("passes suggested tasks to the V1 create conversation API", async () => {
@@ -707,6 +709,118 @@ describe("useCreateConversation", () => {
       expect(
         getStoredConversationMetadata("conv-ref-stamp")?.active_profile,
       ).toBe("claude"),
+    );
+  });
+
+  it("points a named OpenHands profile at the LLM on the home chip before a home launch", async () => {
+    // Production repro: active agent profile "OpenHands" → "56sol" (GPT via
+    // Codex), home chip showing "base10-muse". The first send must run
+    // base10-muse, not silently switch to 56sol.
+    listAgentProfilesMock.mockResolvedValue({
+      profiles: [
+        {
+          id: "profile-openhands",
+          name: "OpenHands",
+          agent_kind: "openhands",
+          revision: 2,
+          llm_profile_ref: "56sol",
+          mcp_server_refs: null,
+        },
+      ],
+      active_agent_profile_id: "profile-openhands",
+    });
+    listLlmProfilesMock.mockResolvedValue({
+      profiles: [{ name: "56sol" }, { name: "base10-muse" }],
+      active_profile: "base10-muse",
+    });
+    getAgentProfileMock.mockResolvedValue({
+      profile: {
+        name: "OpenHands",
+        agent_kind: "openhands",
+        llm_profile_ref: "56sol",
+      },
+    });
+    const createConversationSpy = vi
+      .spyOn(AgentServerConversationService, "createConversation")
+      .mockResolvedValue({
+        id: "task-id",
+        app_conversation_id: "conv-named-align",
+        agent_server_url: "http://agent-server.local",
+      } as never);
+
+    const { result } = renderHook(() => useCreateConversation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await result.current.mutateAsync({ query: "hello" });
+
+    expect(saveAgentProfileMock).toHaveBeenCalledWith(
+      "OpenHands",
+      expect.objectContaining({
+        agent_kind: "openhands",
+        llm_profile_ref: "base10-muse",
+      }),
+    );
+    expect(createConversationSpy.mock.lastCall?.[0]?.agentProfileId).toBe(
+      "profile-openhands",
+    );
+    await waitFor(() =>
+      expect(
+        getStoredConversationMetadata("conv-named-align")?.active_profile,
+      ).toBe("base10-muse"),
+    );
+  });
+
+  it("keeps a named OpenHands profile's own LLM when it is picked explicitly", async () => {
+    // The in-conversation agent picker passes agentProfileId: that is a
+    // deliberate profile choice, so the home chip must not override its ref.
+    listAgentProfilesMock.mockResolvedValue({
+      profiles: [
+        {
+          id: "profile-modal",
+          name: "modal",
+          agent_kind: "openhands",
+          revision: 1,
+          llm_profile_ref: "modal-kimi-k3",
+          mcp_server_refs: null,
+        },
+      ],
+      active_agent_profile_id: null,
+    });
+    listLlmProfilesMock.mockResolvedValue({
+      profiles: [{ name: "modal-kimi-k3" }, { name: "base10-muse" }],
+      active_profile: "base10-muse",
+    });
+    const createConversationSpy = vi
+      .spyOn(AgentServerConversationService, "createConversation")
+      .mockResolvedValue({
+        id: "task-id",
+        app_conversation_id: "conv-named-explicit",
+        agent_server_url: "http://agent-server.local",
+      } as never);
+
+    const { result } = renderHook(() => useCreateConversation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await result.current.mutateAsync({ agentProfileId: "profile-modal" });
+
+    expect(saveAgentProfileMock).not.toHaveBeenCalled();
+    expect(createConversationSpy.mock.lastCall?.[0]?.agentProfileId).toBe(
+      "profile-modal",
+    );
+    await waitFor(() =>
+      expect(
+        getStoredConversationMetadata("conv-named-explicit")?.active_profile,
+      ).toBe("modal-kimi-k3"),
     );
   });
 });

@@ -233,16 +233,26 @@ export const useCreateConversation = (options?: {
         }
       }
 
-      // Home chip shows the standalone active LLM. If we have to launch the
-      // seeded OpenHands `default` via profile id (stale ACP settings, or
-      // cloud), point that profile at the picked LLM before create so the
-      // first turn cannot run a different model.
+      // The home chip shows the standalone active LLM profile, and a pick
+      // there promises "the next conversation launches with it". When the
+      // launch goes through an OpenHands agent profile instead, the server
+      // runs that profile's `llm_profile_ref`, which can be a different model
+      // entirely: with an active profile named e.g. "OpenHands" pointing at
+      // "56sol", picking "base10-muse" on home still started a GPT/Codex
+      // conversation. Point the launch profile at the picked LLM before create
+      // so the first turn cannot run a model other than the one on the chip.
+      // This covers the seeded `default` (stale ACP settings, or cloud) and any
+      // named OpenHands profile reached from home. An explicit
+      // `agentProfileId` (the in-conversation agent picker) is a deliberate
+      // profile pick, so a named profile keeps its own ref there.
+      const isHomeLaunch = agentProfileId === undefined;
       if (
         effectiveAgentProfileId &&
-        resolvedAgentProfile?.name === WELL_KNOWN_DEFAULT_AGENT_PROFILE_NAME &&
-        resolvedAgentProfile.agent_kind === "openhands"
+        resolvedAgentProfile?.agent_kind === "openhands" &&
+        (isHomeLaunch ||
+          resolvedAgentProfile.name === WELL_KNOWN_DEFAULT_AGENT_PROFILE_NAME)
       ) {
-        const defaultProfile = resolvedAgentProfile;
+        const launchProfile = resolvedAgentProfile;
         try {
           const llm = await queryClient.ensureQueryData({
             queryKey: [...LLM_PROFILES_QUERY_KEYS.all, backend.id, orgId],
@@ -252,28 +262,28 @@ export const useCreateConversation = (options?: {
           const picked = llm.active_profile;
           if (
             picked &&
-            picked !== defaultProfile.llm_profile_ref &&
+            picked !== launchProfile.llm_profile_ref &&
             llm.profiles.some((profile) => profile.name === picked)
           ) {
             const detail = await queryClient.ensureQueryData({
               queryKey: agentProfileDetailQueryKey(
                 backend.id,
                 orgId,
-                defaultProfile.name,
+                launchProfile.name,
               ),
               queryFn: () =>
-                AgentProfilesService.getProfile(defaultProfile.name),
+                AgentProfilesService.getProfile(launchProfile.name),
               ...AGENT_PROFILES_RETRY_OPTIONS,
             });
             await AgentProfilesService.saveProfile(
-              defaultProfile.name,
+              launchProfile.name,
               mergeAgentProfileSaveInput(detail.profile, {
                 agent_kind: "openhands",
                 llm_profile_ref: picked,
               }),
             );
             resolvedAgentProfile = {
-              ...defaultProfile,
+              ...launchProfile,
               llm_profile_ref: picked,
             };
           }
