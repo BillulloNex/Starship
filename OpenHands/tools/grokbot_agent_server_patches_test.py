@@ -1,8 +1,12 @@
 import threading
 import time
+import types
 import unittest
 
-from grokbot_agent_server_patches import bound_conversation_close
+from grokbot_agent_server_patches import (
+    bound_conversation_close,
+    disable_tool_usability,
+)
 
 
 def make_conversation_cls(body):
@@ -57,6 +61,26 @@ class BoundConversationCloseTests(unittest.TestCase):
         patched = cls.close
         self.assertFalse(bound_conversation_close(cls, 5))
         self.assertIs(cls.close, patched)
+
+
+class DisableToolUsabilityTests(unittest.TestCase):
+    def make_registry(self):
+        return types.SimpleNamespace(_check_tool_usable=lambda name, checker: checker())
+
+    def test_named_tool_is_unusable_and_others_untouched(self):
+        registry = self.make_registry()
+        self.assertTrue(disable_tool_usability(registry, "browser_tool_set"))
+
+        self.assertFalse(registry._check_tool_usable("browser_tool_set", lambda: True))
+        self.assertTrue(registry._check_tool_usable("terminal", lambda: True))
+        self.assertFalse(registry._check_tool_usable("terminal", lambda: False))
+
+    def test_disabling_twice_is_a_noop(self):
+        registry = self.make_registry()
+        disable_tool_usability(registry, "browser_tool_set")
+        patched = registry._check_tool_usable
+        self.assertFalse(disable_tool_usability(registry, "browser_tool_set"))
+        self.assertIs(registry._check_tool_usable, patched)
 
 
 if __name__ == "__main__":

@@ -404,6 +404,7 @@ COPY OpenHands/scripts/grokbot-app.mjs /opt/agent-canvas/grokbot-app.mjs
 RUN chmod +x /opt/agent-canvas/grokbot-app.mjs && ln -sf /opt/agent-canvas/grokbot-app.mjs /usr/local/bin/grokbot-app
 COPY OpenHands/scripts/job-board.mjs /opt/agent-canvas/job-board.mjs
 RUN chmod +x /opt/agent-canvas/job-board.mjs && ln -sf /opt/agent-canvas/job-board.mjs /usr/local/bin/grokbot-job
+COPY OpenHands/scripts/agent-server-watchdog.mjs /opt/agent-canvas/agent-server-watchdog.mjs
 COPY OpenHands/scripts/computer-broker.mjs /opt/agent-canvas/computer-broker.mjs
 RUN chmod +x /opt/agent-canvas/computer-broker.mjs && ln -sf /opt/agent-canvas/computer-broker.mjs /usr/local/bin/grokbot-computer
 COPY OpenHands/scripts/grokbot-deploy.mjs /opt/agent-canvas/grokbot-deploy.mjs

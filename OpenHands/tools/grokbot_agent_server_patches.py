@@ -84,6 +84,38 @@ def bound_conversation_close(conversation_cls, timeout_seconds: float) -> bool:
     return True
 
 
+BROWSER_TOOL_NAME = "browser_tool_set"
+
+
+def disable_tool_usability(registry, tool_name: str) -> bool:
+    """Make the SDK tool registry report ``tool_name`` as unusable.
+
+    The image hides Chromium behind a shim that exits 1 (agents browse through
+    chrome-devtools-mcp instead), but the shim still satisfies the browser
+    tool's usability check. So the agent-server appended ``browser_tool_set``
+    to every profile launch without an explicit tool list, and on 2026-11-02 a
+    browser_use launch against the shim hung the conversation's close.
+
+    ``is_tool_usable`` (profile-launch injection) and ``list_usable_tools``
+    (``/server_info``, which the canvas also gates on) both resolve
+    ``registry._check_tool_usable`` at call time, so wrapping it holds no matter
+    when the tool registers. Conversations that already persisted the tool keep
+    it; the bounded close above contains those.
+    """
+    original = registry._check_tool_usable
+    if getattr(original, "_grokbot_disabled", None) == tool_name:
+        return False
+
+    def check(name, checker):
+        if name == tool_name:
+            return False
+        return original(name, checker)
+
+    check._grokbot_disabled = tool_name  # type: ignore[attr-defined]
+    registry._check_tool_usable = check
+    return True
+
+
 def _apply() -> None:
     try:
         from openhands.sdk.conversation.impl.local_conversation import (
@@ -94,6 +126,14 @@ def _apply() -> None:
             logger.info("[grokbot] Bounded LocalConversation.close")
     except Exception:
         logger.exception("[grokbot] Could not bound LocalConversation.close")
+
+    try:
+        from openhands.sdk.tool import registry
+
+        if disable_tool_usability(registry, BROWSER_TOOL_NAME):
+            logger.info("[grokbot] Disabled %s (Chromium is shimmed)", BROWSER_TOOL_NAME)
+    except Exception:
+        logger.exception("[grokbot] Could not disable %s", BROWSER_TOOL_NAME)
 
 
 _apply()

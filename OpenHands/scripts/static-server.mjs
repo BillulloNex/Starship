@@ -89,6 +89,7 @@ import {
   handleJobBoardRequest,
   startJobBoardDispatcher,
 } from "./job-board.mjs";
+import { startAgentServerWatchdog } from "./agent-server-watchdog.mjs";
 import { handleSkillInstallRequest } from "./skill-installer.mjs";
 import { createWorkbenchTerminalHandler } from "./workbench-terminal.mjs";
 import { initPostHogLogs, phLog } from "./posthog-logs.mjs";
@@ -1607,6 +1608,12 @@ export function startStaticServer(config) {
         });
         server.on("close", stopDispatcher);
         console.log("  Job board dispatcher: armed (auto-run when enabled)");
+        const stopWatchdog = startAgentServerWatchdog({
+          agentServerUrl,
+          apiKey: dispatchApiKey,
+        });
+        server.on("close", stopWatchdog);
+        console.log("  Agent-server watchdog: armed (conversation lock probe)");
       }
       console.log("");
       resolveListen(server);
