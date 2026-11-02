@@ -108,14 +108,19 @@ export function scrubEvent(event) {
   }
 
   // 5. Scrub breadcrumbs
-  if (event.breadcrumbs?.values) {
-    for (const b of event.breadcrumbs.values) {
-      if (b.message) b.message = scrubStr(b.message);
-      if (b.data) {
-        for (const [key, val] of Object.entries(b.data)) {
-          if (typeof val === "string") {
-            b.data[key] = scrubStr(val);
-          }
+  // The JS SDK sends a plain array; `.values` on an array is
+  // Array.prototype.values, so only accept the wire format when it's an array.
+  const breadcrumbs = Array.isArray(event.breadcrumbs)
+    ? event.breadcrumbs
+    : Array.isArray(event.breadcrumbs?.values)
+      ? event.breadcrumbs.values
+      : [];
+  for (const b of breadcrumbs) {
+    if (b.message) b.message = scrubStr(b.message);
+    if (b.data) {
+      for (const [key, val] of Object.entries(b.data)) {
+        if (typeof val === "string") {
+          b.data[key] = scrubStr(val);
         }
       }
     }

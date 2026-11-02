@@ -13,10 +13,12 @@
  */
 
 import * as Sentry from "@sentry/node";
+import { makeMultiplexedTransport } from "@sentry/core";
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import process from "node:process";
 import { scrubEvent } from "./glitchtip-scrub.mjs";
+import { getSentryDsn } from "./sentry-fanout.mjs";
 
 // ---------------------------------------------------------------------------
 // Version detection
@@ -49,7 +51,7 @@ const SERVER_NAME = basename(process.argv[1] || "node")
 // Map script names to service tags for GlitchTip project separation
 const SERVICE_MAP = {
   "static-server": "node-proxy",
-  "ingress": "node-proxy",
+  ingress: "node-proxy",
   "ship-jira-orchestrator": "orchestrators",
   "ship-log-monitor-orchestrator": "orchestrators",
   "ralph-runner": "orchestrators",
@@ -66,22 +68,38 @@ const service = SERVICE_MAP[SERVER_NAME] || "node-server";
 // Sentry initialization
 // ---------------------------------------------------------------------------
 
-const DSN = process.env.GLITCHTIP_NODE_DSN
-  || process.env.GLITCHTIP_ORCH_DSN
-  || process.env.GLITCHTIP_DSN
+const DSN =
+  process.env.GLITCHTIP_NODE_DSN ||
+  process.env.GLITCHTIP_ORCH_DSN ||
+  process.env.GLITCHTIP_DSN ||
   // Fallback to frontend DSN — same project, differentiated by service tag.
   // Server events are distinguished by tags.process and tags.service.
-  || process.env.VITE_GLITCHTIP_DSN
-  || "";
+  process.env.VITE_GLITCHTIP_DSN ||
+  "";
+
+// Optional mirror to Sentry SaaS. With both set, every envelope goes to both;
+// with only SENTRY_DSN set, Sentry becomes the sole sink.
+const SENTRY_DSN = getSentryDsn();
+const PRIMARY_DSN = DSN || SENTRY_DSN;
 
 let initialized = false;
 
-if (DSN) {
+if (PRIMARY_DSN) {
   try {
     Sentry.init({
-      dsn: DSN,
+      dsn: PRIMARY_DSN,
+      transport:
+        DSN && SENTRY_DSN
+          ? makeMultiplexedTransport(Sentry.makeNodeTransport, () => [
+              DSN,
+              SENTRY_DSN,
+            ])
+          : undefined,
       release: `grokbot-server@${version}`,
-      environment: process.env.GLITCHTIP_ENVIRONMENT || process.env.NODE_ENV || "production",
+      environment:
+        process.env.GLITCHTIP_ENVIRONMENT ||
+        process.env.NODE_ENV ||
+        "production",
       serverName: SERVER_NAME,
       sampleRate: 1.0,
       tracesSampleRate: 0,
@@ -116,7 +134,7 @@ if (DSN) {
             scrubbed.message
               .replace(/[0-9a-f]{8,}/gi, "{ID}")
               .replace(/\/[0-9]+/g, "/{N}")
-              .replace(/port \d+/g, "port {PORT}")
+              .replace(/port \d+/g, "port {PORT}"),
           ];
         }
 
@@ -157,7 +175,8 @@ if (DSN) {
 
     console.log(
       `[glitchtip-server] Initialized — release=grokbot-server@${version}, ` +
-      `process=${SERVER_NAME}, service=${service}`
+        `process=${SERVER_NAME}, service=${service}` +
+        (SENTRY_DSN ? (DSN ? ", mirroring to Sentry" : ", Sentry only") : ""),
     );
   } catch (err) {
     console.error(`[glitchtip-server] Init FAILED: ${err.message}`);

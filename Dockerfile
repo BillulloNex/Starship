@@ -395,6 +395,7 @@ COPY OpenHands/scripts/langfuse-proxy.mjs /opt/agent-canvas/langfuse-proxy.mjs
 # GlitchTip server-side error tracking (scrubber + SDK init)
 COPY OpenHands/scripts/glitchtip-scrub.mjs /opt/agent-canvas/glitchtip-scrub.mjs
 COPY OpenHands/scripts/glitchtip-server.mjs /opt/agent-canvas/glitchtip-server.mjs
+COPY OpenHands/scripts/sentry-fanout.mjs /opt/agent-canvas/sentry-fanout.mjs
 COPY OpenHands/scripts/opencode-api-proxy.mjs /opt/agent-canvas/opencode-api-proxy.mjs
 COPY OpenHands/scripts/telegram-bridge.mjs /opt/agent-canvas/telegram-bridge.mjs
 COPY OpenHands/scripts/preview-proxy.mjs /opt/agent-canvas/preview-proxy.mjs

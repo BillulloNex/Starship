@@ -36,6 +36,7 @@ import sirv from "sirv";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
 import "./glitchtip-server.mjs";
+import { mirrorEnvelopeToSentry } from "./sentry-fanout.mjs";
 
 import {
   applyCorsHeaders,
@@ -1324,6 +1325,7 @@ export function startStaticServer(config) {
             res.writeHead(403).end();
             return;
           }
+          mirrorEnvelopeToSentry(body);
           fetch(`${GLITCHTIP_UPSTREAM}/api/${projectId}/envelope/`, {
             method: "POST",
             body,

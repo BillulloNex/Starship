@@ -684,6 +684,11 @@ def _init_glitchtip():
     if not dsn:
         # Fallback to generic DSN — same project, differentiated by service tag
         dsn = os.environ.get("GLITCHTIP_DSN", "").strip()
+    # Optional mirror to Sentry SaaS (see scripts/sentry-fanout.mjs). With only
+    # SENTRY_DSN set, Sentry becomes the sole sink.
+    sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+    if not dsn:
+        dsn, sentry_dsn = sentry_dsn, ""
     if not dsn:
         return
 
@@ -774,8 +779,40 @@ def _init_glitchtip():
                 event["message"] = _scrub_str(event["message"])
             return event
 
+        transport = None
+        if sentry_dsn:
+            from sentry_sdk.transport import Transport, make_transport
+
+            class _FanoutTransport(Transport):
+                """Sends every envelope to GlitchTip and to Sentry."""
+
+                def __init__(self, options):
+                    super().__init__(options)
+                    self._targets = [
+                        make_transport(dict(options, transport=None)),
+                        make_transport(dict(options, transport=None, dsn=sentry_dsn)),
+                    ]
+
+                def capture_envelope(self, envelope):
+                    for t in self._targets:
+                        t.capture_envelope(envelope)
+
+                def flush(self, timeout, callback=None):
+                    for t in self._targets:
+                        t.flush(timeout, callback)
+
+                def kill(self):
+                    for t in self._targets:
+                        t.kill()
+
+                def is_healthy(self):
+                    return all(t.is_healthy() for t in self._targets)
+
+            transport = _FanoutTransport
+
         sentry_sdk.init(
             dsn=dsn,
+            transport=transport,
             release=f"grokbot-python@{version}",
             environment=os.environ.get("GLITCHTIP_ENVIRONMENT",
                                        os.environ.get("NODE_ENV", "production")),
@@ -825,7 +862,8 @@ def _init_glitchtip():
         print(
             f"[grokbot-sitecustomize] GlitchTip init OK — "
             f"release=grokbot-python@{version}, service={service}, "
-            f"process={server_name}",
+            f"process={server_name}"
+            + (", mirroring to Sentry" if sentry_dsn else ""),
             file=sys.stderr, flush=True,
         )
     except Exception as e:
