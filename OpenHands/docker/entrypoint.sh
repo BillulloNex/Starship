@@ -346,21 +346,25 @@ log "Starting agent-server on port $AGENT_SERVER_PORT..."
 # Launch via grokbot_agent_server.py so that file is imported even when the
 # console script would skip PYTHONPATH sitecustomize.
 AGENT_SERVER_LAUNCHER="/opt/agent-canvas/tools/grokbot_agent_server.py"
+# The PyInstaller binary ignores site-packages patches and sitecustomize, so
+# agent-server runtime patches load through its own --import-modules hook
+# (resolved from OH_EXTRA_PYTHON_PATH above).
+AGENT_SERVER_IMPORTS="grokbot_agent_server_patches"
 if [ -x /agent-server/.venv/bin/python ] && [ -f "$AGENT_SERVER_LAUNCHER" ]; then
   if [ "$DD_ENABLED" = "true" ]; then
     log "Agent server will be traced by Datadog (monkey-patch via sitecustomize.py)"
   fi
-  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python "$AGENT_SERVER_LAUNCHER" --port "$AGENT_SERVER_PORT" &
+  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python "$AGENT_SERVER_LAUNCHER" --port "$AGENT_SERVER_PORT" --import-modules "$AGENT_SERVER_IMPORTS" &
 elif command -v openhands-agent-server >/dev/null 2>&1; then
   if [ "$DD_ENABLED" = "true" ]; then
     log "Agent server will be traced by Datadog (monkey-patch via sitecustomize.py)"
   fi
-  DD_SERVICE="grokbot-agent-server" openhands-agent-server --port "$AGENT_SERVER_PORT" &
+  DD_SERVICE="grokbot-agent-server" openhands-agent-server --port "$AGENT_SERVER_PORT" --import-modules "$AGENT_SERVER_IMPORTS" &
 elif [ -x /agent-server/.venv/bin/python ]; then
   if [ "$DD_ENABLED" = "true" ]; then
     log "Agent server will be traced by Datadog (monkey-patch via sitecustomize.py)"
   fi
-  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" &
+  DD_SERVICE="grokbot-agent-server" /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" --import-modules "$AGENT_SERVER_IMPORTS" &
 else
   log_error "Cannot find agent-server binary or source venv."
   exit 1
