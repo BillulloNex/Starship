@@ -10,7 +10,12 @@ import {
 } from "#/types/agent-server/type-guards";
 import { I18nKey } from "#/i18n/declaration";
 import { getEventContent } from "../event-content-helpers/get-event-content";
+import { getObservationImageUrls } from "../event-content-helpers/observation-images";
 import { IsInEventGroupContext } from "../../../features/chat/is-in-event-group-context";
+import { ObservationImageStrip } from "../../../features/chat/observation-image-strip";
+
+/** Most recent images to surface under a collapsed group. */
+const MAX_COLLAPSED_GROUP_IMAGES = 4;
 
 interface EventGroupProps {
   /** The events represented by this group. Used to compute the summary. */
@@ -65,6 +70,18 @@ export function EventGroup({
   const [expanded, setExpanded] = React.useState(false);
   const contentId = React.useId();
   const buttonId = `${contentId}-toggle`;
+
+  // Images the group's tool results attached (screenshots, generated
+  // images). Shown under the collapsed summary so the visual outcome of a
+  // run of actions is in the transcript without expanding the group; once
+  // expanded, each card shows its own image instead.
+  const collapsedImages = React.useMemo(
+    () =>
+      Array.from(new Set(events.flatMap(getObservationImageUrls))).slice(
+        -MAX_COLLAPSED_GROUP_IMAGES,
+      ),
+    [events],
+  );
 
   if (events.length === 0) {
     return null;
@@ -145,6 +162,8 @@ export function EventGroup({
           </>
         )}
       </button>
+
+      {!expanded && <ObservationImageStrip images={collapsedImages} />}
 
       {expanded && (
         <div

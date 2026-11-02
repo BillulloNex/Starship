@@ -1,4 +1,5 @@
 import Markdown, { Components, defaultUrlTransform } from "react-markdown";
+import { useTranslation } from "react-i18next";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
@@ -14,6 +15,7 @@ import { table, th, td } from "./table";
 import { blockquote } from "./blockquote";
 import { hr } from "./horizontal-rule";
 import { remarkGithubAlerts } from "./remark-github-alerts";
+import { I18nKey } from "#/i18n/declaration";
 
 /**
  * Custom URL transformer for react-markdown.
@@ -97,6 +99,10 @@ export const MARKDOWN_SANITIZE_SCHEMA: Schema = {
   },
 };
 
+/** Styling for images rendered inside chat markdown. */
+export const MARKDOWN_IMAGE_CLASS_NAME =
+  "max-w-full h-auto rounded-lg my-2 border border-neutral-700/50 shadow-md object-contain";
+
 interface MarkdownRendererProps {
   /**
    * The markdown content to render. Can be passed as children (string) or content prop.
@@ -151,6 +157,7 @@ export function MarkdownRenderer({
   includeHeadings = false,
   allowHtml = true,
 }: MarkdownRendererProps) {
+  const { t } = useTranslation("openhands");
   // Build the components object with defaults and optional additions
   const components: Components = {
     code,
@@ -165,8 +172,8 @@ export function MarkdownRenderer({
     img: ({ src, alt, ...props }) => (
       <img
         src={src}
-        alt={alt ?? "image"}
-        className="max-w-full h-auto rounded-lg my-2 border border-neutral-700/50 shadow-md object-contain"
+        alt={alt ?? t(I18nKey.MARKDOWN$IMAGE_ALT)}
+        className={MARKDOWN_IMAGE_CLASS_NAME}
         loading="lazy"
         {...props}
       />

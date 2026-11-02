@@ -39003,5 +39003,11 @@
   },
   "PREVIEW$INTERACTIVE_TITLE": {
     "en": "Interactive browser session"
+  },
+  "OBSERVATION$TOOL_IMAGE_ALT": {
+    "en": "Tool result image"
+  },
+  "MARKDOWN$IMAGE_ALT": {
+    "en": "image"
   }
 }

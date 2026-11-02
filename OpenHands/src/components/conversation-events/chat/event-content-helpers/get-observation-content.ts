@@ -2,6 +2,10 @@ import { CANVAS_UI_CLIENT_TOOL_NAME } from "#/constants/canvas-ui";
 import { ObservationEvent } from "#/types/agent-server/core";
 import { getObservationResult } from "./get-observation-result";
 import { getDefaultEventContent, MAX_CONTENT_LENGTH } from "./shared";
+import {
+  getObservationImageUrls,
+  imagesToMarkdown,
+} from "./observation-images";
 import i18n from "#/i18n";
 import { I18nKey } from "#/i18n/declaration";
 import {
@@ -20,6 +24,24 @@ import {
   CanvasUIObservation,
   SwitchLLMObservation,
 } from "#/types/agent-server/core/base/observation";
+
+/**
+ * Append any images the observation carries (screenshots, generated images)
+ * as markdown so they render inline in the card. Always applied after the
+ * text has been truncated: a data URI is far longer than MAX_CONTENT_LENGTH
+ * and must never be cut.
+ */
+const appendObservationImages = (
+  content: string,
+  event: ObservationEvent,
+): string => {
+  const images = imagesToMarkdown(
+    getObservationImageUrls(event),
+    i18n.t(I18nKey.OBSERVATION$TOOL_IMAGE_ALT),
+  );
+  if (!images) return content;
+  return content ? `${content}\n\n${images}` : images;
+};
 
 // File Editor Observations
 const getFileEditorObservationContent = (
@@ -121,7 +143,7 @@ const getBrowserObservationContent = (
     contentDetails = `${contentDetails.slice(0, MAX_CONTENT_LENGTH)}...(truncated)`;
   }
 
-  return contentDetails;
+  return appendObservationImages(contentDetails, event);
 };
 
 const getMCPToolObservationContent = (
@@ -147,7 +169,7 @@ const getMCPToolObservationContent = (
     content = `${content.slice(0, MAX_CONTENT_LENGTH)}...`;
   }
 
-  return content;
+  return appendObservationImages(content, event);
 };
 
 // Invoke-skill observations
@@ -286,7 +308,7 @@ const getFinishObservationContent = (
     content += textContent;
   }
 
-  return content;
+  return appendObservationImages(content, event);
 };
 
 // Glob Observations

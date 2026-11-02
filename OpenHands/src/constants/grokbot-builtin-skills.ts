@@ -178,6 +178,7 @@ You MUST use the chrome-devtools-mcp MCP tools for ALL browsing tasks:
 2. Use \`take_screenshot\` or \`take_snapshot\` to capture page state.
 3. Use \`click\`, \`fill\`, \`evaluate_script\` as needed.
 4. For container apps, navigate to \`https://pNNNN.beenex.org\` (NOT \`localhost:PORT\`).
+5. To show the user a screenshot: \`take_screenshot\` WITHOUT \`filePath\` attaches the image and the chat renders it. If you save it with \`filePath\` (e.g. \`shots/page.png\`), embed it in your reply as \`![Page](shots/page.png)\` — a bare path in prose is not rendered.
 
 ## AUTHENTICATION:
 Sessions are ephemeral — no persistent login state. If a target requires auth, prefer API-based access (tokens, keys). Inform the user that Browser Run cannot persist auth across sessions.

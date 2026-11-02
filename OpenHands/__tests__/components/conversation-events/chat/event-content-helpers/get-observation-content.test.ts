@@ -5,7 +5,85 @@ import {
   BrowserObservation,
   GlobObservation,
   GrepObservation,
+  MCPToolObservation,
 } from "#/types/agent-server/core/base/observation";
+
+const PNG_DATA_URI = "data:image/png;base64,iVBORw0KGgo=";
+
+describe("getObservationContent - images", () => {
+  const makeMcpEvent = (
+    content: MCPToolObservation["content"],
+  ): ObservationEvent<MCPToolObservation> => ({
+    id: "test-id",
+    timestamp: "2024-01-01T00:00:00Z",
+    source: "environment",
+    tool_name: "take_screenshot",
+    tool_call_id: "call-id",
+    action_id: "action-id",
+    observation: {
+      kind: "MCPToolObservation",
+      tool_name: "take_screenshot",
+      is_error: false,
+      content,
+    },
+  });
+
+  it("renders an MCP tool result's image block as a markdown image", () => {
+    const result = getObservationContent(
+      makeMcpEvent([
+        { type: "text", text: "Captured the viewport." },
+        { type: "image", image_urls: [PNG_DATA_URI] },
+      ]),
+    );
+
+    expect(result).toContain("**Tool:** take_screenshot");
+    expect(result).toContain("Captured the viewport.");
+    expect(result).toContain(`](${PNG_DATA_URI})`);
+  });
+
+  it("keeps the image intact when the text is truncated", () => {
+    const longText = "x".repeat(5000);
+    const result = getObservationContent(
+      makeMcpEvent([
+        { type: "text", text: longText },
+        { type: "image", image_urls: [PNG_DATA_URI] },
+      ]),
+    );
+
+    expect(result).toContain("...");
+    expect(result.endsWith(`](${PNG_DATA_URI})`)).toBe(true);
+  });
+
+  it("skips image urls that are not inline or absolute", () => {
+    const result = getObservationContent(
+      makeMcpEvent([
+        { type: "text", text: "Saved screenshot to shot.png." },
+        { type: "image", image_urls: ["/workspace/shot.png"] },
+      ]),
+    );
+
+    expect(result).not.toContain("![");
+  });
+
+  it("renders a BrowserObservation's screenshot_data inline", () => {
+    const mockEvent: ObservationEvent<BrowserObservation> = {
+      id: "test-id",
+      timestamp: "2024-01-01T00:00:00Z",
+      source: "environment",
+      tool_name: "browser_navigate",
+      tool_call_id: "call-id",
+      action_id: "action-id",
+      observation: {
+        kind: "BrowserObservation",
+        output: "Loaded",
+        error: null,
+        screenshot_data: "iVBORw0KGgo=",
+      },
+    };
+
+    expect(getObservationContent(mockEvent)).toContain(`](${PNG_DATA_URI})`);
+  });
+});
 
 describe("getObservationContent - BrowserObservation", () => {
   it("should return output content when available", () => {
@@ -64,7 +142,7 @@ describe("getObservationContent - BrowserObservation", () => {
         kind: "BrowserObservation",
         output: "",
         error: null,
-        screenshot_data: "base64data",
+        screenshot_data: null,
       },
     };
 
@@ -138,7 +216,9 @@ describe("getObservationContent - GlobObservation", () => {
       action_id: "action-id",
       observation: {
         kind: "GlobObservation",
-        content: [{ type: "text", text: "No files found", cache_prompt: false }],
+        content: [
+          { type: "text", text: "No files found", cache_prompt: false },
+        ],
         is_error: false,
         files: [],
         pattern: "**/*.xyz",
@@ -166,7 +246,9 @@ describe("getObservationContent - GlobObservation", () => {
       action_id: "action-id",
       observation: {
         kind: "GlobObservation",
-        content: [{ type: "text", text: "Permission denied", cache_prompt: false }],
+        content: [
+          { type: "text", text: "Permission denied", cache_prompt: false },
+        ],
         is_error: true,
         files: [],
         pattern: "**/*",
@@ -223,7 +305,9 @@ describe("getObservationContent - GrepObservation", () => {
       action_id: "action-id",
       observation: {
         kind: "GrepObservation",
-        content: [{ type: "text", text: "Found 2 matches", cache_prompt: false }],
+        content: [
+          { type: "text", text: "Found 2 matches", cache_prompt: false },
+        ],
         is_error: false,
         matches: ["/workspace/src/api.ts", "/workspace/src/routes.ts"],
         pattern: "fetchData",
@@ -285,7 +369,9 @@ describe("getObservationContent - GrepObservation", () => {
       action_id: "action-id",
       observation: {
         kind: "GrepObservation",
-        content: [{ type: "text", text: "Invalid regex pattern", cache_prompt: false }],
+        content: [
+          { type: "text", text: "Invalid regex pattern", cache_prompt: false },
+        ],
         is_error: true,
         matches: [],
         pattern: "[invalid",

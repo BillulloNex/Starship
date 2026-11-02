@@ -40,6 +40,7 @@ import { LlmNotConfiguredBanner } from "#/components/features/home/llm-not-confi
 import { useLlmConfigured } from "#/hooks/use-llm-configured";
 import { Messages } from "#/components/conversation-events/chat/messages";
 import { PendingUserMessages } from "./pending-user-messages";
+import { WorkspaceMarkdownComponentsProvider } from "./workspace-markdown-components-context";
 import { useUnifiedUploadFiles } from "#/hooks/mutation/use-unified-upload-files";
 import { validateFiles } from "#/utils/file-validation";
 import { useConversationStore } from "#/stores/conversation-store";
@@ -555,10 +556,12 @@ export function ChatInterface() {
           <ModelMessages conversationId={conversationId} anchorEventId={null} />
 
           {showConversationMessages && renderableEvents.length > 0 && (
-            <Messages
-              messages={renderableEvents}
-              allEvents={allConversationEvents}
-            />
+            <WorkspaceMarkdownComponentsProvider>
+              <Messages
+                messages={renderableEvents}
+                allEvents={allConversationEvents}
+              />
+            </WorkspaceMarkdownComponentsProvider>
           )}
 
           {/*

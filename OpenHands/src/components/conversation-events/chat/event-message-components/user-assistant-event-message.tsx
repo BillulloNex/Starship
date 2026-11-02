@@ -22,6 +22,7 @@ import { useConversationStore } from "#/stores/conversation-store";
 import ConversationService from "#/api/conversation-service/conversation-service.api";
 import { displayErrorToast } from "#/utils/custom-toast-handlers";
 import { convertImageUrlsToFiles } from "#/utils/image-url-to-file";
+import { useWorkspaceMarkdownComponentsContext } from "#/components/features/chat/workspace-markdown-components-context";
 
 interface UserAssistantEventMessageProps {
   event: MessageEvent;
@@ -45,6 +46,7 @@ export function UserAssistantEventMessage({
   );
   // Blocks a same-tick double-click, before `isForking` flips.
   const forkInFlightRef = React.useRef(false);
+  const workspaceMarkdownComponents = useWorkspaceMarkdownComponentsContext();
 
   const parsed = parseMessageFromEvent(event);
   // Route an inline <think> block (e.g. from a streamed reply) to the thinking
@@ -155,6 +157,9 @@ export function UserAssistantEventMessage({
         message={message}
         isFromPlanningAgent={isFromPlanningAgent}
         actions={actions}
+        components={
+          event.source === "agent" ? workspaceMarkdownComponents : undefined
+        }
       >
         {imageUrls.length > 0 && (
           <ImageCarousel size="small" images={imageUrls} />

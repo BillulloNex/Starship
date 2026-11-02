@@ -239,6 +239,28 @@ export function buildRuntimeServicesInfo(options) {
     },
   };
 
+  // How to get an image in front of the user. The chat renders two things:
+  // image blocks attached to a tool result (take_screenshot without
+  // `filePath`), and markdown images in the agent's own reply whose path is
+  // relative to the workspace — the GUI rewrites those to the conversation's
+  // workspace fileserver. A bare path in prose is never rendered, which is
+  // the mistake this entry exists to prevent.
+  services.chat_images = {
+    description:
+      "How to show an image to the user in the chat transcript. Two ways " +
+      "render inline: (1) an image attached to a tool result — e.g. " +
+      "take_screenshot WITHOUT filePath attaches the screenshot and the chat " +
+      "shows it; (2) a markdown image in your reply whose path is relative to " +
+      "the workspace root, e.g. ![Guardian homepage](shots/guardian.png). " +
+      "Writing a file path in prose does NOT render it.",
+    markdown_template: "![caption](relative/path/to/image.png)",
+    note_from_agent:
+      "take_screenshot with filePath saves to disk INSTEAD of attaching the " +
+      "image. If you save a screenshot, embed it with the markdown template " +
+      "in your final reply so the user sees it; absolute paths work only when " +
+      "they are inside the workspace. Keep images under ~2 MB.",
+  };
+
   // ── Browser routing guide (browser-v2 — Cloudflare Browser Run) ──────────
   // Ephemeral headless Chrome sessions via chrome-devtools-mcp connected to
   // the Cloudflare Browser Run API. No persistent cookies or profiles.

@@ -99,7 +99,10 @@ function extractImageGenerationData(event: ACPToolCallEvent): {
     const raw = event.raw_output as ImageGenerationPayload;
     if (typeof raw.result === "string" && raw.result.trim().length > 50) {
       const trimmed = raw.result.trim();
-      if (trimmed.startsWith("data:") || /^[A-Za-z0-9+/=\s]+$/.test(trimmed.slice(0, 100))) {
+      if (
+        trimmed.startsWith("data:") ||
+        /^[A-Za-z0-9+/=\s]+$/.test(trimmed.slice(0, 100))
+      ) {
         return {
           imageData: trimmed.replace(/\s+/g, ""),
           mimeType: "image/png",
@@ -115,11 +118,18 @@ function extractImageGenerationData(event: ACPToolCallEvent): {
     for (const block of event.content) {
       if (block && typeof block === "object") {
         const item =
-          "content" in block && typeof block.content === "object" && block.content !== null
+          "content" in block &&
+          typeof block.content === "object" &&
+          block.content !== null
             ? (block.content as Record<string, unknown>)
             : (block as Record<string, unknown>);
-        if (item.type === "image" && typeof item.data === "string" && item.data.length > 50) {
-          const mime = typeof item.mimeType === "string" ? item.mimeType : "image/png";
+        if (
+          item.type === "image" &&
+          typeof item.data === "string" &&
+          item.data.length > 50
+        ) {
+          const mime =
+            typeof item.mimeType === "string" ? item.mimeType : "image/png";
           return {
             imageData: item.data.trim().replace(/\s+/g, ""),
             mimeType: mime,
@@ -132,6 +142,20 @@ function extractImageGenerationData(event: ACPToolCallEvent): {
 
   return null;
 }
+
+/**
+ * The image an ACP tool call attached (image generation, screenshots), as a
+ * data URI ready for `<img src>`, or `null` when the call carried none.
+ */
+export const getACPToolCallImageDataUri = (
+  event: ACPToolCallEvent,
+): string | null => {
+  const imgData = extractImageGenerationData(event);
+  if (!imgData?.imageData) return null;
+  return imgData.imageData.startsWith("data:")
+    ? imgData.imageData
+    : `data:${imgData.mimeType};base64,${imgData.imageData}`;
+};
 
 const truncate = (content: string): string =>
   content.length > MAX_CONTENT_LENGTH
@@ -152,7 +176,7 @@ const truncate = (content: string): string =>
 export const getACPToolCallContent = (event: ACPToolCallEvent): string => {
   // Check if this is an image generation tool call output
   const imgData = extractImageGenerationData(event);
-  if (imgData && imgData.imageData) {
+  if (imgData?.imageData) {
     const dataUri = imgData.imageData.startsWith("data:")
       ? imgData.imageData
       : `data:${imgData.mimeType};base64,${imgData.imageData}`;

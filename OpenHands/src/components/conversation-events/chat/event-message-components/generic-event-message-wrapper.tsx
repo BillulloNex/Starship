@@ -26,6 +26,7 @@ import { ConversationConfirmationButtons } from "#/components/shared/buttons/con
 import { SkillReadyContentList } from "./skill-ready-content-list";
 import SkillsIcon from "#/icons/skills.svg?react";
 import { isMarkdownFileEditorEvent } from "#/components/features/chat/tool-visualizers/primitives/markdown-file-preview";
+import { getObservationImageUrls } from "../event-content-helpers/observation-images";
 
 interface GenericEventMessageWrapperProps {
   event: OpenHandsEvent | SkillReadyEvent;
@@ -112,12 +113,15 @@ export function GenericEventMessageWrapper({
         typeof event.raw_output === "object" &&
         "result" in (event.raw_output as Record<string, unknown>)));
 
-  // Markdown file-editor cards and image generation cards carry visual content;
-  // expand them by default so the image/artifact is immediately visible without an extra chevron click.
+  // Markdown file-editor cards, image generation cards and any tool result
+  // that attached an image (a screenshot, say) carry visual content; expand
+  // them by default so the image/artifact is immediately visible without an
+  // extra chevron click.
   const initiallyExpanded =
     !isSkillReadyEvent(event) &&
     (isMarkdownFileEditorEvent(event, correspondingAction) ||
-      isImageGenerationToolCall);
+      isImageGenerationToolCall ||
+      getObservationImageUrls(event).length > 0);
 
   return (
     <div>

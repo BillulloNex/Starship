@@ -9,7 +9,33 @@ import {
   SecurityRisk,
 } from "#/types/agent-server/core";
 import { ExecuteBashAction } from "#/types/agent-server/core/base/action";
-import { ExecuteBashObservation } from "#/types/agent-server/core/base/observation";
+import {
+  ExecuteBashObservation,
+  MCPToolObservation,
+} from "#/types/agent-server/core/base/observation";
+
+const PNG_DATA_URI = "data:image/png;base64,iVBORw0KGgo=";
+
+const makeScreenshotObservation = (
+  id: string,
+  actionId: string,
+): ObservationEvent<MCPToolObservation> => ({
+  id,
+  timestamp: new Date().toISOString(),
+  source: "environment",
+  tool_name: "take_screenshot",
+  tool_call_id: `call_${actionId}`,
+  action_id: actionId,
+  observation: {
+    kind: "MCPToolObservation",
+    tool_name: "take_screenshot",
+    is_error: false,
+    content: [
+      { type: "text", text: "Captured" },
+      { type: "image", image_urls: [PNG_DATA_URI] },
+    ],
+  },
+});
 
 const makeBashAction = (
   id: string,
@@ -64,6 +90,48 @@ const makeBashObservation = (
 });
 
 describe("EventGroup", () => {
+  it("shows tool-result images under the collapsed summary and hides them once expanded", async () => {
+    const user = userEvent.setup();
+    const events = [
+      makeBashObservation("o1", "a1", "ls"),
+      makeScreenshotObservation("o2", "a2"),
+    ];
+
+    renderWithProviders(
+      <EventGroup events={events} isFinalized>
+        <div data-testid="child">child content</div>
+      </EventGroup>,
+    );
+
+    const strip = screen.getByTestId("observation-image-strip");
+    expect(strip.querySelector("img")).toHaveAttribute("src", PNG_DATA_URI);
+
+    await user.click(screen.getByTestId("event-group-toggle"));
+
+    expect(
+      screen.queryByTestId("observation-image-strip"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+  });
+
+  it("renders no image strip when no observation carries an image", () => {
+    renderWithProviders(
+      <EventGroup
+        events={[
+          makeBashObservation("o1", "a1", "ls"),
+          makeBashObservation("o2", "a2", "pwd"),
+        ]}
+        isFinalized
+      >
+        <div>child</div>
+      </EventGroup>,
+    );
+
+    expect(
+      screen.queryByTestId("observation-image-strip"),
+    ).not.toBeInTheDocument();
+  });
+
   it("returns null for an empty events array", () => {
     const { container } = renderWithProviders(
       <EventGroup events={[]}>

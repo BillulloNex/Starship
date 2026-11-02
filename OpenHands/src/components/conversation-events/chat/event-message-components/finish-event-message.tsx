@@ -3,6 +3,7 @@ import { FinishAction } from "#/types/agent-server/core/base/action";
 import { ChatMessage } from "../../../features/chat/chat-message";
 import { getEventContent } from "../event-content-helpers/get-event-content";
 import { CriticResultDisplay } from "./critic-result-display";
+import { useWorkspaceMarkdownComponentsContext } from "#/components/features/chat/workspace-markdown-components-context";
 
 interface FinishEventMessageProps {
   event: ActionEvent<FinishAction>;
@@ -13,6 +14,7 @@ export function FinishEventMessage({
   event,
   isFromPlanningAgent = false,
 }: FinishEventMessageProps) {
+  const workspaceMarkdownComponents = useWorkspaceMarkdownComponentsContext();
   const eventContent = getEventContent(event);
   const message =
     typeof eventContent.details === "string"
@@ -25,6 +27,7 @@ export function FinishEventMessage({
         type="agent"
         message={message}
         isFromPlanningAgent={isFromPlanningAgent}
+        components={workspaceMarkdownComponents}
       />
       {event.critic_result != null && (
         <CriticResultDisplay criticResult={event.critic_result} />

@@ -39,6 +39,25 @@ interface RuntimeServicesInfoShape {
 }
 
 describe("runtime-services-info.mjs", () => {
+  describe("chat images", () => {
+    it("always tells the agent how to get an image into the chat", () => {
+      const info = buildRuntimeServicesInfo({
+        agentServerUrl: "http://127.0.0.1:18000",
+      }) as RuntimeServicesInfoShape & {
+        services: {
+          chat_images?: { markdown_template: string; description: string };
+        };
+      };
+
+      expect(info.services.chat_images?.markdown_template).toBe(
+        "![caption](relative/path/to/image.png)",
+      );
+      expect(info.services.chat_images?.description).toContain(
+        "take_screenshot",
+      );
+    });
+  });
+
   describe("app preview", () => {
     it("advertises the template and the ports this stack reserves", () => {
       const info = buildRuntimeServicesInfo({

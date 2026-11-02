@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import type { Components } from "react-markdown";
 import { cn } from "#/utils/utils";
 import { CopyToClipboardButton } from "#/components/shared/buttons/copy-to-clipboard-button";
 import type { SourceType } from "#/types/agent-server/core/base/common";
@@ -25,6 +26,12 @@ interface ChatMessageProps {
     tooltip?: string;
   }>;
   isFromPlanningAgent?: boolean;
+  /**
+   * Markdown component overrides for agent messages (e.g. an `img` that
+   * resolves workspace-relative paths). Ignored for user messages, which
+   * keep the chat-bubble components.
+   */
+  components?: Partial<Components>;
   pendingStatus?: ChatMessagePendingStatus;
   onEdit?: () => void;
   onRetry?: () => void;
@@ -38,6 +45,7 @@ export function ChatMessage({
   children,
   actions,
   isFromPlanningAgent = false,
+  components,
   pendingStatus,
   onEdit,
   onRetry,
@@ -131,7 +139,11 @@ export function ChatMessage({
         includeStandard
         includeHeadings
         allowHtml={type !== "user"}
-        {...(type === "user" ? { components: chatBubbleMarkdownComponents } : {})}
+        {...(type === "user"
+          ? { components: chatBubbleMarkdownComponents }
+          : components
+            ? { components }
+            : {})}
       >
         {message}
       </MarkdownRenderer>
@@ -151,7 +163,8 @@ export function ChatMessage({
         hasBubbleChildren && "gap-2",
         type === "user" &&
           "mt-6 bg-[var(--oh-surface-raised)] border border-white/10 text-[var(--oh-foreground)] self-end px-4 py-3 rounded-2xl shadow-sm leading-relaxed max-w-[88%]",
-        type === "agent" && "mt-6 w-full max-w-full bg-transparent leading-relaxed",
+        type === "agent" &&
+          "mt-6 w-full max-w-full bg-transparent leading-relaxed",
         isFromPlanningAgent &&
           type === "agent" &&
           "border border-[#597ff4] bg-[var(--oh-surface-raised)] p-4 mt-2 rounded-2xl shadow-sm",
