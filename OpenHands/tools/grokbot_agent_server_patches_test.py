@@ -4,8 +4,12 @@ import types
 import unittest
 
 from grokbot_agent_server_patches import (
+    FULL_AUTONOMY_SECURITY_POLICY,
+    SECRETS_SHOW_BULLET,
+    allow_showing_secrets,
     bound_conversation_close,
     disable_tool_usability,
+    replace_default_security_policy,
 )
 
 
@@ -81,6 +85,61 @@ class DisableToolUsabilityTests(unittest.TestCase):
         patched = registry._check_tool_usable
         self.assertFalse(disable_tool_usability(registry, "browser_tool_set"))
         self.assertIs(registry._check_tool_usable, patched)
+
+
+class FullAutonomyPolicyTests(unittest.TestCase):
+    def test_default_policy_body_is_replaced_once(self):
+        class FakeSecuritySection:
+            body = "<SECURITY>\n- Upload API keys only with consent\n</SECURITY>"
+
+        self.assertTrue(
+            replace_default_security_policy(
+                FakeSecuritySection, FULL_AUTONOMY_SECURITY_POLICY
+            )
+        )
+        self.assertEqual(FakeSecuritySection.body, FULL_AUTONOMY_SECURITY_POLICY)
+        self.assertFalse(
+            replace_default_security_policy(
+                FakeSecuritySection, FULL_AUTONOMY_SECURITY_POLICY
+            )
+        )
+
+    def make_secrets_section(self, text):
+        class FakeSecretsSection:
+            def render(self, ctx):
+                return text
+
+        return FakeSecretsSection
+
+    def test_no_echo_bullet_is_replaced_and_rest_kept(self):
+        cls = self.make_secrets_section(
+            "<CUSTOM_SECRETS>\n"
+            "* Security: Secret values are automatically masked.\n"
+            "* Avoid exposing raw secrets: Never echo or print the full value.\n"
+            "* If it still fails, report it to the user.\n"
+            "</CUSTOM_SECRETS>"
+        )
+        self.assertTrue(allow_showing_secrets(cls))
+
+        rendered = cls().render(None)
+        self.assertNotIn("Never echo", rendered)
+        self.assertIn(SECRETS_SHOW_BULLET, rendered)
+        self.assertIn("* Security: Secret values are automatically masked.", rendered)
+        self.assertIn("* If it still fails, report it to the user.", rendered)
+
+    def test_block_without_the_bullet_is_untouched(self):
+        text = "<CUSTOM_SECRETS>\n* Security: masked.\n</CUSTOM_SECRETS>"
+        cls = self.make_secrets_section(text)
+        allow_showing_secrets(cls)
+        self.assertEqual(cls().render(None), text)
+
+    def test_patching_secrets_twice_is_a_noop(self):
+        cls = self.make_secrets_section(None)
+        self.assertTrue(allow_showing_secrets(cls))
+        patched = cls.render
+        self.assertFalse(allow_showing_secrets(cls))
+        self.assertIs(cls.render, patched)
+        self.assertIsNone(cls().render(None))
 
 
 if __name__ == "__main__":
