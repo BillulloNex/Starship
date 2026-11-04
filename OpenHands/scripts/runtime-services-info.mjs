@@ -262,8 +262,9 @@ export function buildRuntimeServicesInfo(options) {
   };
 
   // ── Browser routing guide (browser-v2 — Cloudflare Browser Run) ──────────
-  // Ephemeral headless Chrome sessions via chrome-devtools-mcp connected to
-  // the Cloudflare Browser Run API. No persistent cookies or profiles.
+  // Headless Chrome sessions via chrome-devtools-mcp connected to the
+  // Cloudflare Browser Run API. Sessions are disposable; cookies persist
+  // through the login vault (browser-run-vault.mjs).
   if (appPreview?.urlTemplate) {
     services.browser_routing_guide = {
       CRITICAL:
@@ -274,13 +275,15 @@ export function buildRuntimeServicesInfo(options) {
       workflow: {
         routine_browsing:
           "Use chrome-devtools-mcp tools (navigate_page, take_screenshot, click, fill, evaluate_script) " +
-          "to browse the web. Each session is ephemeral — no cookies or logins persist.",
+          "to browse the web. Logins persist: cookies are saved to an encrypted vault and " +
+          "restored into every new Browser Run session. After logging in, take one more " +
+          "action (e.g. take_snapshot) so the new cookies are saved.",
         container_apps:
           "To browse apps running inside the container, navigate to the public preview URL " +
           "`pNNNN.beenex.org` (NOT `localhost:PORT`). Browser Run sessions run outside the container.",
         idle_timeout:
           "Browser Run sessions auto-close after ~10 minutes of inactivity. " +
-          "Perform periodic actions to keep the session alive if needed.",
+          "The next browser action opens a new session with the saved logins already in it.",
         prohibitions:
           "The local chromium binary is DISABLED (returns exit 1). " +
           "NEVER run chromium, google-chrome, or any headless browser via bash/shell. " +
@@ -291,10 +294,10 @@ export function buildRuntimeServicesInfo(options) {
 
     services.collaborative_browser = {
       description:
-        "Cloudflare Browser Run — ephemeral headless Chrome sessions. " +
+        "Cloudflare Browser Run — headless Chrome sessions with persistent logins. " +
         "Screenshots from chrome-devtools-mcp appear in the Snapshot tab of the Browser panel. " +
-        "No persistent cookies or login state across sessions.",
-      session_type: "ephemeral (no persistent profile)",
+        "Cookies persist across sessions via the login vault (cf-browser-vault list / clear <domain>).",
+      session_type: "disposable browser, persistent cookies",
       procedure: [
         "1. Use navigate_page to go to the requested URL.",
         "2. Use take_screenshot or take_snapshot to capture the page.",

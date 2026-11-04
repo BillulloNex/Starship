@@ -155,23 +155,23 @@ Use this skill whenever the user mentions "ralph loop", "ralph", "/ralph-loop", 
    - Execute the Ralph loop iteratively using \`./scripts/ralph-loop.sh\` or by executing each story individually, running quality checks (\`npm run build\` and \`npm run lint\`), bumping Grokbot version (\`node scripts/bump-version.mjs patch\`), committing, and appending learnings to \`progress.txt\`.
 `;
 
-const BROWSER_V2_CONTENT = `# Browser V2 — Cloudflare Browser Run (Ephemeral Sessions)
+const BROWSER_V2_CONTENT = `# Browser V2 — Cloudflare Browser Run (Persistent Logins)
 
-Grokbot uses **Cloudflare Browser Run** for headless browser automation via the \`chrome-devtools-mcp\` tool. Each session is ephemeral — no persistent cookies, logins, or profiles.
+Grokbot uses **Cloudflare Browser Run** for headless browser automation via the \`chrome-devtools-mcp\` tool. Each Browser Run browser is disposable, but logins are not: a cookie vault saves the browser's cookies and loads them into every new session.
 
 ## BANNED — Do NOT do these:
 - Running bash commands like \`chromium\`, \`google-chrome\`, \`DISPLAY=:1\`, \`DISPLAY=:99\` in the container (the binary is DISABLED and will error)
 - pip install playwright, pip install selenium, pip install puppeteer-core, npm install puppeteer
 - chromium --headless, chromium --dump-dom — the local binary is a shim that exits with an error
 - Writing custom Python/Node.js scripts to automate browsers
+- Writing your own cookie export/import (the vault already does it), or printing, copying, or exporting cookie values or the vault files
 - Using \`localhost:PORT\` when browsing container apps via Browser Run — use \`pNNNN.beenex.org\`
 
 ## HOW TO BROWSE (MANDATORY):
 You MUST use the chrome-devtools-mcp MCP tools for ALL browsing tasks:
-- Each session spins up a fresh Chromium instance via Cloudflare Browser Run.
-- Sessions are ephemeral and carry no state between runs.
+- Each session spins up a fresh Chromium instance via Cloudflare Browser Run. Open tabs do not survive a session ending; cookies do.
 - The agent controls the browser through MCP tools (\`navigate_page\`, \`take_screenshot\`, \`click\`, \`fill\`, etc.).
-- Sessions auto-close after ~10 minutes of inactivity. Perform periodic actions to keep alive.
+- Sessions auto-close after ~10 minutes of inactivity. The next browser action opens a new session with the saved logins already in it.
 
 ## PROCEDURE FOR BROWSING:
 1. Use \`navigate_page\` to go to the URL.
@@ -180,8 +180,13 @@ You MUST use the chrome-devtools-mcp MCP tools for ALL browsing tasks:
 4. For container apps, navigate to \`https://pNNNN.beenex.org\` (NOT \`localhost:PORT\`).
 5. To show the user a screenshot: \`take_screenshot\` WITHOUT \`filePath\` attaches the image and the chat renders it. If you save it with \`filePath\` (e.g. \`shots/page.png\`), embed it in your reply as \`![Page](shots/page.png)\` — a bare path in prose is not rendered.
 
-## AUTHENTICATION:
-Sessions are ephemeral — no persistent login state. If a target requires auth, prefer API-based access (tokens, keys). Inform the user that Browser Run cannot persist auth across sessions.
+## AUTHENTICATION (logins persist):
+1. Navigate to the site first — it may already be signed in from an earlier conversation.
+2. If not, log in with the tools. After the login completes, take one more action (e.g. \`take_snapshot\`) so the new cookies are saved.
+3. For MFA, SSO prompts, or CAPTCHAs, ask the user to finish the login themselves: Cloudflare dashboard → Browser Run → Live Sessions → open the live session. Continue once they confirm, then take a snapshot so the login is saved.
+4. Some sites (Google, banks) may still sign the browser out, because Browser Run is identified as bot traffic and its IP changes. Prefer API access (tokens, keys) where the site offers it.
+5. Pages opened with \`isolatedContext\` start logged out and their cookies are not saved.
+6. \`cf-browser-vault list\` shows sites with saved logins (no values); \`cf-browser-vault clear <domain>\` signs the browser out of one site, \`cf-browser-vault clear\` out of all.
 `;
 
 const AUTH_HANDOFF_CONTENT = [
@@ -212,7 +217,7 @@ export const GROKBOT_BUILTIN_SKILLS: SkillCatalogEntry[] = [
   {
     name: "browser-v2",
     description:
-      "Browser skill using Cloudflare Browser Run for ephemeral headless Chrome sessions via chrome-devtools-mcp. Supports screenshots, navigation, form filling, and page inspection.",
+      "Browser skill using Cloudflare Browser Run headless Chrome sessions via chrome-devtools-mcp, with logins that persist across sessions. Supports screenshots, navigation, form filling, and page inspection.",
     triggers: [
       "browser",
       "browse",

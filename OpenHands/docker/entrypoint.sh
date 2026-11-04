@@ -121,12 +121,31 @@ log "Browser session persistence: $CHROME_PROFILE_DIR"
 
 # ── Browser Run credentials for chrome-devtools-mcp ──────────────────
 if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_BROWSER_API_TOKEN:-}" ]; then
-  cat > /tmp/cf-browser-env <<EOF
-export CF_ACCOUNT_ID="${CF_ACCOUNT_ID}"
-export CF_BROWSER_API_TOKEN="${CF_BROWSER_API_TOKEN}"
-EOF
+  # The browser login vault (browser-run-vault.mjs) lives on the durable
+  # mount so saved logins survive redeploys. MCP servers do not inherit this
+  # environment, so everything cf-browser-mcp needs goes into the env file.
+  BROWSER_VAULT_DIR="${BROWSER_VAULT_DIR:-${STATE_DIR}/browser-vault}"
+  mkdir -p "$BROWSER_VAULT_DIR" 2>/dev/null && chmod 700 "$BROWSER_VAULT_DIR" 2>/dev/null || true
+  (
+    umask 077
+    {
+      printf 'export CF_ACCOUNT_ID=%q\n' "${CF_ACCOUNT_ID}"
+      printf 'export CF_BROWSER_API_TOKEN=%q\n' "${CF_BROWSER_API_TOKEN}"
+      printf 'export BROWSER_VAULT_DIR=%q\n' "${BROWSER_VAULT_DIR}"
+      if [ -n "${BROWSER_VAULT_KEY:-}" ]; then
+        printf 'export BROWSER_VAULT_KEY=%q\n' "${BROWSER_VAULT_KEY}"
+      fi
+      if [ -n "${BROWSER_VAULT_DISABLED:-}" ]; then
+        printf 'export BROWSER_VAULT_DISABLED=%q\n' "${BROWSER_VAULT_DISABLED}"
+      fi
+    } > /tmp/cf-browser-env
+  )
   chmod 600 /tmp/cf-browser-env
-  log "Browser Run credentials written to /tmp/cf-browser-env"
+  if [ "${BROWSER_VAULT_DISABLED:-}" = "true" ]; then
+    log "Browser Run credentials written to /tmp/cf-browser-env (login vault disabled)"
+  else
+    log "Browser Run credentials written to /tmp/cf-browser-env (login vault: $BROWSER_VAULT_DIR)"
+  fi
 
   # Cursor's print-mode bridge launches `agent -p`, which discovers MCPs from
   # Cursor's own user config rather than the ACP session's mcpServers list.

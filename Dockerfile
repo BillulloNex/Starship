@@ -424,7 +424,9 @@ COPY scripts/cursor-acp-auth-wrapper.sh /opt/agent-canvas/cursor-acp-auth-wrappe
 COPY scripts/opencode-acp-auth-wrapper.sh /opt/agent-canvas/opencode-acp-auth-wrapper.sh
 COPY scripts/opencode-acp-prewarm.sh /opt/agent-canvas/opencode-acp-prewarm.sh
 COPY scripts/cf-browser-mcp.sh /usr/local/bin/cf-browser-mcp
-RUN chmod +x /usr/local/bin/cf-browser-mcp
+COPY OpenHands/scripts/browser-run-vault.mjs /opt/agent-canvas/browser-run-vault.mjs
+RUN chmod +x /usr/local/bin/cf-browser-mcp /opt/agent-canvas/browser-run-vault.mjs && \
+    ln -sf /opt/agent-canvas/browser-run-vault.mjs /usr/local/bin/cf-browser-vault
 COPY scripts/ensure-cursor-browser-mcp.mjs /opt/agent-canvas/ensure-cursor-browser-mcp.mjs
 RUN chmod +x /opt/agent-canvas/start-vnc-browser.sh && ln -sf /opt/agent-canvas/start-vnc-browser.sh /usr/local/bin/start-vnc-browser && \
     chmod +x /opt/agent-canvas/cursor-acp-auth-wrapper.sh && ln -sf /opt/agent-canvas/cursor-acp-auth-wrapper.sh /usr/local/bin/cursor-acp && \
@@ -447,7 +449,8 @@ RUN cd /opt/agent-canvas && \
     done
 RUN cd /opt/agent-canvas && \
     node -e "import('./workbench-terminal.mjs').then(() => console.log('workbench-terminal ok'))" && \
-    python3 -m py_compile workbench-pty-bridge.py
+    python3 -m py_compile workbench-pty-bridge.py && \
+    cf-browser-vault help >/dev/null && echo 'browser-run-vault ok'
 
 # Copy the runtime-services-info builder (entrypoint.sh runs it as a CLI to
 # emit the agent's <RUNTIME_SERVICES> block).

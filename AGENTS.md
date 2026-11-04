@@ -264,6 +264,27 @@ Unit tests, successful compilation, visible UI, authentication probes, ACP initi
   (`scripts/runtime-services-info.mjs`), so it hands the user a public URL instead of
   a localhost one.
 
+## Browser Run Login Vault
+
+- Agents browse through Cloudflare Browser Run (`/usr/local/bin/cf-browser-mcp` →
+  chrome-devtools-mcp). Browser Run browsers are disposable: they close after the
+  `keep_alive` idle window (10 min) **and whenever Cloudflare ships a release**, so
+  keeping one alive 24/7 cannot preserve logins on its own.
+- `OpenHands/scripts/browser-run-vault.mjs` is a local CDP proxy between
+  chrome-devtools-mcp and Browser Run. On every new session it loads the saved
+  cookies before the first client message; a few seconds after browser activity,
+  on disconnect and before `Browser.close` it merges the browser's cookie changes
+  (three-way, so concurrent conversations don't clobber each other) into
+  `$OH_PERSISTENCE_DIR/agent-canvas/browser-vault/cookies.vault`
+  (AES-256-GCM, 0600). On exit it deletes its Browser Run session.
+- Coolify knobs: `BROWSER_VAULT_KEY` (encryption secret; otherwise a random
+  `vault.key` beside the vault is used — moving to the env key later still reads
+  the old file) and `BROWSER_VAULT_DISABLED=true` (kill switch: straight
+  connection, no saved logins). Both are read at container start.
+- Operators: `cf-browser-vault list | clear [domain] | path` inside the container.
+- Cookies only: localStorage/IndexedDB-based logins are not carried over, and
+  bot-sensitive sites (Google, banks) may still revoke restored sessions.
+
 ## Autonomous Ralph Loop & Budget Guardrails
 
 Grokbot supports unattended, iterative execution via the **Ralph loop** pattern (`scripts/ralph-runner.mjs`).
