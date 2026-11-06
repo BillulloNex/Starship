@@ -265,6 +265,12 @@ ENV AUTOMATION_SHARED_VENV=/opt/openhands-shared-sdk-venv
 COPY patches/fix-acp-superseded-prompt-replay.py /tmp/fix-acp-superseded-prompt-replay.py
 RUN python3 /tmp/fix-acp-superseded-prompt-replay.py && rm /tmp/fix-acp-superseded-prompt-replay.py
 
+# Record tool output, exit code and failures on Langfuse tool spans. Without this
+# every TerminalAction/FileEditorAction span has an empty output and is never
+# marked failed (random_incidents 0038). Patches both SDK copies.
+COPY patches/fix-tool-span-output.py /tmp/fix-tool-span-output.py
+RUN python3 /tmp/fix-tool-span-output.py && rm /tmp/fix-tool-span-output.py
+
 # ── Observability (Datadog APM + Langfuse HTTP OTLP + GlitchTip/Sentry) ────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
