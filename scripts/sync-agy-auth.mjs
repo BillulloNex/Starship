@@ -24,8 +24,6 @@ function getArgValue(flag) {
   return idx !== -1 && args[idx + 1] ? args[idx + 1] : null;
 }
 
-const DEFAULT_PROD_KEY = "S9Ni/L8opqCk7HgXyBfEwvd16oGixLf6Sg1lZKRtewg=";
-
 const apiKey =
   getArgValue("--api-key") ||
   getArgValue("--key") ||
@@ -33,7 +31,7 @@ const apiKey =
   process.env.STARSHIP_SECRET ||
   process.env.STARSHIP_API_KEY ||
   process.env.LOCAL_BACKEND_API_KEY ||
-  (targetUrl.includes("ship.beenex.org") ? DEFAULT_PROD_KEY : "");
+  "";
 
 import { execFileSync } from "node:child_process";
 

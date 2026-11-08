@@ -69,11 +69,11 @@ Running this skill provisions full access to all 5 operational subsystems:
 - **Public App Previews**: `PREVIEW_HOST_PATTERN` (`{app}.beenex.space,p{port}.beenex.space,{app}.beenex.org,p{port}.beenex.org`)
 
 ### 3. Telegram Bridge & Remote Agent Channel
-- `TELEGRAM_BOT_TOKEN`: `8822184580:AAHLGioEyrBVNvwt3_hD_O32bVdU6CoqiLI`
+- `TELEGRAM_BOT_TOKEN`: (secret — stored in Coolify only)
 - `TELEGRAM_ALLOWED_USER_IDS`: `6544913948`
 
 ### 4. GrokBot Server Security
-- `LOCAL_BACKEND_API_KEY`, `GROKBOT_AGENT_SERVER_API_KEY`, `OPENHANDS_AUTOMATION_API_KEY` (`S9Ni/L8opqCk7HgXyBfEwvd16oGixLf6Sg1lZKRtewg=`)
+- `LOCAL_BACKEND_API_KEY`, `GROKBOT_AGENT_SERVER_API_KEY`, `OPENHANDS_AUTOMATION_API_KEY` (secret — stored in Coolify only)
 - `AGENT_CANVAS_BASE_PATH`: `/`
 - `AGENT_CLI_CREDENTIAL_STORE`: `file`
 
