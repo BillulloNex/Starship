@@ -460,6 +460,16 @@ describe("app-auth.mjs", () => {
       expect(noKey.status).toBe(401);
     });
 
+    it("lets automation setup.sh read the SDK version over loopback without a key", async () => {
+      // Gating this failed every scheduled automation run from 2026-10-22.
+      const { base } = await startGatedServer();
+      const response = await get(base, "/api/automation/sdk-version");
+      expect(response.status).not.toBe(401);
+
+      const other = await get(base, "/api/automation/gate-probe");
+      expect(other.status).toBe(401);
+    });
+
     it("accepts the key from the query string, as the SDK WebSocket clients send it", async () => {
       const { base } = await startGatedServer();
       const response = await get(

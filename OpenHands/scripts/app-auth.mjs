@@ -82,6 +82,9 @@ const PUBLIC_EXACT_PATHS = new Set([
   LOGOUT_PATH,
 ]);
 
+// Read by automation run setup.sh from inside the container, unauthenticated.
+const AUTOMATION_SDK_VERSION_PATH = "/api/automation/sdk-version";
+
 // Everything under /api/app-auth is public except these, which an admin owns.
 const ADMIN_API_PATHS = new Set([
   `${APP_AUTH_API_PREFIX}/invites`,
@@ -938,6 +941,12 @@ export function createAppAuth(options = {}) {
   async function guard(req, res, pathname) {
     if (!enabled()) return false;
     if (isPublicPath(pathname)) return false;
+    // Automation run setup.sh curls the SDK version through the ingress with
+    // no credentials. Gating it failed every scheduled run from 2026-10-22
+    // (random_incidents 0040). It is a version string, and loopback only.
+    if (pathname === AUTOMATION_SDK_VERSION_PATH && isLoopbackRequest(req)) {
+      return false;
+    }
 
     const { user } = await identify(req);
     if (!user) {

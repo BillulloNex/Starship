@@ -7,13 +7,18 @@
  *   - Unhandled promise rejections
  *   - React component errors (via ErrorBoundary in root.tsx)
  *   - ALL console.error() calls (via captureConsoleIntegration)
+ *   - console.log/info/warn/error as GlitchTip Logs (via
+ *     consoleLoggingIntegration)
  *   - HTTP 4xx/5xx responses (via httpClientIntegration)
  *   - Network/CORS/fetch failures (via global fetch interceptor)
  *
  * DSN resolution order:
  *   1. window.__OBSERVABILITY_CONFIG__.VITE_GLITCHTIP_DSN  (runtime-injected)
  *   2. import.meta.env.VITE_GLITCHTIP_DSN                 (build-time)
- *   3. hardcoded fallback DSN                              (always works)
+ *   3. hardcoded fallback DSN                              (production builds only)
+ *
+ * Release: VITE_GLITCHTIP_RELEASE (git commit SHA injected at Docker build
+ * time, matches the uploaded source maps), else grokbot@<version>.
  *
  * Session tracking is disabled — GlitchTip doesn't support it.
  */
@@ -21,6 +26,7 @@
 import * as Sentry from "@sentry/browser";
 import {
   captureConsoleIntegration,
+  consoleLoggingIntegration,
   httpClientIntegration,
 } from "@sentry/browser";
 import { GROKBOT_VERSION } from "#/constants/grokbot-version";
@@ -39,9 +45,18 @@ function getConfig(key: string, fallback = ""): string {
   return fallback;
 }
 
+// The fallback DSN applies to production builds only, so local dev stays
+// silent unless VITE_GLITCHTIP_DSN is set explicitly.
 const GLITCHTIP_DSN = getConfig(
   "VITE_GLITCHTIP_DSN",
-  "https://f263a1c8ebe0485f965fb1eeff1a9afe@glitchtip.beenex.cloud/4",
+  import.meta.env.PROD
+    ? "https://f263a1c8ebe0485f965fb1eeff1a9afe@glitchtip.beenex.cloud/4"
+    : "",
+);
+
+const GLITCHTIP_RELEASE = getConfig(
+  "VITE_GLITCHTIP_RELEASE",
+  `grokbot@${GROKBOT_VERSION}`,
 );
 
 const GLITCHTIP_ENVIRONMENT = getConfig(
@@ -51,6 +66,24 @@ const GLITCHTIP_ENVIRONMENT = getConfig(
 
 // URLs to exclude from HTTP error tracking (prevent infinite loops and noise)
 const EXCLUDED_URLS = ["glitchtip.beenex.cloud", "sentry.io"];
+
+// Scrub secrets from event and log data (client-side belt-and-suspenders)
+const SECRET_PATTERNS = [
+  /sk-or-v1-[a-f0-9]+/gi,
+  /sk-ant-[a-zA-Z0-9_-]+/gi,
+  /ship_pat_[a-zA-Z0-9]+/gi,
+  /gf_[a-f0-9]{20,}/gi,
+  /Bearer\s+[^\s"']+/gi,
+  /session_api_key=[^\s&"']+/gi,
+];
+const scrub = (str: string): string => {
+  let result = str;
+  for (const p of SECRET_PATTERNS) {
+    p.lastIndex = 0;
+    result = result.replace(p, "[REDACTED]");
+  }
+  return result;
+};
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -62,8 +95,10 @@ if (isEnabled) {
   Sentry.init({
     dsn: GLITCHTIP_DSN,
     tunnel: "/api/glitchtip-tunnel", // Same-origin tunnel, bypasses ad-blockers
-    release: `grokbot@${GROKBOT_VERSION}`,
+    release: GLITCHTIP_RELEASE,
     environment: GLITCHTIP_ENVIRONMENT,
+    // Sentry JS SDK v11 always sends logs (the v9/v10 `enableLogs` flag is
+    // gone); consoleLoggingIntegration below feeds them.
 
     // Sample 100% of errors — no performance tracing
     sampleRate: 1.0,
@@ -88,6 +123,9 @@ if (isEnabled) {
       // This catches handled errors, CORS warnings logged as errors,
       // failed API calls that are caught and console.error'd, etc.
       captureConsoleIntegration({ levels: ["error"] }),
+
+      // Send console.log/info/warn/error as GlitchTip Logs (not Issues).
+      consoleLoggingIntegration({ levels: ["log", "info", "warn", "error"] }),
 
       // Capture HTTP 4xx and 5xx responses as Sentry events.
       // By default this only captures 5xx; we extend to 4xx too.
@@ -117,24 +155,6 @@ if (isEnabled) {
         return null;
       }
 
-      // Scrub secrets from event data (client-side belt-and-suspenders)
-      const secretPatterns = [
-        /sk-or-v1-[a-f0-9]+/gi,
-        /sk-ant-[a-zA-Z0-9_-]+/gi,
-        /ship_pat_[a-zA-Z0-9]+/gi,
-        /gf_[a-f0-9]{20,}/gi,
-        /Bearer\s+[^\s"']+/gi,
-        /session_api_key=[^\s&"']+/gi,
-      ];
-      const scrub = (str: string): string => {
-        let result = str;
-        for (const p of secretPatterns) {
-          p.lastIndex = 0;
-          result = result.replace(p, "[REDACTED]");
-        }
-        return result;
-      };
-
       // Scrub exception values
       event.exception?.values?.forEach((v) => {
         if (v.value) {
@@ -145,7 +165,6 @@ if (isEnabled) {
       // Scrub breadcrumbs
       if (event.breadcrumbs) {
         for (const b of event.breadcrumbs) {
-          // eslint-disable-next-line no-param-reassign
           if (b.message) b.message = scrub(b.message);
         }
       }
@@ -166,6 +185,12 @@ if (isEnabled) {
       }
 
       return event;
+    },
+
+    beforeSendLog(log) {
+      return typeof log.message === "string"
+        ? { ...log, message: scrub(log.message) }
+        : log;
     },
 
     // Keep breadcrumbs for observability endpoints — useful debugging context.
@@ -196,9 +221,7 @@ if (isEnabled) {
       if ("error" in e && e.error) {
         Sentry.captureException(e.error);
       } else if ("reason" in e) {
-        Sentry.captureException(
-          (e as unknown as PromiseRejectionEvent).reason,
-        );
+        Sentry.captureException((e as unknown as PromiseRejectionEvent).reason);
       } else {
         Sentry.captureException(e);
       }
@@ -251,7 +274,7 @@ if (isEnabled) {
   };
 
   console.debug(
-    `[glitchtip] Initialized — release=grokbot@${GROKBOT_VERSION}, env=${GLITCHTIP_ENVIRONMENT}`,
+    `[glitchtip] Initialized — release=${GLITCHTIP_RELEASE}, env=${GLITCHTIP_ENVIRONMENT}`,
     "Capturing: unhandled exceptions, console.error, HTTP 4xx/5xx, fetch failures",
   );
 } else {

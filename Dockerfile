@@ -114,6 +114,14 @@ ENV VITE_RAINDROP_WRITE_KEY=${VITE_RAINDROP_WRITE_KEY} \
     VITE_RAINDROP_PROJECT_ID=${VITE_RAINDROP_PROJECT_ID} \
     VITE_RAINDROP_BASE_URL=${VITE_RAINDROP_BASE_URL}
 
+# GlitchTip release + source maps. Coolify passes SOURCE_COMMIT (the git SHA,
+# "Include Source Commit in Build" is on) and GLITCHTIP_AUTH_TOKEN (Build
+# Variable, project:releases scope). The browser SDK reports release=SHA; the
+# hidden source maps are uploaded for that release and then deleted so they
+# are never served. Upload problems never fail the build.
+ARG SOURCE_COMMIT=""
+ARG GLITCHTIP_AUTH_TOKEN=""
+
 # Write a .env file from the ARG values so Vite picks them up at build time.
 # This avoids committing secrets to the repo — values come from Coolify build vars.
 RUN printf '%s\n' \
@@ -136,8 +144,22 @@ RUN printf '%s\n' \
       "VITE_DD_SITE=${VITE_DD_SITE}" \
       "VITE_DD_ENV=${VITE_DD_ENV}" \
       "VITE_TELEMETRY_AUTO_CONSENT=${VITE_TELEMETRY_AUTO_CONSENT}" \
+      "VITE_GLITCHTIP_RELEASE=${SOURCE_COMMIT}" \
       > .env \
-    && rm -rf build && npm run build
+    && rm -rf build \
+    && if [ -n "${GLITCHTIP_AUTH_TOKEN}" ] && [ -n "${SOURCE_COMMIT}" ]; then \
+         export GLITCHTIP_SOURCEMAPS=1; fi \
+    && npm run build \
+    && if [ "${GLITCHTIP_SOURCEMAPS:-}" = "1" ]; then \
+         ( export SENTRY_URL=https://glitchtip.beenex.cloud SENTRY_ORG=beenex \
+                  SENTRY_PROJECT=starship SENTRY_AUTH_TOKEN="${GLITCHTIP_AUTH_TOKEN}"; \
+           npx --yes @sentry/cli@2 releases new "${SOURCE_COMMIT}" && \
+           npx --yes @sentry/cli@2 sourcemaps inject build/assets && \
+           npx --yes @sentry/cli@2 sourcemaps upload --release "${SOURCE_COMMIT}" build/assets && \
+           npx --yes @sentry/cli@2 releases finalize "${SOURCE_COMMIT}" \
+         ) || echo "WARNING: GlitchTip source map upload failed (non-fatal)"; \
+       fi \
+    && find build -name '*.map' -delete
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
 # This avoids needing jq/python at container runtime to parse the JSON.
@@ -274,13 +296,13 @@ RUN python3 /tmp/fix-tool-span-output.py && rm /tmp/fix-tool-span-output.py
 # ── Observability (Datadog APM + Langfuse HTTP OTLP + GlitchTip/Sentry) ────────
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null \
-    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]"; \
+    uv pip install --system "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]>=2.35" 2>/dev/null \
+    || pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]>=2.35"; \
     if [ -d /agent-server/.venv ]; then \
-      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null || true; \
+      /agent-server/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]>=2.35" 2>/dev/null || true; \
     fi; \
     if [ -d /openhands/.venv ]; then \
-      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]" 2>/dev/null || true; \
+      /openhands/.venv/bin/pip install --no-cache-dir "ddtrace" "opentelemetry-exporter-otlp-proto-http" "sentry-sdk[pure_eval]>=2.35" 2>/dev/null || true; \
     fi
 
 # Install Bun and Antigravity CLI (agy)
@@ -514,6 +536,11 @@ EXPOSE 8000
 # file, not even in a comment: Coolify substring-matches it, sets
 # custom_healthcheck_found, then fails the rolling update because the container
 # has no .State.Health ("map has no entry for key Health").
+
+# GlitchTip release = git commit SHA (Coolify build arg). Last, so a new SHA
+# only invalidates this metadata layer.
+ARG SOURCE_COMMIT=""
+ENV GLITCHTIP_RELEASE=${SOURCE_COMMIT}
 
 # Wrapper fixes permissions, then execs the real entrypoint as openhands
 ENTRYPOINT ["tini", "--", "/opt/agent-canvas/wrapper-entrypoint.sh"]

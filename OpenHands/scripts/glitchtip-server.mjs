@@ -5,8 +5,14 @@
  * automatic error reporting to GlitchTip. Captures:
  *   - Uncaught exceptions (with automatic flush before exit)
  *   - Unhandled promise rejections
- *   - All console.error() calls (via captureConsoleIntegration)
+ *   - All console.error() calls as Issues (via captureConsoleIntegration)
+ *   - All console.log/info/warn/error calls as Logs (via
+ *     consoleLoggingIntegration)
  *   - Duplicate deduplication
+ *
+ * Also exports pingHeartbeat(job) for scheduled jobs: after each successful
+ * run, the job pings its GlitchTip Heartbeat monitor. The job → endpoint id
+ * map comes from GLITCHTIP_HEARTBEATS (JSON, set in Coolify).
  *
  * DSN is opt-in: only initializes when GLITCHTIP_NODE_DSN or GLITCHTIP_DSN
  * is set. No hardcoded fallback for server — explicit config only.
@@ -17,7 +23,7 @@ import { makeMultiplexedTransport } from "@sentry/core";
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import process from "node:process";
-import { scrubEvent } from "./glitchtip-scrub.mjs";
+import { scrubEvent, scrubStr } from "./glitchtip-scrub.mjs";
 import { getSentryDsn } from "./sentry-fanout.mjs";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +70,13 @@ const SERVICE_MAP = {
 
 const service = SERVICE_MAP[SERVER_NAME] || "node-server";
 
+// Release = git commit SHA injected at build time (Dockerfile SOURCE_COMMIT →
+// GLITCHTIP_RELEASE). Falls back to the Grokbot version when absent.
+const RELEASE =
+  process.env.GLITCHTIP_RELEASE ||
+  process.env.SOURCE_COMMIT ||
+  `grokbot-server@${version}`;
+
 // ---------------------------------------------------------------------------
 // Sentry initialization
 // ---------------------------------------------------------------------------
@@ -95,7 +108,9 @@ if (PRIMARY_DSN) {
               SENTRY_DSN,
             ])
           : undefined,
-      release: `grokbot-server@${version}`,
+      release: RELEASE,
+      // Sentry JS SDK v11 always sends logs (no `enableLogs` flag any more);
+      // consoleLoggingIntegration below feeds console output into them.
       environment:
         process.env.GLITCHTIP_ENVIRONMENT ||
         process.env.NODE_ENV ||
@@ -121,6 +136,9 @@ if (PRIMARY_DSN) {
       // captureConsoleIntegration captures all console.error calls.
       integrations: [
         Sentry.captureConsoleIntegration({ levels: ["error"] }),
+        Sentry.consoleLoggingIntegration({
+          levels: ["log", "info", "warn", "error"],
+        }),
         Sentry.dedupeIntegration(),
       ],
 
@@ -139,6 +157,12 @@ if (PRIMARY_DSN) {
         }
 
         return scrubbed;
+      },
+
+      beforeSendLog(log) {
+        // Same secret scrubbing as events, applied to log bodies.
+        if (typeof log.message === "string") log.message = scrubStr(log.message);
+        return log;
       },
 
       initialScope: {
@@ -173,8 +197,15 @@ if (PRIMARY_DSN) {
     updateProcessHealth();
     setInterval(updateProcessHealth, 60_000).unref();
 
+    Sentry.logger.info("deploy", {
+      release: RELEASE,
+      version,
+      process: SERVER_NAME,
+      service,
+    });
+
     console.log(
-      `[glitchtip-server] Initialized — release=grokbot-server@${version}, ` +
+      `[glitchtip-server] Initialized — release=${RELEASE}, ` +
         `process=${SERVER_NAME}, service=${service}` +
         (SENTRY_DSN ? (DSN ? ", mirroring to Sentry" : ", Sentry only") : ""),
     );
@@ -186,7 +217,75 @@ if (PRIMARY_DSN) {
 }
 
 // ---------------------------------------------------------------------------
+// Heartbeats for scheduled jobs
+// ---------------------------------------------------------------------------
+
+const HEARTBEAT_BASE =
+  "https://glitchtip.beenex.cloud/api/0/organizations/beenex/heartbeat_check";
+
+/**
+ * Parse GLITCHTIP_HEARTBEATS: `job-key=endpoint-uuid,job-key=endpoint-uuid`
+ * (no quotes, so it survives Coolify's .env handling). Python twin:
+ * tools/automation_glitchtip.py heartbeat_map().
+ */
+export function heartbeatMap(raw = process.env.GLITCHTIP_HEARTBEATS) {
+  const map = {};
+  for (const pair of String(raw ?? "").split(",")) {
+    const i = pair.indexOf("=");
+    if (i > 0) map[pair.slice(0, i).trim()] = pair.slice(i + 1).trim();
+  }
+  return map;
+}
+
+/**
+ * Ping the GlitchTip Heartbeat monitor for `job` after a successful run.
+ * Never throws: a failed ping must not fail the job. Returns true on 2xx.
+ */
+export async function pingHeartbeat(job) {
+  const endpointId = heartbeatMap()[job];
+  if (!endpointId) return false;
+  try {
+    const response = await fetch(`${HEARTBEAT_BASE}/${endpointId}/`, {
+      method: "POST",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      console.warn(`[glitchtip-server] heartbeat ${job} → HTTP ${response.status}`);
+    }
+    return response.ok;
+  } catch (error) {
+    console.warn(`[glitchtip-server] heartbeat ${job} failed: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Record one scheduled-job outcome: a structured log line, and for failures
+ * an Issue. Safe to call when Sentry is not initialized.
+ */
+export function reportJobOutcome(job, outcome, attributes = {}, error = null) {
+  if (!initialized) return;
+  try {
+    const attrs = { job, outcome, ...attributes };
+    if (outcome === "success") {
+      Sentry.logger.info(`job ${job} succeeded`, attrs);
+    } else {
+      Sentry.logger.error(`job ${job} ${outcome}`, attrs);
+      Sentry.withScope((scope) => {
+        scope.setTag("job", job);
+        scope.setTag("job_outcome", outcome);
+        scope.setContext("job", attrs);
+        if (error) Sentry.captureException(error);
+        else Sentry.captureMessage(`Scheduled job ${job} ${outcome}`, "error");
+      });
+    }
+  } catch {
+    // Reporting must never break the job.
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
-export { Sentry, initialized as glitchtipInitialized };
+export { Sentry, initialized as glitchtipInitialized, RELEASE as glitchtipRelease };

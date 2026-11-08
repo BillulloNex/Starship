@@ -45,6 +45,10 @@ const EXTENSIONS_SKILLS_DIR = resolve(
 const PUBLIC_LOCALES_DIR = resolve(process.cwd(), "public", "locales");
 
 const appBuildConfig = {
+  // Hidden source maps only for the Docker build that uploads them to
+  // GlitchTip (GLITCHTIP_SOURCEMAPS=1); the Dockerfile deletes them after.
+  sourcemap:
+    process.env.GLITCHTIP_SOURCEMAPS === "1" ? ("hidden" as const) : false,
   rolldownOptions: {
     output: {
       codeSplitting: {

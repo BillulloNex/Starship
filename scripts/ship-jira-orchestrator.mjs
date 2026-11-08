@@ -13,9 +13,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+// pingHeartbeat/reportJobOutcome: each scheduled run pings its GlitchTip
+// Heartbeat monitor on success and reports failures as Issues.
 let _Sentry = null;
-try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+let pingHeartbeat = async () => false;
+let reportJobOutcome = () => {};
+try {
+  ({ Sentry: _Sentry, pingHeartbeat, reportJobOutcome } = await import("./glitchtip-server.mjs"));
+} catch { /* optional */ }
 const Sentry = _Sentry;
+const JOB = "ship-jira-orchestrator";
 
 const CONFIG = {
   project: process.env.SHIP_JIRA_PROJECT || "SHIP",
@@ -343,6 +350,11 @@ or
 
 async function failIssue(creds, state, reason) {
   const key = state.active.key;
+  reportJobOutcome(JOB, "issue_needs_attention", {
+    issue: key,
+    phase: state.active.phase,
+    reason: String(reason).slice(0, 1000),
+  });
   await comment(creds, key, `Automation needs attention.\n\n${reason}`);
   await transition(creds, key, "Needs Attention");
   await slack(creds, `:warning: ${key} needs attention\n${reason}`).catch(console.error);
@@ -485,9 +497,19 @@ async function main() {
       const creds = await credentials();
       const state = await loadState();
       const profileIds = await profiles();
+      const startedAt = Date.now();
       await tick(creds, state, profileIds);
+      reportJobOutcome(JOB, "success", {
+        durationMs: Date.now() - startedAt,
+        activeIssue: state.active?.key ?? null,
+        phase: state.active?.phase ?? null,
+      });
+      await pingHeartbeat(JOB);
     } catch (error) {
-      console.error(`[ship-automation] ${new Date().toISOString()} ${error.stack || error}`);
+      // warn, not error: reportJobOutcome files the Issue with the real stack,
+      // and console.error would file a second, message-only Issue.
+      console.warn(`[ship-automation] ${new Date().toISOString()} ${error.stack || error}`);
+      reportJobOutcome(JOB, "error", {}, error);
     }
     await sleep(CONFIG.pollMs);
   }

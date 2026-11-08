@@ -12,9 +12,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 // GlitchTip server-side error tracking (no-ops gracefully if DSN not set)
+// pingHeartbeat/reportJobOutcome: each scheduled run pings its GlitchTip
+// Heartbeat monitor on success and reports failures as Issues.
 let _Sentry = null;
-try { ({ Sentry: _Sentry } = await import("./glitchtip-server.mjs")); } catch { /* optional */ }
+let pingHeartbeat = async () => false;
+let reportJobOutcome = () => {};
+try {
+  ({ Sentry: _Sentry, pingHeartbeat, reportJobOutcome } = await import("./glitchtip-server.mjs"));
+} catch { /* optional */ }
 const Sentry = _Sentry;
+const JOB = "ship-log-monitor";
 
 const CONFIG = {
   repo: process.env.SHIP_REPO_DIR || process.env.AUTO_CLONE_TARGET || "/projects/Grokbot",
@@ -175,6 +182,16 @@ export async function runOnce() {
       response: result.response.slice(0, 20_000),
     };
     console.log(`[ship-log-monitor] finished status=${result.status}`);
+    if (result.status === "finished" || result.status === "idle") {
+      reportJobOutcome(JOB, "success", { conversationId, status: result.status });
+      await pingHeartbeat(JOB);
+    } else {
+      reportJobOutcome(JOB, `ended_${result.status}`, {
+        conversationId,
+        status: result.status,
+        response: result.response.slice(0, 1000),
+      });
+    }
   } finally {
     state.running = false;
     await saveState(state);
@@ -191,7 +208,9 @@ async function main() {
       const state = await loadState();
       if (dueForRun(state)) await runOnce();
     } catch (error) {
-      console.error(`[ship-log-monitor] ${new Date().toISOString()} ${error.stack || error}`);
+      // warn, not error: reportJobOutcome files the Issue with the real stack.
+      console.warn(`[ship-log-monitor] ${new Date().toISOString()} ${error.stack || error}`);
+      reportJobOutcome(JOB, "error", {}, error);
     }
     await sleep(Math.min(CONFIG.intervalMs, 60_000));
   }

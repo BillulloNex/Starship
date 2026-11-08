@@ -707,9 +707,10 @@ def _init_glitchtip():
     os.environ["_GLITCHTIP_INITIALIZED"] = "1"
 
     try:
+        import logging
+        import re
         import sentry_sdk
         from sentry_sdk.integrations.logging import LoggingIntegration
-        import re
 
         # Version detection
         version = "unknown"
@@ -810,10 +811,23 @@ def _init_glitchtip():
 
             transport = _FanoutTransport
 
+        def before_send_log(log, hint):
+            if isinstance(log.get("body"), str):
+                log["body"] = _scrub_str(log["body"])
+            return log
+
+        # Release = git commit SHA injected at build time (Dockerfile
+        # SOURCE_COMMIT -> GLITCHTIP_RELEASE); version string otherwise.
+        release = (
+            os.environ.get("GLITCHTIP_RELEASE", "").strip()
+            or os.environ.get("SOURCE_COMMIT", "").strip()
+            or f"grokbot-python@{version}"
+        )
+
         sentry_sdk.init(
             dsn=dsn,
             transport=transport,
-            release=f"grokbot-python@{version}",
+            release=release,
             environment=os.environ.get("GLITCHTIP_ENVIRONMENT",
                                        os.environ.get("NODE_ENV", "production")),
             server_name=server_name,
@@ -822,8 +836,16 @@ def _init_glitchtip():
             send_default_pii=False,
             include_local_variables=False,  # Prevents secret leakage
             before_send=before_send,
+            # Ship stdlib logging (INFO+) as GlitchTip Logs; ERROR+ also
+            # opens Issues.
+            enable_logs=True,
+            before_send_log=before_send_log,
             integrations=[
-                LoggingIntegration(level=None, event_level="ERROR"),
+                LoggingIntegration(
+                    level=logging.INFO,
+                    event_level=logging.ERROR,
+                    sentry_logs_level=logging.INFO,
+                ),
             ],
             ignore_errors=[
                 "KeyboardInterrupt",
@@ -859,9 +881,21 @@ def _init_glitchtip():
         import atexit
         atexit.register(sentry_sdk.flush, timeout=2)
 
+        from sentry_sdk import logger as sentry_logger
+
+        sentry_logger.info(
+            "deploy",
+            attributes={
+                "release": release,
+                "version": version,
+                "service": service,
+                "process": server_name,
+            },
+        )
+
         print(
             f"[grokbot-sitecustomize] GlitchTip init OK — "
-            f"release=grokbot-python@{version}, service={service}, "
+            f"release={release}, service={service}, "
             f"process={server_name}"
             + (", mirroring to Sentry" if sentry_dsn else ""),
             file=sys.stderr, flush=True,
@@ -874,6 +908,28 @@ def _init_glitchtip():
 
 
 _init_glitchtip()
+
+
+def _init_automation_glitchtip():
+    """Report every automation run outcome (Issue on failure, heartbeat on success)."""
+    if "openhands.automation.app" not in " ".join(sys.argv):
+        return
+    try:
+        from automation_glitchtip import install
+
+        if install():
+            print(
+                "[grokbot-sitecustomize] Automation run GlitchTip reporting installed",
+                file=sys.stderr, flush=True,
+            )
+    except Exception as e:
+        print(
+            f"[grokbot-sitecustomize] Automation run GlitchTip reporting skipped: {e}",
+            file=sys.stderr, flush=True,
+        )
+
+
+_init_automation_glitchtip()
 
 
 def _background_sync():
