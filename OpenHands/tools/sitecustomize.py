@@ -724,7 +724,8 @@ def _init_glitchtip():
 
         # Service name detection
         server_name = argv0.replace(".py", "")
-        service = "automation" if "automat" in argv0 else "agent-server"
+        # argv0 is "uvicorn" for both servers; the app path tells them apart.
+        service = "automation" if "automat" in " ".join(sys.argv[:2]) else "agent-server"
 
         # Secret patterns (same as Node.js scrubber)
         SECRET_PATTERNS = [

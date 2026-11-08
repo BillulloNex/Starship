@@ -20,6 +20,12 @@ FROM node:24-slim AS frontend-build
 
 WORKDIR /build
 
+# CA roots for sentry-cli (a Rust binary that uses the system trust store) to
+# reach GlitchTip when uploading source maps. node:24-slim ships without them.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # Cache-friendly: package files first
 COPY OpenHands/package.json OpenHands/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
